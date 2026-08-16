@@ -36,6 +36,7 @@ export function useEnviarIssue() {
   const [mensagemErro, setMensagemErro] = useState<string | null>(null);
 
   async function enviar(dados: NovoIssue & { isca?: string }): Promise<string | null> {
+    // `anexos` já vem pronto do CampoAnexos: reduzido, validado e dentro do teto.
     if (dados.isca) return null; // campo-isca preenchido: é robô, some em silêncio
     if (dados.titulo.trim().length < 3) {
       setEstado("erro");

@@ -13,6 +13,7 @@ function issue(over: Partial<Issue> & { id: string }): Issue {
     arquivado: false,
     upvotes: 0,
     comentarios: 0,
+    anexos: 0,
     criadoEm: new Date("2026-01-01"),
     atualizadoEm: new Date("2026-01-01"),
     autor: null,

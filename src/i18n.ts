@@ -47,6 +47,19 @@ export const t = {
   campoAutor: "Seu nick (opcional)",
   campoAutorAjuda:
     "Aparece publicamente no card e nas novidades, como crédito. Deixe em branco se preferir não aparecer.",
+  campoAnexos: "Anexos (opcional)",
+  campoAnexosAjuda:
+    "Replay .rrf ou print da tela — até 5 arquivos. Imagem grande é reduzida automaticamente antes de enviar.",
+  anexoPreparando: "Preparando os arquivos…",
+  anexoTipoInvalido: (nome: string) => `${nome}: só aceito .rrf e imagem.`,
+  anexoGrande: (nome: string, max: string) => `${nome}: passa de ${max}.`,
+  anexoFalhou: (nome: string) => `${nome}: não consegui ler o arquivo.`,
+  anexoDemais: "Máximo de 5 arquivos.",
+  remover: "Remover",
+  anexosTitulo: "Anexos",
+  baixar: "Baixar",
+  abrirImagem: "Abrir em tamanho cheio",
+
   campoContato: "Contato (opcional)",
   campoContatoAjuda:
     "Discord ou e-mail, caso eu precise de mais detalhes. Não aparece no site — só eu vejo.",

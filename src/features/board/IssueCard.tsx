@@ -69,6 +69,12 @@ export function IssueCard({ issue, jaVotou, onVotar, onMover, onAbrir }: Props) 
           </span>
         )}
 
+        {issue.anexos > 0 && (
+          <span className="issue-card-meta" title={t.anexosTitulo}>
+            <span aria-hidden="true">📎</span> {issue.anexos}
+          </span>
+        )}
+
         {issue.autor && <span className="issue-card-meta">{t.reportadoPor(issue.autor)}</span>}
 
         <time className="issue-card-meta issue-card-data" dateTime={issue.criadoEm?.toISOString()}>

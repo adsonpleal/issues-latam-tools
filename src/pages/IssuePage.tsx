@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { t } from "../i18n";
+import { subscribeAnexos, type Anexo } from "../lib/anexos";
 import { subscribeComentarios, type Comentario } from "../lib/comentarios";
 import { subscribeIssue, type Issue } from "../lib/issues";
 import { useSeo } from "../lib/seo";
 import { IssueDetail } from "../features/ticket/IssueDetail";
+import { ListaAnexos } from "../features/ticket/ListaAnexos";
 import { ListaComentarios } from "../features/ticket/ListaComentarios";
 
 export function IssuePage() {
@@ -15,6 +17,7 @@ export function IssuePage() {
 
   const [issue, setIssue] = useState<Issue | null>(null);
   const [comentarios, setComentarios] = useState<Comentario[]>([]);
+  const [anexos, setAnexos] = useState<Anexo[]>([]);
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
@@ -40,6 +43,11 @@ export function IssuePage() {
   useEffect(() => {
     if (!issueId) return;
     return subscribeComentarios(issueId, setComentarios, () => setComentarios([]));
+  }, [issueId]);
+
+  useEffect(() => {
+    if (!issueId) return;
+    return subscribeAnexos(issueId, setAnexos, () => setAnexos([]));
   }, [issueId]);
 
   useSeo({
@@ -70,6 +78,7 @@ export function IssuePage() {
       {issue && (
         <>
           <IssueDetail issue={issue} />
+          <ListaAnexos anexos={anexos} />
           <h2 className="secao">{t.comentariosLabel(comentarios.length)}</h2>
           <ListaComentarios comentarios={comentarios} />
         </>

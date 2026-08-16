@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 
 import { LABEL_TIPO, t } from "../../i18n";
+import { apagarAnexo, subscribeAnexos, type Anexo } from "../../lib/anexos";
 import { subscribeComentarios, type Comentario } from "../../lib/comentarios";
 import { getContato, type Issue } from "../../lib/issues";
 import { PROJETOS, SLUGS_PROJETO, type Projeto } from "../../lib/projetos";
 import { TIPOS, type Tipo } from "../../lib/status";
+import { ListaAnexos } from "../ticket/ListaAnexos";
 import { ListaComentarios } from "../ticket/ListaComentarios";
 
 type Props = {
@@ -16,6 +18,7 @@ type Props = {
 
 export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
   const [comentarios, setComentarios] = useState<Comentario[]>([]);
+  const [anexos, setAnexos] = useState<Anexo[]>([]);
   const [contato, setContato] = useState<string | null>(null);
   const [texto, setTexto] = useState("");
   const [editando, setEditando] = useState(false);
@@ -40,6 +43,8 @@ export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
     () => subscribeComentarios(issue.id, setComentarios, () => setComentarios([])),
     [issue.id],
   );
+
+  useEffect(() => subscribeAnexos(issue.id, setAnexos, () => setAnexos([])), [issue.id]);
 
   useEffect(() => {
     // Contato de quem reportou: mora num subdocumento que só o admin lê. Ausente
@@ -134,6 +139,11 @@ export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
           </button>
         </>
       )}
+
+      <ListaAnexos
+        anexos={anexos}
+        onApagar={(anexoId) => void apagarAnexo(issue.id, anexoId)}
+      />
 
       <h3 className="secao">{t.comentariosLabel(comentarios.length)}</h3>
       <ListaComentarios comentarios={comentarios} />

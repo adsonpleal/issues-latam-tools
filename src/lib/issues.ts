@@ -1,5 +1,4 @@
 import {
-  addDoc,
   collection,
   doc,
   getDoc,
@@ -16,6 +15,7 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 
+import { ANEXOS_MAX, enviarAnexo, type TipoAnexo } from "./anexos";
 import { getDb } from "./firebase";
 import type { Projeto } from "./projetos";
 import { isProjeto } from "./projetos";
@@ -38,6 +38,7 @@ export type Issue = {
   arquivado: boolean;
   upvotes: number;
   comentarios: number;
+  anexos: number;
   criadoEm: Date | null;
   atualizadoEm: Date | null;
   /** Nick público e opcional de quem reportou. */
@@ -61,6 +62,8 @@ function toIssue(snap: QueryDocumentSnapshot<DocumentData>): Issue | null {
     arquivado: Boolean(d["arquivado"]),
     upvotes: Number(d["upvotes"] ?? 0),
     comentarios: Number(d["comentarios"] ?? 0),
+    // Os 62 cards migrados são anteriores ao campo e não o têm.
+    anexos: Number(d["anexos"] ?? 0),
     criadoEm: d["criadoEm"]?.toDate?.() ?? null,
     atualizadoEm: d["atualizadoEm"]?.toDate?.() ?? null,
     autor: typeof d["autor"] === "string" && d["autor"] ? d["autor"] : null,
@@ -116,6 +119,12 @@ export async function getIssue(id: string): Promise<Issue | null> {
   return snap.exists() ? toIssue(snap as QueryDocumentSnapshot<DocumentData>) : null;
 }
 
+export type AnexoPronto = {
+  nome: string;
+  tipo: TipoAnexo;
+  dados: Uint8Array;
+};
+
 export type NovoIssue = {
   projeto: Projeto;
   tipo: Tipo;
@@ -125,10 +134,13 @@ export type NovoIssue = {
   autor?: string;
   /** Discord/e-mail, opcional — vai para o subdocumento privado, nunca aparece. */
   contato?: string;
+  /** Já reduzidos e validados pelo formulário. */
+  anexos?: AnexoPronto[];
 };
 
 export async function createIssue(dados: NovoIssue): Promise<string> {
   const db = getDb();
+  const anexos = (dados.anexos ?? []).slice(0, ANEXOS_MAX);
 
   const payload: Record<string, unknown> = {
     projeto: dados.projeto,
@@ -139,13 +151,25 @@ export async function createIssue(dados: NovoIssue): Promise<string> {
     arquivado: false,
     upvotes: 0,
     comentarios: 0,
+    anexos: anexos.length,
     criadoEm: serverTimestamp(),
     atualizadoEm: serverTimestamp(),
   };
   const autor = dados.autor?.trim().slice(0, AUTOR_MAX);
   if (autor) payload["autor"] = autor;
 
-  const ref = await addDoc(collection(db, "issues"), payload);
+  // O card vai primeiro, com o id gerado no cliente. Se algum anexo falhar
+  // depois, o relato — que é a parte que importa — já está salvo; o pior caso
+  // é o selo do card dizer 2 e existir 1. O contrário (anexo órfão embaixo de
+  // um card que nunca nasceu) seria byte invisível e impossível de limpar.
+  const ref = doc(collection(db, "issues"));
+  await setDoc(ref, payload);
+
+  for (const anexo of anexos) {
+    await enviarAnexo(ref.id, crypto.randomUUID(), anexo.nome, anexo.tipo, anexo.dados).catch(
+      () => undefined,
+    );
+  }
 
   const contato = dados.contato?.trim().slice(0, CONTATO_MAX);
   if (contato) {

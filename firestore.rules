@@ -54,14 +54,18 @@ service cloud.firestore {
       function isNovoIssuePublico(d) {
         return d.keys().hasOnly([
                  'projeto', 'titulo', 'descricao', 'tipo', 'status',
-                 'arquivado', 'upvotes', 'comentarios',
+                 'arquivado', 'upvotes', 'comentarios', 'anexos',
                  'criadoEm', 'atualizadoEm', 'autor'
                ])
                && d.keys().hasAll([
                  'projeto', 'titulo', 'descricao', 'tipo', 'status',
-                 'arquivado', 'upvotes', 'comentarios',
+                 'arquivado', 'upvotes', 'comentarios', 'anexos',
                  'criadoEm', 'atualizadoEm'
                ])
+               // Contador só para o selo do card. Quem manda de verdade é o que
+               // existe na subcoleção; este número é escrito na criação porque
+               // o público não pode atualizar o card depois.
+               && d.anexos is int && d.anexos >= 0 && d.anexos <= 5
                && d.projeto is string && d.projeto in projetos()
                && d.tipo is string && d.tipo in ['bug', 'feature']
                && d.status == 'reportado'
@@ -141,6 +145,45 @@ service cloud.firestore {
                       && request.resource.data.texto.size() <= 4000;
 
         allow delete: if false;
+      }
+
+      // --- ANEXOS ---------------------------------------------------------
+      // Um documento por arquivo, com o conteúdo num campo `bytes` nativo. É a
+      // mesma forma que o simulador já usa para receber .rrf — e evita depender
+      // do Cloud Storage, que exigiria plano Blaze.
+      //
+      // O teto de 900 kB por arquivo é o limite de 1 MiB por documento do
+      // Firestore menos a folga dos outros campos. .rrf de verdade fica em
+      // 50–100 kB; imagem grande é reduzida no navegador antes de subir.
+      match /anexos/{anexoId} {
+        // Anexo de card arquivado não vaza. O exists() é necessário porque o
+        // documento do anexo pode ser gravado antes do card existir, e get()
+        // em documento inexistente é erro, não null.
+        allow read: if isAdmin()
+                    || (exists(/databases/$(database)/documents/issues/$(issueId))
+                        && get(/databases/$(database)/documents/issues/$(issueId))
+                             .data.arquivado == false);
+
+        allow create: if request.resource.data.keys().hasOnly(
+                           ['nome', 'tipo', 'tamanho', 'bytes', 'criadoEm'])
+                      && request.resource.data.keys().hasAll(
+                           ['nome', 'tipo', 'tamanho', 'bytes', 'criadoEm'])
+                      && request.resource.data.nome is string
+                      && request.resource.data.nome.size() > 0
+                      && request.resource.data.nome.size() <= 200
+                      && request.resource.data.tipo in ['rrf', 'imagem']
+                      && request.resource.data.bytes is bytes
+                      && request.resource.data.bytes.size() > 0
+                      && request.resource.data.bytes.size() <= 900000
+                      && request.resource.data.tamanho is int
+                      && request.resource.data.tamanho == request.resource.data.bytes.size()
+                      && request.resource.data.criadoEm == request.time;
+
+        allow update: if false;
+        // Aqui delete é permitido, ao contrário do resto: qualquer pessoa anexa
+        // arquivo, então precisa existir um jeito de tirar o que não devia ter
+        // entrado.
+        allow delete: if isAdmin();
       }
 
       // --- CONTATO PRIVADO -----------------------------------------------

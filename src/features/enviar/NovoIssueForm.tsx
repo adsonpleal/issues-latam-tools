@@ -2,9 +2,16 @@ import { useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { LABEL_TIPO, t } from "../../i18n";
-import { AUTOR_MAX, CONTATO_MAX, DESCRICAO_MAX, TITULO_MAX } from "../../lib/issues";
+import {
+  AUTOR_MAX,
+  CONTATO_MAX,
+  DESCRICAO_MAX,
+  TITULO_MAX,
+  type AnexoPronto,
+} from "../../lib/issues";
 import { PROJETOS, SLUGS_PROJETO, parseProjeto, type Projeto } from "../../lib/projetos";
 import { TIPOS, type Tipo } from "../../lib/status";
+import { CampoAnexos } from "./CampoAnexos";
 import { useEnviarIssue } from "./useEnviarIssue";
 
 export function NovoIssueForm() {
@@ -19,11 +26,12 @@ export function NovoIssueForm() {
   const [descricao, setDescricao] = useState("");
   const [autor, setAutor] = useState("");
   const [contato, setContato] = useState("");
+  const [anexos, setAnexos] = useState<AnexoPronto[]>([]);
   const [isca, setIsca] = useState("");
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    const id = await enviar({ projeto, tipo, titulo, descricao, autor, contato, isca });
+    const id = await enviar({ projeto, tipo, titulo, descricao, autor, contato, anexos, isca });
     if (id) navigate(`/t/${id}?novo=1`);
   }
 
@@ -90,6 +98,8 @@ export function NovoIssueForm() {
           rows={7}
         />
       </div>
+
+      <CampoAnexos anexos={anexos} onChange={setAnexos} />
 
       <div className="campo">
         <label htmlFor="autor">{t.campoAutor}</label>

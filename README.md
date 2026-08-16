@@ -56,6 +56,24 @@ Um por navegador, guardado em `localStorage`. Limpar o storage vota de novo, e
 tudo bem: é termômetro de prioridade, não eleição. A regra do Firestore só
 garante que cada escrita pública mexe em um campo e soma exatamente 1.
 
+### Anexos
+
+Quem reporta pode mandar até 5 arquivos: replay `.rrf` ou print de tela.
+
+Cada anexo é um documento em `issues/{id}/anexos/{anexoId}`, com o conteúdo num
+campo `bytes` nativo do Firestore — **não** no Cloud Storage, que exigiria plano
+Blaze. É a mesma solução que o simulador já usa para receber `.rrf`.
+
+Daí sai o teto de **900 kB por arquivo**: o limite do Firestore é 1 MiB por
+documento, e o resto é folga. Um `.rrf` de verdade fica em 50–100 kB e passa
+folgado. Imagem é convertida para WebP no navegador antes de subir
+(`src/lib/imagem.ts`), apertando primeiro a qualidade e depois a dimensão até
+caber — um PNG de 12 MB sai em ~800 kB no pior caso.
+
+Apagar anexo é a única exceção ao `delete: if false` que vale para todo o resto:
+qualquer pessoa anexa arquivo, então precisa existir moderação. Só o admin
+apaga, pelo painel do `/admin`.
+
 ### Privacidade
 
 Quem reporta pode deixar **nick** (público, aparece no card — o formulário diz

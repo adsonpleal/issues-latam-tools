@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0
+
+- Anexos no formulário: até 5 arquivos por card, `.rrf` ou imagem, guardados em
+  campo `bytes` do Firestore (teto de 900 kB por arquivo). Imagem grande é
+  convertida para WebP e reduzida no navegador antes de subir.
+- Admin apaga anexo pelo painel — é a moderação de quem subir o que não devia.
+- Rádio de tipo do formulário volta a ficar em uma linha só.
+
 ## 1.0.0
 
 Primeira versão.

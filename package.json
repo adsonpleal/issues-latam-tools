@@ -1,0 +1,32 @@
+{
+  "name": "issues-latam-tools",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Quadro público de issues das ferramentas do RO LATAM",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "preview": "vite preview",
+    "importar": "node tools/importar-planilhas.mjs",
+    "seed": "node tools/seed.mjs"
+  },
+  "dependencies": {
+    "firebase": "^11.10.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-router-dom": "^7.9.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.4",
+    "jsdom": "^26.1.0",
+    "typescript": "^5.7.2",
+    "vite": "^7.1.7",
+    "vitest": "^2.1.8"
+  }
+}

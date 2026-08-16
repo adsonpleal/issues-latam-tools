@@ -1,0 +1,32 @@
+name: Preview de PR
+
+on: pull_request
+
+permissions:
+  checks: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  preview:
+    # PR vinda de fork não tem acesso aos secrets: pular é melhor do que falhar.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.3
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ISSUES_LATAM_TOOLS }}
+          projectId: issues-latam-tools
+          firebaseToolsVersion: "15.22.1"

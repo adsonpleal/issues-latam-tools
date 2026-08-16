@@ -1,0 +1,41 @@
+name: Deploy to Firebase Hosting
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Fixado: o 22.23.0 regrediu a busca do token da service account
+          # ("Premature close" no undici) e derrubou o deploy dos projetos irmãos.
+          node-version: 22.22.3
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ISSUES_LATAM_TOOLS }}
+          channelId: live
+          projectId: issues-latam-tools
+          # Fixado: o firebase-tools 15.22.2 regrediu a autenticação por service
+          # account. Mesma trava que o simulador já carrega.
+          firebaseToolsVersion: "15.22.1"
+
+# As regras e os índices do Firestore NÃO saem daqui — o deploy deles é manual
+# (`firebase deploy --only firestore`). Assim a credencial do CI não precisa de
+# permissão de escrita no banco, e uma regressão de regra não entra de carona
+# num push de rotina.

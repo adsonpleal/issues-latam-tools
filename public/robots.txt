@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+
+Sitemap: https://issues.latam-tools.com.br/sitemap.xml

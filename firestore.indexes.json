@@ -1,0 +1,30 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "issues",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "arquivado", "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "issues",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "arquivado", "order": "ASCENDING" },
+        { "fieldPath": "atualizadoEm", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "issues",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "arquivado", "order": "ASCENDING" },
+        { "fieldPath": "projeto", "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

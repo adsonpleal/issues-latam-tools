@@ -1,0 +1,170 @@
+rules_version = '2';
+
+// Quadro público de issues. Três regras valem por todo o resto:
+//
+//  1. Leitura é pública, MENOS o que está arquivado.
+//  2. A única escrita pública em `issues` é `upvotes += 1`. Mais nada.
+//  3. Nada é apagado nunca — arquivar É o delete.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Um operador só. `email_verified` é o que impede um token emitido para um
+    // endereço não verificado que apenas ALEGA ser este e-mail.
+    function isAdmin() {
+      return request.auth != null
+             && request.auth.token.email_verified == true
+             && request.auth.token.email == 'adsonpleal@gmail.com';
+    }
+
+    function projetos() {
+      return ['visuais', 'simulador', 'recap', 'mercado', 'calc'];
+    }
+
+    function statuses() {
+      return ['reportado', 'backlog', 'em_progresso', 'resolvido', 'nao_sera_feito'];
+    }
+
+    match /issues/{issueId} {
+
+      // --- LEITURA ------------------------------------------------------
+      // `get` é avaliado contra o documento real: quem guardou a URL de um
+      // card arquivado leva negado. O cliente precisa renderizar
+      // permission-denied e not-found do mesmo jeito, senão a diferença entre
+      // as duas respostas vira um oráculo de "existe um card arquivado aqui".
+      allow get: if isAdmin() || resource.data.arquivado == false;
+
+      // `list` é avaliado contra a CONSULTA, não contra o resultado: regra de
+      // segurança não filtra coleção. Quem não é admin precisa prender
+      // `arquivado` em false no próprio where, ou a consulta inteira é
+      // rejeitada antes de ler um único documento. É por isso que `arquivado`
+      // é booleano obrigatório e não um sexto status — um `!=` não compõe com
+      // o orderBy em outro campo, e um documento sem o campo derruba a
+      // consulta do quadro para todo mundo.
+      allow list: if isAdmin()
+                  || (resource.data.arquivado == false
+                      && request.query.limit <= 500);
+
+      // --- CRIAÇÃO PÚBLICA ----------------------------------------------
+      // Qualquer pessoa abre um card. Ele nasce em `reportado`, visível, com
+      // os contadores zerados e o relógio do servidor. `origem` fica de fora
+      // do hasOnly de propósito: só o seed (admin SDK, que passa por cima das
+      // regras) escreve procedência.
+      allow create: if isNovoIssuePublico(request.resource.data);
+
+      function isNovoIssuePublico(d) {
+        return d.keys().hasOnly([
+                 'projeto', 'titulo', 'descricao', 'tipo', 'status',
+                 'arquivado', 'upvotes', 'comentarios',
+                 'criadoEm', 'atualizadoEm', 'autor'
+               ])
+               && d.keys().hasAll([
+                 'projeto', 'titulo', 'descricao', 'tipo', 'status',
+                 'arquivado', 'upvotes', 'comentarios',
+                 'criadoEm', 'atualizadoEm'
+               ])
+               && d.projeto is string && d.projeto in projetos()
+               && d.tipo is string && d.tipo in ['bug', 'feature']
+               && d.status == 'reportado'
+               && d.arquivado == false
+               && d.titulo is string
+               && d.titulo.size() >= 3 && d.titulo.size() <= 120
+               && d.descricao is string && d.descricao.size() <= 4000
+               && d.upvotes == 0
+               && d.comentarios == 0
+               // Relógio do servidor, não o de quem chama: torna `criadoEm`
+               // confiável para ordenar e impossível de retrodatar.
+               && d.criadoEm == request.time
+               && d.atualizadoEm == request.time
+               // O nick é opcional e PÚBLICO — o formulário diz isso na label.
+               && (!d.keys().hasAny(['autor'])
+                   || (d.autor is string && d.autor.size() <= 40));
+      }
+
+      // --- ATUALIZAÇÃO ---------------------------------------------------
+      allow update: if isAdmin() ? isEdicaoAdmin() : isUpvotePublico();
+
+      // A única mutação pública do sistema. `increment(1)` é resolvido no
+      // servidor ANTES da regra rodar, então a conta abaixo enxerga o valor
+      // final — é a mesma forma que já roda em produção no ragreplaystats.
+      // O de-duplicado é localStorage e só: esta regra existe para limitar o
+      // estrago (um campo, +1, card visível), não para impedir gamificação.
+      function isUpvotePublico() {
+        return resource.data.arquivado == false
+               && request.resource.data.diff(resource.data)
+                    .affectedKeys().hasOnly(['upvotes'])
+               && request.resource.data.upvotes == resource.data.upvotes + 1;
+      }
+
+      // O admin move, edita e arquiva — mas os enums continuam valendo, senão
+      // uma edição errada no console escreve um status sem coluna e o card
+      // some de todas as telas sem erro nenhum.
+      function isEdicaoAdmin() {
+        return request.resource.data.status in statuses()
+               && request.resource.data.projeto in projetos()
+               && request.resource.data.tipo in ['bug', 'feature']
+               && request.resource.data.arquivado is bool
+               && request.resource.data.criadoEm == resource.data.criadoEm
+               && request.resource.data.atualizadoEm == request.time;
+      }
+
+      allow delete: if false;
+
+      // --- COMENTÁRIOS ---------------------------------------------------
+      // Leitura pública, escrita só do admin: é o changelog que quem reportou
+      // acompanha. O get() do pai é o que impede comentário de card arquivado
+      // de vazar para quem guardou o id. Custa uma leitura extra por avaliação,
+      // e isso só acontece na página do card — nunca no quadro.
+      match /comentarios/{comentarioId} {
+        allow read: if isAdmin()
+                    || get(/databases/$(database)/documents/issues/$(issueId))
+                         .data.arquivado == false;
+
+        allow create: if isAdmin()
+                      && request.resource.data.keys().hasOnly(
+                           ['texto', 'autor', 'autorUid', 'criadoEm', 'tipo'])
+                      && request.resource.data.keys().hasAll(
+                           ['texto', 'autor', 'autorUid', 'criadoEm', 'tipo'])
+                      && request.resource.data.texto is string
+                      && request.resource.data.texto.size() > 0
+                      && request.resource.data.texto.size() <= 4000
+                      && request.resource.data.autor is string
+                      && request.resource.data.autor.size() <= 60
+                      && request.resource.data.autorUid == request.auth.uid
+                      && request.resource.data.tipo in ['comentario', 'mudanca']
+                      && request.resource.data.criadoEm == request.time;
+
+        allow update: if isAdmin()
+                      && request.resource.data.diff(resource.data)
+                           .affectedKeys().hasOnly(['texto'])
+                      && request.resource.data.texto is string
+                      && request.resource.data.texto.size() > 0
+                      && request.resource.data.texto.size() <= 4000;
+
+        allow delete: if false;
+      }
+
+      // --- CONTATO PRIVADO -----------------------------------------------
+      // Escreve e nunca mais lê: quem reporta pode deixar Discord/e-mail para
+      // o admin dar retorno, e isso não aparece no site. Mesma forma da
+      // coleção `replay_submissions` do simulador. Regra não esconde campo, por
+      // isso o contato mora num documento à parte em vez de numa coluna do card.
+      match /privado/{docId} {
+        allow read: if isAdmin();
+
+        allow create: if request.resource.data.keys().hasOnly(['contato', 'criadoEm'])
+                      && request.resource.data.keys().hasAll(['contato', 'criadoEm'])
+                      && request.resource.data.contato is string
+                      && request.resource.data.contato.size() > 0
+                      && request.resource.data.contato.size() <= 120
+                      && request.resource.data.criadoEm == request.time;
+
+        allow update, delete: if false;
+      }
+    }
+
+    // Tudo que não casou acima é negado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

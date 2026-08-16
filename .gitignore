@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.firebase/
+*.local
+*.log
+
+# Briefings para os projetos irmaos: uso interno, nao vao para o repositorio.
+prompts/
+
+# Chave de service account: nunca commitar.
+service-account*.json
+*-firebase-adminsdk-*.json

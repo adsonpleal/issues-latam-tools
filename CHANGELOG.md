@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.0
+
+- Fichas de `tipo: "replay"`: as gravações `.rrf` do "Ajude o simulador a acertar
+  as contas" agora entram aqui, com o arquivo em anexo e o resumo do parser no
+  campo `replay`.
+- Elas chegam arquivadas — fora do quadro público e com o anexo ilegível — e só
+  aparecem quando a triagem promove para backlog. É a mesma privacidade que a
+  coleção de origem tinha.
+- Migradas as 24 gravações que estavam no Firestore do simulador, todas
+  arquivadas: 9 aguardando conferência, 9 já conferidas, 6 recusadas.
+
 ## 1.1.0
 
 - Anexos no formulário: até 5 arquivos por card, `.rrf` ou imagem, guardados em

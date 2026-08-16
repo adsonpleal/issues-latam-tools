@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { LABEL_TIPO, t } from "../../i18n";
 import { apagarAnexo, subscribeAnexos, type Anexo } from "../../lib/anexos";
 import { subscribeComentarios, type Comentario } from "../../lib/comentarios";
-import { getContato, type Issue } from "../../lib/issues";
+import { getContato, type Issue, type ResumoReplay } from "../../lib/issues";
 import { PROJETOS, SLUGS_PROJETO, type Projeto } from "../../lib/projetos";
 import { TIPOS, type Tipo } from "../../lib/status";
 import { ListaAnexos } from "../ticket/ListaAnexos";
@@ -15,6 +15,62 @@ type Props = {
   onComentar: (texto: string) => void;
   onEditar: (campos: Partial<Pick<Issue, "titulo" | "descricao" | "tipo" | "projeto">>) => void;
 };
+
+/**
+ * As linhas que decidem se uma gravação vale a conferência: trocas de equipamento
+ * separam "fórmula errada" de "item faltando no banco", e golpes em dummy é o que
+ * gera crítico suficiente para fechar a conta.
+ */
+function ResumoGravacao({ replay }: { replay: ResumoReplay }) {
+  const talentos = replay.traits
+    ? Object.entries(replay.traits)
+        .map(([k, v]) => `${k.toUpperCase()} ${v}`)
+        .join("  ")
+    : null;
+
+  return (
+    <dl className="painel-replay">
+      <div>
+        <dt>{t.gravacaoClasse}</dt>
+        <dd>
+          {replay.className ?? "?"} — {replay.player ?? "?"} (nv {replay.baseLevel ?? "?"}/
+          {replay.jobLevel ?? "?"})
+        </dd>
+      </div>
+      <div>
+        <dt>{t.gravacaoGolpes}</dt>
+        <dd>
+          {replay.dummyHits ?? 0} em dummy · {replay.damageEvents ?? 0} no total
+        </dd>
+      </div>
+      <div>
+        <dt>{t.gravacaoTrocas}</dt>
+        <dd>{replay.equipChangeCount ?? 0}</dd>
+      </div>
+      {talentos && (
+        <div>
+          <dt>
+            {t.gravacaoTalentos}{" "}
+            <span className="campo-ajuda">
+              ({replay.traitsSource === "replay" ? t.talentosDaGravacao : t.talentosDoFormulario})
+            </span>
+          </dt>
+          <dd>{talentos}</dd>
+        </div>
+      )}
+      {replay.skippedItems && replay.skippedItems.length > 0 && (
+        <div>
+          <dt>{t.gravacaoItensFora}</dt>
+          <dd>{replay.skippedItems.join(", ")}</dd>
+        </div>
+      )}
+      <div>
+        <dt>{t.gravacaoVersao}</dt>
+        <dd>{replay.appVersion ?? "?"}</dd>
+      </div>
+    </dl>
+  );
+}
 
 export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
   const [comentarios, setComentarios] = useState<Comentario[]>([]);
@@ -131,6 +187,7 @@ export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
             {issue.autor && <> · {t.reportadoPor(issue.autor)}</>}
           </p>
           {issue.descricao && <p className="painel-descricao">{issue.descricao}</p>}
+          {issue.replay && <ResumoGravacao replay={issue.replay} />}
           <p className="painel-contato">
             <strong>{t.contatoLabel}:</strong> {contato ?? t.semContato}
           </p>

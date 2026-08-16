@@ -74,6 +74,24 @@ Apagar anexo é a única exceção ao `delete: if false` que vale para todo o re
 qualquer pessoa anexa arquivo, então precisa existir moderação. Só o admin
 apaga, pelo painel do `/admin`.
 
+### Gravações do "Ajude o simulador"
+
+O simulador tem um diálogo que recebe gravações `.rrf` para conferir as fórmulas
+contra o jogo. Elas viram fichas daqui, de **`tipo: "replay"`** — é essa etiqueta
+que a triagem usa para achá-las no meio do resto.
+
+Elas **nascem arquivadas**, e isso não é detalhe: na origem a coleção era
+`allow read: if false` de propósito, para as gravações não ficarem atrás de uma
+URL adivinhável, e o consentimento que a pessoa marca fala em o arquivo virar
+teste no repositório aberto — não em ficar publicado num quadro. Enquanto a
+ficha estiver arquivada, a regra dos anexos nega o `.rrf` também.
+
+**Promover para `backlog` é o que publica.** É a decisão da triagem, e a partir
+dela o card e a gravação ficam abertos. O contato de quem enviou continua no
+subdocumento privado, sempre.
+
+O ciclo inteiro vive na skill `triage-rrf-uploads`, no repositório do simulador.
+
 ### Privacidade
 
 Quem reporta pode deixar **nick** (público, aparece no card — o formulário diz

@@ -10,7 +10,7 @@ import {
   type AnexoPronto,
 } from "../../lib/issues";
 import { PROJETOS, SLUGS_PROJETO, parseProjeto, type Projeto } from "../../lib/projetos";
-import { TIPOS, type Tipo } from "../../lib/status";
+import { TIPOS_FORM, type Tipo } from "../../lib/status";
 import { CampoAnexos } from "./CampoAnexos";
 import { useEnviarIssue } from "./useEnviarIssue";
 
@@ -59,7 +59,7 @@ export function NovoIssueForm() {
             `flex-direction: column` de `.campo`, e é a linha que precisa ser
             horizontal, não a legenda junto com eles. */}
         <div className="radio-linha">
-          {TIPOS.map((tp) => (
+          {TIPOS_FORM.map((tp) => (
             <label key={tp} className="radio">
               <input
                 type="radio"

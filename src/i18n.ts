@@ -92,6 +92,16 @@ export const t = {
   contatoLabel: "Contato de quem reportou",
   semContato: "Sem contato informado.",
 
+  // Fichas vindas do "Ajude o simulador a acertar as contas"
+  gravacaoClasse: "Personagem",
+  gravacaoGolpes: "Golpes",
+  gravacaoTrocas: "Trocas de equipamento",
+  gravacaoTalentos: "Talentos",
+  gravacaoItensFora: "Itens fora do banco",
+  gravacaoVersao: "Versão do simulador",
+  talentosDaGravacao: "lidos da gravação",
+  talentosDoFormulario: "informados por quem gravou",
+
   // Rodapé
   maisFerramentas: "Veja mais ferramentas em",
   entreNoDiscord: "Entre no nosso",
@@ -118,4 +128,5 @@ export const AJUDA_STATUS: Record<Status, string> = {
 export const LABEL_TIPO: Record<Tipo, string> = {
   bug: "Bug",
   feature: "Sugestão",
+  replay: "Gravação",
 };

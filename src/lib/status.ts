@@ -21,8 +21,16 @@ export type Coluna = Status | "arquivado";
 
 export const COLUNAS_ADMIN: Coluna[] = [...COLUNAS, "arquivado"];
 
-export const TIPOS = ["bug", "feature"] as const;
+/**
+ * `replay` é a gravação .rrf que chega do "Ajude o simulador a acertar as
+ * contas". Não é um pedido de ninguém: é material de conferência, e serve de
+ * etiqueta para a triagem achar essas fichas no meio do resto.
+ */
+export const TIPOS = ["bug", "feature", "replay"] as const;
 export type Tipo = (typeof TIPOS)[number];
+
+/** O formulário público oferece só estes dois — gravação só entra pelo simulador. */
+export const TIPOS_FORM = ["bug", "feature"] as const;
 
 export function isStatus(valor: unknown): valor is Status {
   return typeof valor === "string" && (COLUNAS as readonly string[]).includes(valor);

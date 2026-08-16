@@ -17,6 +17,7 @@ function issue(over: Partial<Issue> & { id: string }): Issue {
     criadoEm: new Date("2026-01-01"),
     atualizadoEm: new Date("2026-01-01"),
     autor: null,
+    replay: null,
     ...over,
   };
 }

@@ -43,6 +43,31 @@ export type Issue = {
   atualizadoEm: Date | null;
   /** Nick público e opcional de quem reportou. */
   autor: string | null;
+  /**
+   * Só nas fichas `tipo: "replay"`: o que o parser leu da gravação (classe,
+   * níveis, golpes, trocas de equipamento, talentos). Fica desnormalizado aqui
+   * para a triagem ranquear sem baixar o .rrf, que tem centenas de kB.
+   */
+  replay: ResumoReplay | null;
+};
+
+/** Campos que a triagem usa. O mapa guardado tem mais, e passa direto. */
+export type ResumoReplay = {
+  player?: string;
+  className?: string;
+  baseLevel?: number;
+  jobLevel?: number;
+  durationMs?: number;
+  damageEvents?: number;
+  dummyHits?: number;
+  equipChangeCount?: number;
+  learnedSkillCount?: number;
+  skippedItems?: number[];
+  appVersion?: string;
+  fileName?: string;
+  traits?: Record<string, number>;
+  traitsSource?: "replay" | "form";
+  [k: string]: unknown;
 };
 
 function toIssue(snap: QueryDocumentSnapshot<DocumentData>): Issue | null {
@@ -67,6 +92,7 @@ function toIssue(snap: QueryDocumentSnapshot<DocumentData>): Issue | null {
     criadoEm: d["criadoEm"]?.toDate?.() ?? null,
     atualizadoEm: d["atualizadoEm"]?.toDate?.() ?? null,
     autor: typeof d["autor"] === "string" && d["autor"] ? d["autor"] : null,
+    replay: d["replay"] && typeof d["replay"] === "object" ? (d["replay"] as ResumoReplay) : null,
   };
 }
 

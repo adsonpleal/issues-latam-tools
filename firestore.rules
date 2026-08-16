@@ -24,6 +24,12 @@ service cloud.firestore {
       return ['reportado', 'backlog', 'em_progresso', 'resolvido', 'nao_sera_feito'];
     }
 
+    // `replay` não aparece no formulário público: só o simulador cria ficha
+    // desse tipo. Mas o admin precisa poder editar uma depois.
+    function tipos() {
+      return ['bug', 'feature', 'replay'];
+    }
+
     match /issues/{issueId} {
 
       // --- LEITURA ------------------------------------------------------
@@ -49,7 +55,49 @@ service cloud.firestore {
       // os contadores zerados e o relógio do servidor. `origem` fica de fora
       // do hasOnly de propósito: só o seed (admin SDK, que passa por cima das
       // regras) escreve procedência.
-      allow create: if isNovoIssuePublico(request.resource.data);
+      allow create: if isNovoIssuePublico(request.resource.data)
+                    || isNovaGravacao(request.resource.data);
+
+      // --- GRAVAÇÃO VINDA DO "AJUDE O SIMULADOR" --------------------------
+      // Caminho separado do formulário público, e não um relaxamento dele.
+      //
+      // Chega SEMPRE arquivada. No simulador essas gravações moravam numa
+      // coleção com `allow read: if false`, justamente para não ficarem atrás
+      // de uma URL adivinhável — e o consentimento que a pessoa marcou fala em
+      // o arquivo virar teste no repositório aberto, não em ficar publicado num
+      // quadro. Então ela entra invisível, a triagem confere, e só vai para o
+      // quadro público quando decide que a gravação presta (status backlog,
+      // arquivado false). Enquanto estiver arquivada, a regra de leitura dos
+      // anexos também nega o .rrf.
+      function isNovaGravacao(d) {
+        return d.keys().hasOnly([
+                 'projeto', 'titulo', 'descricao', 'tipo', 'status',
+                 'arquivado', 'upvotes', 'comentarios', 'anexos',
+                 'criadoEm', 'atualizadoEm', 'autor', 'replay'
+               ])
+               && d.keys().hasAll([
+                 'projeto', 'titulo', 'descricao', 'tipo', 'status',
+                 'arquivado', 'upvotes', 'comentarios', 'anexos',
+                 'criadoEm', 'atualizadoEm', 'replay'
+               ])
+               && d.projeto == 'simulador'
+               && d.tipo == 'replay'
+               && d.status == 'reportado'
+               && d.arquivado == true
+               && d.titulo is string
+               && d.titulo.size() >= 3 && d.titulo.size() <= 120
+               && d.descricao is string && d.descricao.size() <= 4000
+               && d.upvotes == 0
+               && d.comentarios == 0
+               && d.anexos == 1
+               && d.criadoEm == request.time
+               && d.atualizadoEm == request.time
+               // O que a triagem lê para ranquear sem baixar o .rrf: classe,
+               // níveis, golpes, trocas de equipamento, talentos, versão.
+               && d.replay is map && d.replay.size() <= 24
+               && (!d.keys().hasAny(['autor'])
+                   || (d.autor is string && d.autor.size() <= 40));
+      }
 
       function isNovoIssuePublico(d) {
         return d.keys().hasOnly([
@@ -67,6 +115,7 @@ service cloud.firestore {
                // o público não pode atualizar o card depois.
                && d.anexos is int && d.anexos >= 0 && d.anexos <= 5
                && d.projeto is string && d.projeto in projetos()
+               // O formulário público não cria gravação — isso é do simulador.
                && d.tipo is string && d.tipo in ['bug', 'feature']
                && d.status == 'reportado'
                && d.arquivado == false
@@ -105,7 +154,7 @@ service cloud.firestore {
       function isEdicaoAdmin() {
         return request.resource.data.status in statuses()
                && request.resource.data.projeto in projetos()
-               && request.resource.data.tipo in ['bug', 'feature']
+               && request.resource.data.tipo in tipos()
                && request.resource.data.arquivado is bool
                && request.resource.data.criadoEm == resource.data.criadoEm
                && request.resource.data.atualizadoEm == request.time;

@@ -20,10 +20,21 @@ export function ListaAnexos({ anexos, onApagar }: Props) {
       <h3 className="secao">{t.anexosTitulo}</h3>
       <ul className="anexos-lista">
         {anexos.map((a, i) => (
-          <li key={a.id} className={`anexo anexo-${a.tipo}`}>
+          {/* `anexo-tipo-*` e não `anexo-imagem`: essa segunda forma colidia com
+              a classe do próprio <img>, e a regra de imagem acabava caindo no
+              <li> — que virava display:block, achatava para 2px e, de quebra,
+              fazia o loading="lazy" nunca disparar. */}
+          <li key={a.id} className={`anexo anexo-tipo-${a.tipo}`}>
             {a.tipo === "imagem" ? (
-              <a href={urls[i]} target="_blank" rel="noopener noreferrer" title={t.abrirImagem}>
-                <img src={urls[i]} alt={a.nome} className="anexo-imagem" loading="lazy" />
+              <a
+                className="anexo-link-imagem"
+                href={urls[i]}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={t.abrirImagem}
+              >
+                {/* Sem lazy: são no máximo 5 e os bytes já estão na memória. */}
+                <img src={urls[i]} alt={a.nome} className="anexo-preview" />
               </a>
             ) : (
               <span className="anexo-icone" aria-hidden="true">

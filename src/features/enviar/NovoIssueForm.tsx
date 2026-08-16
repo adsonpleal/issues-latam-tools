@@ -47,18 +47,23 @@ export function NovoIssueForm() {
 
       <fieldset className="campo campo-radio">
         <legend>{t.campoTipo}</legend>
-        {TIPOS.map((tp) => (
-          <label key={tp} className="radio">
-            <input
-              type="radio"
-              name="tipo"
-              value={tp}
-              checked={tipo === tp}
-              onChange={() => setTipo(tp)}
-            />
-            {LABEL_TIPO[tp]}
-          </label>
-        ))}
+        {/* Os rádios ficam numa div própria: o fieldset herda o
+            `flex-direction: column` de `.campo`, e é a linha que precisa ser
+            horizontal, não a legenda junto com eles. */}
+        <div className="radio-linha">
+          {TIPOS.map((tp) => (
+            <label key={tp} className="radio">
+              <input
+                type="radio"
+                name="tipo"
+                value={tp}
+                checked={tipo === tp}
+                onChange={() => setTipo(tp)}
+              />
+              {LABEL_TIPO[tp]}
+            </label>
+          ))}
+        </div>
       </fieldset>
 
       <div className="campo">

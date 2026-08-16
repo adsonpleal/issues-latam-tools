@@ -18,12 +18,12 @@ export function ListaAnexos({ anexos, onApagar }: Props) {
   return (
     <section className="anexos">
       <h3 className="secao">{t.anexosTitulo}</h3>
+      {/* `anexo-tipo-*` e não `anexo-imagem`: essa segunda forma colidia com a
+          classe do próprio <img>, a regra da imagem acabava caindo também no
+          <li> — que virava display:block, achatava para 2px e, de quebra, fazia
+          o loading="lazy" concluir que a imagem estava fora de vista. */}
       <ul className="anexos-lista">
         {anexos.map((a, i) => (
-          {/* `anexo-tipo-*` e não `anexo-imagem`: essa segunda forma colidia com
-              a classe do próprio <img>, e a regra de imagem acabava caindo no
-              <li> — que virava display:block, achatava para 2px e, de quebra,
-              fazia o loading="lazy" nunca disparar. */}
           <li key={a.id} className={`anexo anexo-tipo-${a.tipo}`}>
             {a.tipo === "imagem" ? (
               <a

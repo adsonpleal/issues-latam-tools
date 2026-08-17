@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.5.0
+
+- Rota `/admin/gravacoes`: a caixa de entrada das gravações do "Ajude o
+  simulador", em lista, com o resumo do parser à vista, a observação de quem
+  enviou, o contato e o `.rrf` para baixar.
+- **Gravação deixou de ser card.** Ela mora agora na coleção `gravacoes`, que só
+  o admin lê, com o arquivo num subdocumento. Antes nascia como card
+  `arquivado: true`, o que dava dois sentidos para o mesmo booleano — "a triagem
+  despachou" e "ninguém olhou ainda" — e empilhava a fila na gaveta de
+  arquivados, junto de bug arquivado por outro motivo.
+- **Promover cria o card**, em vez de desarquivar um: ficha pública em backlog
+  com o `.rrf` anexado, o contato no subdocumento privado e o mesmo id, numa
+  escrita atômica. O card herda a data do envio — o crédito é do dia em que a
+  pessoa gravou, não do dia em que a triagem olhou.
+- Estados da fila: `fila`, `conferida`, `descartada` e `promovida`. Descartar não
+  apaga nada; apagar existe à parte, e é só para upload que não devia ter
+  entrado.
+- `npm run mover-gravacoes` recolhe para a coleção nova o que ficou como card
+  arquivado. Idempotente, e não toca no que já era público.
+- O simulador (`latam-ro-calc`) passa a escrever em `gravacoes`, e a skill
+  `triage-rrf-uploads` ganhou `--promover`. O caminho antigo continua aceito nas
+  regras enquanto houver simulador em cache por aí.
+
 ## 1.4.0
 
 - Comentário do `/admin` aceita imagem: dá para colar o print junto da

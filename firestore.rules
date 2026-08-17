@@ -55,20 +55,33 @@ service cloud.firestore {
       // os contadores zerados e o relógio do servidor. `origem` fica de fora
       // do hasOnly de propósito: só o seed (admin SDK, que passa por cima das
       // regras) escreve procedência.
-      allow create: if isNovoIssuePublico(request.resource.data)
+      allow create: if isCardDoAdmin()
+                    || isNovoIssuePublico(request.resource.data)
                     || isNovaGravacao(request.resource.data);
 
-      // --- GRAVAÇÃO VINDA DO "AJUDE O SIMULADOR" --------------------------
-      // Caminho separado do formulário público, e não um relaxamento dele.
+      // Promover uma gravação da caixa de entrada é criar card, não editar um.
+      // `criadoEm` fica solto de propósito: o card entra no quadro com o dia em
+      // que a pessoa gravou, não com o dia em que a triagem olhou. Os enums
+      // continuam valendo — é o que impede um status sem coluna de existir.
+      function isCardDoAdmin() {
+        return isAdmin()
+               && request.resource.data.status in statuses()
+               && request.resource.data.projeto in projetos()
+               && request.resource.data.tipo in tipos()
+               && request.resource.data.arquivado is bool
+               && request.resource.data.criadoEm is timestamp
+               && request.resource.data.atualizadoEm == request.time;
+      }
+
+      // --- GRAVAÇÃO VINDA DO "AJUDE O SIMULADOR" (CAMINHO ANTIGO) ---------
+      // Substituído pela coleção `gravacoes`, lá embaixo: gravação virou dado
+      // de entrada em vez de card nascido arquivado.
       //
-      // Chega SEMPRE arquivada. No simulador essas gravações moravam numa
-      // coleção com `allow read: if false`, justamente para não ficarem atrás
-      // de uma URL adivinhável — e o consentimento que a pessoa marcou fala em
-      // o arquivo virar teste no repositório aberto, não em ficar publicado num
-      // quadro. Então ela entra invisível, a triagem confere, e só vai para o
-      // quadro público quando decide que a gravação presta (status backlog,
-      // arquivado false). Enquanto estiver arquivada, a regra de leitura dos
-      // anexos também nega o .rrf.
+      // Continua aqui só enquanto houver simulador antigo em cache por aí — um
+      // envio dessas versões ainda cai como card arquivado, e
+      // `tools/mover-gravacoes.mjs` varre para a coleção nova. Depois que o
+      // simulador atualizado estiver no ar e a varredura não achar mais nada,
+      // ISTO SAI, junto do `|| isNovaGravacao(...)` do create acima.
       function isNovaGravacao(d) {
         return d.keys().hasOnly([
                  'projeto', 'titulo', 'descricao', 'tipo', 'status',
@@ -261,6 +274,87 @@ service cloud.firestore {
                       && request.resource.data.criadoEm == request.time;
 
         allow update, delete: if false;
+      }
+    }
+
+    // --- GRAVAÇÕES DO "AJUDE O SIMULADOR" --------------------------------
+    // Caixa de entrada, não quadro.
+    //
+    // Elas não são card: o diálogo do simulador escreve aqui, só o admin lê, e
+    // quem decide se aquilo vira ficha pública é a triagem em /admin/gravacoes
+    // — promover CRIA um card normal, com o .rrf copiado para os anexos dele.
+    //
+    // Antes disso não existe URL que devolva o conteúdo para ninguém. É a mesma
+    // postura que a coleção `replay_submissions` do simulador tinha com
+    // `allow read: if false`, e é o que o consentimento promete: o arquivo vira
+    // teste no repositório aberto, não uma página num quadro. Antes isso era
+    // feito com um card nascendo `arquivado`, o que dava dois significados para
+    // o mesmo booleano — "a triagem já despachou" e "ninguém olhou ainda".
+    match /gravacoes/{gravacaoId} {
+      allow read: if isAdmin();
+
+      // Escrita pública, como o formulário de reportar: quem usa o diálogo do
+      // simulador não tem conta nenhuma.
+      allow create: if isAdmin() || isEnvioDeGravacao(request.resource.data);
+
+      function isEnvioDeGravacao(d) {
+        return d.keys().hasOnly([
+                 'titulo', 'notas', 'resumo', 'nick', 'contato',
+                 'nome', 'tamanho', 'criadoEm', 'estado'
+               ])
+               && d.keys().hasAll(['titulo', 'resumo', 'nome', 'tamanho', 'criadoEm', 'estado'])
+               // Nasce na fila. Os outros estados são carimbo da triagem.
+               && d.estado == 'fila'
+               && d.titulo is string
+               && d.titulo.size() >= 3 && d.titulo.size() <= 120
+               && (!d.keys().hasAny(['notas']) || (d.notas is string && d.notas.size() <= 4000))
+               // O que o parser leu: classe, níveis, golpes, trocas, talentos.
+               && d.resumo is map && d.resumo.size() <= 24
+               // Nick é crédito e só aparece se a ficha for promovida; contato é
+               // Discord/e-mail. Os dois ficam aqui porque a coleção inteira é
+               // privada — não precisa do subdocumento que o card exige.
+               && (!d.keys().hasAny(['nick']) || (d.nick is string && d.nick.size() <= 40))
+               && (!d.keys().hasAny(['contato']) || (d.contato is string && d.contato.size() <= 120))
+               && d.nome is string && d.nome.size() > 0 && d.nome.size() <= 200
+               && d.tamanho is int && d.tamanho > 0 && d.tamanho <= 900000
+               && d.criadoEm == request.time;
+      }
+
+      // A triagem carimba o que decidiu. `issueId` é o card que a promoção
+      // criou — a única coisa daqui que chega ao mundo.
+      allow update: if isAdmin()
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['estado', 'issueId', 'decididaEm', 'notaTriagem'])
+                    && request.resource.data.estado in
+                         ['fila', 'conferida', 'descartada', 'promovida'];
+
+      // Exceção ao `delete: if false` do resto, pela mesma razão dos anexos:
+      // isto é escrita pública, então precisa existir como tirar o que não
+      // devia ter entrado. Descartar (que é o "arquivar" daqui) não apaga nada.
+      allow delete: if isAdmin();
+
+      // O .rrf num documento à parte, e não num campo daqui, para a lista da
+      // triagem não baixar centenas de kB por linha só para mostrar o resumo.
+      // Mesmo formato de `issues/{id}/anexos/{id}`, o que faz a promoção ser
+      // uma cópia de campos em vez de uma conversão.
+      match /arquivo/{arquivoId} {
+        allow read: if isAdmin();
+
+        allow create: if isAdmin() || isArquivoDeGravacao(request.resource.data);
+
+        function isArquivoDeGravacao(d) {
+          return d.keys().hasOnly(['nome', 'tipo', 'tamanho', 'bytes', 'criadoEm'])
+                 && d.keys().hasAll(['nome', 'tipo', 'tamanho', 'bytes', 'criadoEm'])
+                 && d.nome is string && d.nome.size() > 0 && d.nome.size() <= 200
+                 && d.tipo == 'rrf'
+                 // Mesmo teto dos anexos: 1 MiB por documento menos a folga.
+                 && d.bytes is bytes && d.bytes.size() > 0 && d.bytes.size() <= 900000
+                 && d.tamanho is int && d.tamanho == d.bytes.size()
+                 && d.criadoEm == request.time;
+        }
+
+        allow update: if false;
+        allow delete: if isAdmin();
       }
     }
 

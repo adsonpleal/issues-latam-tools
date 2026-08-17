@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { t } from "../i18n";
 import { parseProjeto } from "../lib/projetos";
@@ -18,6 +18,9 @@ export function AdminPage() {
   return (
     <div className="pagina">
       <h1>{t.adminTitulo}</h1>
+      <p>
+        <Link to="/admin/gravacoes">{t.gravacoesLink} →</Link>
+      </p>
       <AdminGate>{(sessao) => <QuadroAdmin sessao={sessao} />}</AdminGate>
     </div>
   );

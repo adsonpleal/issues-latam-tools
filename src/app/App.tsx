@@ -15,6 +15,10 @@ const AdminPage = lazy(() =>
   import("../pages/AdminPage").then((m) => ({ default: m.AdminPage })),
 );
 
+const GravacoesPage = lazy(() =>
+  import("../pages/GravacoesPage").then((m) => ({ default: m.GravacoesPage })),
+);
+
 /**
  * `/visuais` digitado na mão vira `/?projeto=visuais`. O esquema canônico é a
  * querystring — ela compõe com tipo e busca, e não briga com /admin, /novo e
@@ -37,6 +41,9 @@ export function App() {
             <Route path="/novo" element={<NewIssuePage />} />
             <Route path="/t/:issueId" element={<IssuePage />} />
             <Route path="/admin" element={<AdminPage />} />
+            {/* Vem antes do atalho de projeto — `/:slug` casa um segmento só,
+                então não haveria conflito, mas a leitura fica na ordem certa. */}
+            <Route path="/admin/gravacoes" element={<GravacoesPage />} />
             <Route path="/:slug" element={<AtalhoProjeto />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>

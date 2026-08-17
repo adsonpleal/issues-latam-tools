@@ -664,6 +664,130 @@ input[type="file"]::file-selector-button {
   margin-bottom: 1rem;
 }
 
+/* --- Fila de gravações ---------------------------------------------------
+   A lista de /admin/gravacoes. Não é card de quadro: aqui a linha inteira é o
+   resumo do parser, que é o que decide se a gravação vale a conferência. */
+
+.gravacoes-secao {
+  margin-bottom: 2rem;
+}
+
+.gravacoes-lista {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+  max-width: 56rem;
+}
+
+.gravacao {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  padding: 0.75rem 0.9rem;
+}
+
+.gravacao-topo {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.gravacao-titulo {
+  flex: 1;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.gravacao-notas {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg-inset);
+  border-radius: var(--raio);
+  padding: 0.5rem 0.6rem;
+  margin: 0.6rem 0 0;
+  font-size: 0.85rem;
+}
+
+.gravacao-rodape {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+}
+
+.gravacao-acoes {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.6rem;
+}
+
+/* Promover é a única ação daqui que publica alguma coisa: fica na ponta, longe
+   dos carimbos que não saem desta tela. */
+.gravacao-acoes .botao-primario {
+  margin-left: auto;
+}
+
+.botao-perigo {
+  color: var(--perigo);
+  border-color: currentColor;
+}
+
+/* Os quatro estados da fila. Só o promovido ganha cor — é o que saiu daqui. */
+.selo-promovida {
+  color: var(--ok);
+  border-color: currentColor;
+}
+
+.selo-descartada {
+  color: var(--perigo);
+  border-color: currentColor;
+}
+
+/* Resumo do parser, no painel e na fila. Sem isto a <dl> sai com o recuo padrão
+   do navegador e as linhas coladas umas nas outras. */
+.painel-replay,
+.gravacao-resumo {
+  margin: 0.6rem 0 0;
+  font-size: 0.85rem;
+}
+
+.painel-replay > div,
+.gravacao-resumo > div {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.2rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.painel-replay > div:first-child,
+.gravacao-resumo > div:first-child {
+  border-top: 0;
+}
+
+.painel-replay dt,
+.gravacao-resumo dt {
+  flex: 0 0 10rem;
+  color: var(--muted);
+}
+
+.painel-replay dd,
+.gravacao-resumo dd {
+  flex: 1;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .painel {
   position: fixed;
   top: 0;
@@ -757,5 +881,17 @@ input[type="file"]::file-selector-button {
 
   .campo-inline input[type="search"] {
     min-width: 8rem;
+  }
+
+  /* Rótulo e valor empilham: 10rem de dt não sobra largura para o valor. */
+  .painel-replay > div,
+  .gravacao-resumo > div {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .painel-replay dt,
+  .gravacao-resumo dt {
+    flex: none;
   }
 }

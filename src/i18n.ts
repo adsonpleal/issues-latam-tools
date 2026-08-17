@@ -1,4 +1,5 @@
 // Strings de UI — só pt-BR (a língua do servidor LATAM).
+import type { EstadoGravacao } from "./lib/gravacoes";
 import type { Coluna, Status, Tipo } from "./lib/status";
 
 export const t = {
@@ -96,12 +97,47 @@ export const t = {
   contatoLabel: "Contato de quem reportou",
   semContato: "Sem contato informado.",
 
-  // Fichas vindas do "Ajude o simulador a acertar as contas"
+  // Gravações do "Ajude o simulador a acertar as contas"
+  gravacoesTitulo: "Gravações do simulador",
+  gravacoesSub:
+    'Os .rrf que chegam do "Ajude o simulador a acertar as contas". Não são cards: ficam aqui, privadas, até a triagem promover uma — é isso que cria a ficha pública, com a gravação anexada.',
+  gravacoesLink: "Gravações",
+  voltarQuadroAdmin: "Voltar para o quadro",
+  erroGravacoes: "Não consegui carregar a fila. Recarregue a página.",
+  gravacoesFila: "Na fila",
+  gravacoesFilaAjuda: "Esperando decisão. Nada daqui está publicado.",
+  gravacoesPromovidas: "Viraram card",
+  gravacoesPromovidasAjuda: "A ficha e a gravação estão no quadro público.",
+  gravacoesDecididas: "Fechadas sem publicar",
+  gravacoesDecididasAjuda:
+    "Conferidas ou descartadas — continuam guardadas aqui, fora do quadro.",
+  gravacoesVazio: "Nenhuma gravação chegou ainda.",
+  filaVazia: "Nada esperando decisão.",
+  promover: "Promover",
+  promoverTitulo: "Cria o card público em Backlog, com a gravação anexada",
+  marcarConferida: "Conferida",
+  marcarConferidaTitulo: "Já serviu de teste, mas não vai para o quadro",
+  descartar: "Descartar",
+  descartarTitulo: "Não dá para conferir fórmula com ela. Continua guardada aqui.",
+  devolverParaFila: "Devolver para a fila",
+  apagarGravacao: "Apagar",
+  apagarGravacaoTitulo: "Apaga a gravação e o arquivo, para sempre",
+  apagarGravacaoConfirma: (titulo: string) =>
+    `Apagar "${titulo}" e o arquivo, para sempre?\n\nIsto é para upload que não devia ter entrado. Gravação legítima que não presta é Descartar.`,
+  baixarRrf: "Baixar .rrf",
+  baixando: "Abrindo…",
+  erroBaixar: "Não consegui abrir o arquivo.",
+  verCard: "Ver o card",
+  notasDeQuemEnviou: "Observação de quem enviou",
+  notaDaTriagem: "Nota da triagem",
+  gravacaoSemResumo: "Esta ficha não tem o resumo do parser.",
   gravacaoClasse: "Personagem",
   gravacaoGolpes: "Golpes",
   gravacaoTrocas: "Trocas de equipamento",
   gravacaoTalentos: "Talentos",
   gravacaoItensFora: "Itens fora do banco",
+  gravacaoDuracao: "Duração",
+  gravacaoArquivo: "Arquivo",
   gravacaoVersao: "Versão do simulador",
   talentosDaGravacao: "lidos da gravação",
   talentosDoFormulario: "informados por quem gravou",
@@ -127,6 +163,13 @@ export const AJUDA_STATUS: Record<Status, string> = {
   em_progresso: "Estou mexendo nisso agora.",
   resolvido: "Já está no ar.",
   nao_sera_feito: "Analisado e descartado.",
+};
+
+export const LABEL_ESTADO: Record<EstadoGravacao, string> = {
+  fila: "Na fila",
+  promovida: "No quadro",
+  conferida: "Conferida",
+  descartada: "Descartada",
 };
 
 export const LABEL_TIPO: Record<Tipo, string> = {

@@ -27,6 +27,7 @@ formulário.
 | `/novo` | formulário de envio; aceita `?projeto=` para pré-selecionar |
 | `/t/:id` | um card, com os comentários |
 | `/admin` | quadro editável, exige login; aceita os mesmos filtros e `?card=` para abrir um card no painel |
+| `/admin/gravacoes` | a caixa de entrada das gravações do simulador, e o botão que promove uma para card |
 | `/:slug` | atalho: `/visuais` redireciona para `/?projeto=visuais` |
 
 Os filtros vivem na querystring em vez de virarem rota própria porque eles
@@ -89,20 +90,36 @@ autoridade a ninguém.
 ### Gravações do "Ajude o simulador"
 
 O simulador tem um diálogo que recebe gravações `.rrf` para conferir as fórmulas
-contra o jogo. Elas viram fichas daqui, de **`tipo: "replay"`** — é essa etiqueta
-que a triagem usa para achá-las no meio do resto.
+contra o jogo. Elas **não são cards**: caem na coleção `gravacoes`, que é caixa
+de entrada e não quadro — `allow read: if isAdmin()`, o arquivo num subdocumento
+`gravacoes/{id}/arquivo/rrf`, e nick e contato no próprio documento, já que a
+coleção inteira é privada.
 
-Elas **nascem arquivadas**, e isso não é detalhe: na origem a coleção era
-`allow read: if false` de propósito, para as gravações não ficarem atrás de uma
-URL adivinhável, e o consentimento que a pessoa marca fala em o arquivo virar
-teste no repositório aberto — não em ficar publicado num quadro. Enquanto a
-ficha estiver arquivada, a regra dos anexos nega o `.rrf` também.
+Isso não é detalhe. Na origem a coleção do simulador era `allow read: if false`
+de propósito, para as gravações não ficarem atrás de uma URL adivinhável, e o
+consentimento que a pessoa marca fala em o arquivo virar teste no repositório
+aberto — não em ficar publicado num quadro.
 
-**Promover para `backlog` é o que publica.** É a decisão da triagem, e a partir
-dela o card e a gravação ficam abertos. O contato de quem enviou continua no
-subdocumento privado, sempre.
+**Promover é o que publica, e publicar é criar o card**: `/admin/gravacoes` →
+*Promover* escreve uma ficha pública em `backlog` com o `.rrf` anexado, o contato
+no subdocumento privado e o mesmo id da gravação, numa escrita atômica só. O card
+herda a data do envio, não a de hoje — o crédito é do dia em que a pessoa gravou.
 
-O ciclo inteiro vive na skill `triage-rrf-uploads`, no repositório do simulador.
+Antes isso era um card nascendo `arquivado`. Dava dois sentidos para o mesmo
+booleano — "a triagem despachou" e "ninguém olhou ainda" — e empilhava a caixa de
+entrada na gaveta de arquivados, junto de bug arquivado por outro motivo.
+
+Fora `promovida`, os estados são `fila`, `conferida` (já serviu de teste, mas não
+vira card) e `descartada`. **Descartar não apaga**: é o arquivar daqui. Apagar
+existe, e é só para upload que não devia ter entrado — mesma razão pela qual
+anexo tem delete.
+
+`npm run mover-gravacoes` recolhe para a coleção nova qualquer gravação que ainda
+apareça como card arquivado — o que acontece enquanto houver simulador antigo em
+cache por aí. É idempotente e não toca no que já foi promovido.
+
+O ciclo inteiro vive na skill `triage-rrf-uploads`, no repositório do simulador,
+que faz pela linha de comando o que esta rota faz pelo navegador.
 
 ### Privacidade
 
@@ -132,9 +149,11 @@ o contato de quem reportou. A privacidade é garantida pelo banco, não pelo
 cuidado do script, que é por que aqui não entra `firebase-admin` nem service
 account.
 
-Duas consequências de graça: gravações do "Ajude o simulador" nascem arquivadas,
-então nunca são anunciadas; e o marco d'água em disco significa que a primeira
-execução não despeja o histórico no canal.
+Duas consequências de graça: gravação do "Ajude o simulador" não é card até
+alguém promover, então nunca é anunciada na chegada; e o marco d'água em disco
+significa que a primeira execução não despeja o histórico no canal. (O card que
+sai de uma promoção também não é anunciado — ele nasce com a data do envio, que
+é anterior ao marco.)
 
 O texto que sai dali é escrita pública anônima, então vai saneado: sem menção em
 massa (`allowed_mentions: {parse: []}`), sem URL na descrição, com markdown
@@ -186,6 +205,7 @@ que não vai para o repositório porque tem endereço e chave do servidor.
 npm run importar     # relê as planilhas + o Firestore do recap e regenera o JSON
 npm run seed -- --dry-run
 npm run seed
+npm run mover-gravacoes -- --dry-run   # gravação que virou card arquivado -> coleção `gravacoes`
 ```
 
 O seed é idempotente: usa id determinístico e cria com `currentDocument.exists=false`,

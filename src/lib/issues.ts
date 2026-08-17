@@ -15,7 +15,7 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 
-import { ANEXOS_MAX, enviarAnexo, type TipoAnexo } from "./anexos";
+import { ANEXOS_MAX, enviarAnexo, type AnexoPronto } from "./anexos";
 import { getDb } from "./firebase";
 import type { Projeto } from "./projetos";
 import { isProjeto } from "./projetos";
@@ -145,11 +145,9 @@ export async function getIssue(id: string): Promise<Issue | null> {
   return snap.exists() ? toIssue(snap as QueryDocumentSnapshot<DocumentData>) : null;
 }
 
-export type AnexoPronto = {
-  nome: string;
-  tipo: TipoAnexo;
-  dados: Uint8Array;
-};
+// Mora em `anexos.ts`, junto do resto do assunto — comentário também sobe
+// arquivo agora, e importar de `issues` para isso seria caminho torto.
+export type { AnexoPronto } from "./anexos";
 
 export type NovoIssue = {
   projeto: Projeto;

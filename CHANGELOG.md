@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.4.0
+
+- Comentário do `/admin` aceita imagem: dá para colar o print junto da
+  atualização, e ele aparece dentro do comentário na página do card.
+- As imagens moram na mesma subcoleção `anexos`, com um `comentarioId` — sem
+  onSnapshot novo por comentário e reaproveitando a redução para WebP, a regra
+  de leitura (card arquivado nega) e o apagar do admin. O selo de anexos do card
+  não conta essas: ele fala do que veio no relato.
+- Amarrar anexo a comentário exige admin na regra. Sem isso qualquer pessoa
+  faria uma imagem sua brotar dentro da fala do admin.
+- O campo de comentar volta a ocupar a largura do painel — o `align-items:
+  flex-start` encolhia o campo e o `width: 100%` do textarea virava 100% de nada.
+
 ## 1.3.0
 
 - Card novo e público vira embed no canal de reports do Discord: projeto, tipo,

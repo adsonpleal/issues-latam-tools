@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { t } from "../i18n";
@@ -50,6 +50,15 @@ export function IssuePage() {
     return subscribeAnexos(issueId, setAnexos, () => setAnexos([]));
   }, [issueId]);
 
+  // Uma subscrição só para os dois usos: o que veio no relato fica na lista de
+  // anexos, o que foi colado numa atualização aparece dentro dela. Memoizado
+  // porque as duas listas viram object URL — recriá-las a cada render churnaria
+  // blob à toa.
+  const [anexosDoCard, imagensDeComentario] = useMemo(
+    () => [anexos.filter((a) => !a.comentarioId), anexos.filter((a) => a.comentarioId)],
+    [anexos],
+  );
+
   useSeo({
     title: issue ? `${issue.titulo} — ${t.siteNome}` : `${t.siteNome} — ${t.siteSub}`,
     description: issue?.descricao.slice(0, 160) || t.siteDescricao,
@@ -78,9 +87,9 @@ export function IssuePage() {
       {issue && (
         <>
           <IssueDetail issue={issue} />
-          <ListaAnexos anexos={anexos} />
+          <ListaAnexos anexos={anexosDoCard} />
           <h2 className="secao">{t.comentariosLabel(comentarios.length)}</h2>
-          <ListaComentarios comentarios={comentarios} />
+          <ListaComentarios comentarios={comentarios} imagens={imagensDeComentario} />
         </>
       )}
     </div>

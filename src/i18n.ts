@@ -50,8 +50,12 @@ export const t = {
   campoAnexos: "Anexos (opcional)",
   campoAnexosAjuda:
     "Replay .rrf ou print da tela — até 5 arquivos. Imagem grande é reduzida automaticamente antes de enviar.",
+  campoImagens: "Imagens (opcional)",
+  campoImagensAjuda:
+    "Print para ilustrar a atualização — até 5. Imagem grande é reduzida automaticamente antes de enviar.",
   anexoPreparando: "Preparando os arquivos…",
   anexoTipoInvalido: (nome: string) => `${nome}: só aceito .rrf e imagem.`,
+  anexoSoImagem: (nome: string) => `${nome}: aqui só entra imagem.`,
   anexoGrande: (nome: string, max: string) => `${nome}: passa de ${max}.`,
   anexoFalhou: (nome: string) => `${nome}: não consegui ler o arquivo.`,
   anexoDemais: "Máximo de 5 arquivos.",

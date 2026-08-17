@@ -10,6 +10,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 
+import { ANEXOS_MAX, enviarAnexo, type AnexoPronto } from "./anexos";
 import { getDb } from "./firebase";
 
 export const COMENTARIO_MAX = 4000;
@@ -63,15 +64,33 @@ export async function addComentario(
   autor: string,
   autorUid: string,
   tipo: TipoComentario = "comentario",
+  imagens: AnexoPronto[] = [],
 ): Promise<void> {
   const db = getDb();
-  await addDoc(collection(db, "issues", issueId, "comentarios"), {
+  const ref = await addDoc(collection(db, "issues", issueId, "comentarios"), {
     texto: texto.trim().slice(0, COMENTARIO_MAX),
     autor,
     autorUid,
     tipo,
     criadoEm: serverTimestamp(),
   });
+
+  // Comentário primeiro, imagens depois — mesma ordem de `createIssue` e pelo
+  // mesmo motivo: o texto é a parte que importa, e imagem que falha some sem
+  // levar a atualização junto. Vão para a subcoleção de anexos amarradas ao id
+  // do comentário; o selo de anexos do card NÃO conta estas, ele fala do que
+  // veio no relato.
+  for (const imagem of imagens.slice(0, ANEXOS_MAX)) {
+    await enviarAnexo(
+      issueId,
+      crypto.randomUUID(),
+      imagem.nome,
+      imagem.tipo,
+      imagem.dados,
+      ref.id,
+    ).catch(() => undefined);
+  }
+
   // Contador desnormalizado para o selo do card: o quadro nunca lê a subcoleção.
   // Se esta segunda escrita falhar o comentário continua lá, só o selo fica atrás
   // — preferível a uma transação que poderia recusar o comentário inteiro.

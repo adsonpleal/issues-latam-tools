@@ -31,6 +31,20 @@ export type Anexo = {
   tamanho: number;
   bytes: Uint8Array;
   criadoEm: Date | null;
+  /**
+   * Quando presente, a imagem foi colada num comentário e aparece dentro dele —
+   * não na lista de anexos do card. Mesma subcoleção de propósito: reaproveita a
+   * regra de leitura (arquivado nega os dois) e não cria mais um onSnapshot por
+   * comentário na página.
+   */
+  comentarioId: string | null;
+};
+
+/** Arquivo já lido e reduzido pelo navegador, pronto para subir. */
+export type AnexoPronto = {
+  nome: string;
+  tipo: TipoAnexo;
+  dados: Uint8Array;
 };
 
 export function classificaArquivo(arquivo: File): TipoAnexo | null {
@@ -52,6 +66,7 @@ export async function enviarAnexo(
   nome: string,
   tipo: TipoAnexo,
   dados: Uint8Array,
+  comentarioId?: string,
 ): Promise<void> {
   await setDoc(doc(getDb(), "issues", issueId, "anexos", anexoId), {
     nome: nome.slice(0, 200),
@@ -59,6 +74,9 @@ export async function enviarAnexo(
     tamanho: dados.byteLength,
     bytes: Bytes.fromUint8Array(dados),
     criadoEm: serverTimestamp(),
+    // Ausente é diferente de vazio: a regra só exige admin quando o campo vem,
+    // então anexo comum continua sendo escrita pública.
+    ...(comentarioId ? { comentarioId } : {}),
   });
 }
 
@@ -81,6 +99,7 @@ export function subscribeAnexos(
             tamanho: Number(v["tamanho"] ?? 0),
             bytes: v["bytes"]?.toUint8Array?.() ?? new Uint8Array(),
             criadoEm: v["criadoEm"]?.toDate?.() ?? null,
+            comentarioId: v["comentarioId"] ? String(v["comentarioId"]) : null,
           };
         }),
       ),

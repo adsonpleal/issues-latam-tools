@@ -65,7 +65,7 @@ function QuadroAdmin({ sessao }: { sessao: import("../lib/auth").Sessao }) {
         <PainelIssue
           issue={issueAberta}
           onFechar={() => abrir(null)}
-          onComentar={(texto) => void comentar(issueAberta.id, texto)}
+          onComentar={(texto, imagens) => void comentar(issueAberta.id, texto, imagens)}
           onEditar={(campos) => void editar(issueAberta.id, campos)}
         />
       )}

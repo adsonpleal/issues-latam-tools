@@ -74,6 +74,18 @@ Apagar anexo é a única exceção ao `delete: if false` que vale para todo o re
 qualquer pessoa anexa arquivo, então precisa existir moderação. Só o admin
 apaga, pelo painel do `/admin`.
 
+Imagem colada num comentário vive na **mesma subcoleção**, com um campo
+`comentarioId` a mais — é o que decide se ela é renderizada na lista de anexos
+do card ou dentro daquele comentário. Ficar junto evita um `onSnapshot` por
+comentário na página e herda de graça a regra de leitura (card arquivado nega os
+dois), a redução para WebP e o apagar do admin. O selo de anexos do card não
+conta essas: ele fala do que veio no relato.
+
+Escrever `comentarioId` exige admin, ao contrário do anexo comum, que é escrita
+pública. Sem essa trava qualquer pessoa faria uma imagem sua aparecer *dentro*
+da fala do admin — o anexo do card, no fim da página, não empresta essa
+autoridade a ninguém.
+
 ### Gravações do "Ajude o simulador"
 
 O simulador tem um diálogo que recebe gravações `.rrf` para conferir as fórmulas

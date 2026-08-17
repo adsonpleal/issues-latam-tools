@@ -213,10 +213,20 @@ service cloud.firestore {
                         && get(/databases/$(database)/documents/issues/$(issueId))
                              .data.arquivado == false);
 
+        // `comentarioId` é opcional: quando vem, a imagem aparece DENTRO daquele
+        // comentário em vez de na lista de anexos do card. Por isso ela exige
+        // admin — comentar já é só do admin, e sem esta trava qualquer pessoa
+        // faria uma imagem sua brotar no meio da fala dele.
         allow create: if request.resource.data.keys().hasOnly(
-                           ['nome', 'tipo', 'tamanho', 'bytes', 'criadoEm'])
+                           ['nome', 'tipo', 'tamanho', 'bytes', 'criadoEm', 'comentarioId'])
                       && request.resource.data.keys().hasAll(
                            ['nome', 'tipo', 'tamanho', 'bytes', 'criadoEm'])
+                      && (!request.resource.data.keys().hasAny(['comentarioId'])
+                          || (isAdmin()
+                              && request.resource.data.tipo == 'imagem'
+                              && request.resource.data.comentarioId is string
+                              && request.resource.data.comentarioId.size() > 0
+                              && request.resource.data.comentarioId.size() <= 64))
                       && request.resource.data.nome is string
                       && request.resource.data.nome.size() > 0
                       && request.resource.data.nome.size() <= 200

@@ -489,6 +489,22 @@ a:focus-visible {
   overflow-wrap: anywhere;
 }
 
+/* Print colado numa atualização: mesma régua do anexo do card — largura toda,
+   porque a imagem existe para ser olhada. */
+.comentario-imagens {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.comentario-imagens a {
+  display: block;
+}
+
 /* --- Formulário ---------------------------------------------------------- */
 
 .formulario {
@@ -694,16 +710,23 @@ input[type="file"]::file-selector-button {
   gap: 0.75rem;
 }
 
+/* Sem `align-items: flex-start` aqui: ele encolhia o `.campo` até o tamanho do
+   conteúdo, e o `width: 100%` do textarea passava a ser 100% de quase nada. O
+   stretch padrão é o que dá a largura toda ao campo — só o botão volta a ter
+   tamanho de botão. */
 .painel-comentar {
   margin-top: 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  align-items: flex-start;
 }
 
 .painel-comentar textarea {
   width: 100%;
+}
+
+.painel-comentar > .botao {
+  align-self: flex-start;
 }
 
 /* --- Rodapé -------------------------------------------------------------- */

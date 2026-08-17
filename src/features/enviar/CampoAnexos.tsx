@@ -8,15 +8,19 @@ import {
   classificaArquivo,
   formataTamanho,
 } from "../../lib/anexos";
+import type { AnexoPronto } from "../../lib/anexos";
 import { reduzirImagem } from "../../lib/imagem";
-import type { AnexoPronto } from "../../lib/issues";
 
 type Props = {
   anexos: AnexoPronto[];
   onChange: (anexos: AnexoPronto[]) => void;
+  /** Precisa ser único na página: o formulário e o painel de comentar coexistem. */
+  id?: string;
+  /** No comentário só entra print — `.rrf` é coisa do relato, não da resposta. */
+  apenasImagens?: boolean;
 };
 
-export function CampoAnexos({ anexos, onChange }: Props) {
+export function CampoAnexos({ anexos, onChange, id = "anexos", apenasImagens = false }: Props) {
   const [preparando, setPreparando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -53,8 +57,10 @@ export function CampoAnexos({ anexos, onChange }: Props) {
         break;
       }
       const tipo = classificaArquivo(arquivo);
-      if (!tipo) {
-        problemas.push(t.anexoTipoInvalido(arquivo.name));
+      if (!tipo || (apenasImagens && tipo !== "imagem")) {
+        problemas.push(
+          apenasImagens ? t.anexoSoImagem(arquivo.name) : t.anexoTipoInvalido(arquivo.name),
+        );
         continue;
       }
       try {
@@ -89,19 +95,19 @@ export function CampoAnexos({ anexos, onChange }: Props) {
 
   return (
     <div className="campo">
-      <label htmlFor="anexos">{t.campoAnexos}</label>
+      <label htmlFor={id}>{apenasImagens ? t.campoImagens : t.campoAnexos}</label>
       <input
-        id="anexos"
+        id={id}
         ref={input}
         type="file"
         multiple
-        accept={EXTENSOES_ACEITAS}
+        accept={apenasImagens ? "image/*" : EXTENSOES_ACEITAS}
         onChange={(e) => void aoEscolher(e)}
         disabled={preparando || anexos.length >= ANEXOS_MAX}
-        aria-describedby="ajuda-anexos"
+        aria-describedby={`ajuda-${id}`}
       />
-      <p className="campo-ajuda" id="ajuda-anexos">
-        {t.campoAnexosAjuda}
+      <p className="campo-ajuda" id={`ajuda-${id}`}>
+        {apenasImagens ? t.campoImagensAjuda : t.campoAnexosAjuda}
       </p>
 
       {preparando && <p className="campo-ajuda">{t.anexoPreparando}</p>}

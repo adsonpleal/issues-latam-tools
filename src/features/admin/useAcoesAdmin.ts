@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 
+import type { AnexoPronto } from "../../lib/anexos";
 import { addComentario } from "../../lib/comentarios";
 import { editarIssue, moverIssue, type Issue } from "../../lib/issues";
 import type { Sessao } from "../../lib/auth";
@@ -27,11 +28,11 @@ export function useAcoesAdmin(sessao: Sessao | null) {
   );
 
   const comentar = useCallback(
-    async (issueId: string, texto: string) => {
+    async (issueId: string, texto: string, imagens: AnexoPronto[] = []) => {
       if (!sessao) return;
       setErro(null);
-      await addComentario(issueId, texto, sessao.nome, sessao.uid).catch((e: Error) =>
-        setErro(e.message),
+      await addComentario(issueId, texto, sessao.nome, sessao.uid, "comentario", imagens).catch(
+        (e: Error) => setErro(e.message),
       );
     },
     [sessao],

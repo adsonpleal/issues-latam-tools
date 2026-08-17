@@ -1,18 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { LABEL_TIPO, t } from "../../i18n";
-import { apagarAnexo, subscribeAnexos, type Anexo } from "../../lib/anexos";
+import {
+  apagarAnexo,
+  subscribeAnexos,
+  type Anexo,
+  type AnexoPronto,
+} from "../../lib/anexos";
 import { subscribeComentarios, type Comentario } from "../../lib/comentarios";
 import { getContato, type Issue, type ResumoReplay } from "../../lib/issues";
 import { PROJETOS, SLUGS_PROJETO, type Projeto } from "../../lib/projetos";
 import { TIPOS, type Tipo } from "../../lib/status";
+import { CampoAnexos } from "../enviar/CampoAnexos";
 import { ListaAnexos } from "../ticket/ListaAnexos";
 import { ListaComentarios } from "../ticket/ListaComentarios";
 
 type Props = {
   issue: Issue;
   onFechar: () => void;
-  onComentar: (texto: string) => void;
+  onComentar: (texto: string, imagens: AnexoPronto[]) => void;
   onEditar: (campos: Partial<Pick<Issue, "titulo" | "descricao" | "tipo" | "projeto">>) => void;
 };
 
@@ -77,6 +83,7 @@ export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
   const [anexos, setAnexos] = useState<Anexo[]>([]);
   const [contato, setContato] = useState<string | null>(null);
   const [texto, setTexto] = useState("");
+  const [imagens, setImagens] = useState<AnexoPronto[]>([]);
   const [editando, setEditando] = useState(false);
   const [rascunho, setRascunho] = useState({
     titulo: issue.titulo,
@@ -101,6 +108,13 @@ export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
   );
 
   useEffect(() => subscribeAnexos(issue.id, setAnexos, () => setAnexos([])), [issue.id]);
+
+  // Mesma subcoleção, dois lugares na tela: sem `comentarioId` é anexo do card,
+  // com `comentarioId` é print colado numa atualização.
+  const [anexosDoCard, imagensDeComentario] = useMemo(
+    () => [anexos.filter((a) => !a.comentarioId), anexos.filter((a) => a.comentarioId)],
+    [anexos],
+  );
 
   useEffect(() => {
     // Contato de quem reportou: mora num subdocumento que só o admin lê. Ausente
@@ -198,20 +212,25 @@ export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
       )}
 
       <ListaAnexos
-        anexos={anexos}
+        anexos={anexosDoCard}
         onApagar={(anexoId) => void apagarAnexo(issue.id, anexoId)}
       />
 
       <h3 className="secao">{t.comentariosLabel(comentarios.length)}</h3>
-      <ListaComentarios comentarios={comentarios} />
+      <ListaComentarios
+        comentarios={comentarios}
+        imagens={imagensDeComentario}
+        onApagarImagem={(anexoId) => void apagarAnexo(issue.id, anexoId)}
+      />
 
       <form
         className="painel-comentar"
         onSubmit={(e) => {
           e.preventDefault();
           if (!texto.trim()) return;
-          onComentar(texto);
+          onComentar(texto, imagens);
           setTexto("");
+          setImagens([]);
         }}
       >
         <label className="campo">
@@ -224,6 +243,8 @@ export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
             maxLength={4000}
           />
         </label>
+        {/* id próprio: o painel e o formulário de envio podem coexistir na aba. */}
+        <CampoAnexos id="imagens-comentario" apenasImagens anexos={imagens} onChange={setImagens} />
         <button type="submit" className="botao botao-primario">
           {t.comentar}
         </button>

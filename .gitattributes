@@ -1,0 +1,8 @@
+# O deploy do anunciador é um tar do working tree desta máquina Windows, onde o
+# core.autocrlf deixaria estes arquivos com CRLF. Do outro lado é Linux: um \r no
+# fim da linha faz o shell script não executar ("required file not found", porque
+# o \r entra no nome do interpretador) e entra junto no valor de um Environment=
+# da unit. Estes três nascem e morrem com LF.
+*.sh text eol=lf
+*.service text eol=lf
+*.timer text eol=lf

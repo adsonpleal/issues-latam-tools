@@ -102,6 +102,40 @@ responderam a um formulário privado e nunca combinaram de aparecer num quadro
 aberto. O contato delas foi para o subdocumento privado, então dá para dar
 retorno sem publicar nada.
 
+### Aviso no Discord
+
+Card novo e público vira um embed no canal de reports do Discord, com projeto,
+tipo, título, um trecho da descrição, o nick (quando tem) e o link do card.
+
+Quem faz isso é `tools/anunciar-discord.mjs`, rodando na EC2 compartilhada como
+one-shot do systemd a cada 2 min (`infra/issues-discord.{service,timer}`). O
+plano gratuito do Firebase não tem Cloud Functions, então o gatilho tem que vir
+de fora; e como o serviço não escuta em porta nenhuma, não há endpoint público
+para ninguém abusar.
+
+**Ele consulta o Firestore sem autenticação, de propósito.** Com a identidade de
+um visitante anônimo, as regras o deixam listar só card com `arquivado == false`
+e negam `issues/{id}/privado/contato` — ou seja, o anunciador *não consegue* ler
+o contato de quem reportou. A privacidade é garantida pelo banco, não pelo
+cuidado do script, que é por que aqui não entra `firebase-admin` nem service
+account.
+
+Duas consequências de graça: gravações do "Ajude o simulador" nascem arquivadas,
+então nunca são anunciadas; e o marco d'água em disco significa que a primeira
+execução não despeja o histórico no canal.
+
+O texto que sai dali é escrita pública anônima, então vai saneado: sem menção em
+massa (`allowed_mentions: {parse: []}`), sem URL na descrição, com markdown
+escapado e sem caractere invisível. Se 25 cards chegarem num intervalo de 2 min,
+ele para em vez de repassar a enxurrada.
+
+```bash
+node tools/anunciar-discord.mjs --dry-run --desde 2020-01-01T00:00:00Z --max 100
+```
+
+Renderiza os cards existentes como embeds sem postar nada — é o teste de olho
+antes de qualquer mudança no formato.
+
 ## Desenvolvimento
 
 ```bash
@@ -127,6 +161,10 @@ firebase deploy --only firestore
 
 Assim a credencial do CI não precisa de escrita no banco, e uma regressão de
 regra não entra de carona num push de rotina.
+
+O anunciador do Discord **não sai neste caminho** — ele mora na EC2 e é deploy
+manual (tar + scp + `infra/apply-unit.sh`). Os comandos estão na skill de deploy,
+que não vai para o repositório porque tem endereço e chave do servidor.
 
 ## Migração
 

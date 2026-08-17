@@ -10,3 +10,7 @@ prompts/
 # Chave de service account: nunca commitar.
 service-account*.json
 *-firebase-adminsdk-*.json
+
+# A skill de deploy tem endereco, usuario e chave do servidor: uso interno.
+.claude/settings.local.json
+.claude/skills/deploy/

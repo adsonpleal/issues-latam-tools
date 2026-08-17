@@ -1,0 +1,66 @@
+# Anuncia no Discord os cards novos do quadro público.
+#
+# NÃO habilite este serviço: quem tem ciclo de vida é o issues-discord.timer, que
+# dispara esta unit a cada 2 min. Por isso não há [Install] aqui.
+#
+# Provisionamento manual necessário uma vez (o deploy NÃO faz):
+#   install -d -o ubuntu -g ubuntu /opt/issues-discord /var/lib/issues-discord
+#   o drop-in 10-token.conf com o DISCORD_BOT_TOKEN (ver a skill de deploy)
+#   systemctl start issues-discord.service   # bootstrap, NÃO anuncia nada
+#   systemctl enable --now issues-discord.timer
+#
+# Type=oneshot em vez de um processo residente é a decisão central: um fetch
+# pendurado morre no TimeoutStartSec e o próximo tique começa com processo e
+# socket limpos. Um poller com setInterval fica verde no `systemctl status` para
+# sempre enquanto os anúncios param em silêncio, que é o modo de falha que
+# ninguém percebe. De quebra, entre um tique e outro o consumo de memória é zero,
+# o que importa numa máquina de 2 GB com cinco serviços.
+#
+# Sem Restart=: o systemd recusa Restart=always em Type=oneshot, e não faz falta —
+# o timer já tenta de novo em 120 s.
+
+[Unit]
+Description=issues-discord — anuncia no Discord os cards novos do quadro
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/opt/issues-discord
+
+Environment=NODE_ENV=production
+Environment=FIREBASE_PROJECT_ID=issues-latam-tools
+# Chave web pública: já vai no bundle do site (src/lib/firebase.ts). Não é
+# segredo — quem manda no acesso são as regras do Firestore. O serviço consulta
+# SEM AUTENTICAÇÃO de propósito: assim ele não consegue ler o contato de quem
+# reportou nem por engano.
+Environment=FIREBASE_API_KEY=AIzaSyCcBw2edbq0x15csy4h4w_ZBZOGnpNvBro
+Environment=DISCORD_CHANNEL_ID=1538690478751354880
+Environment=SITE_URL=https://issues.latam-tools.com.br
+# ⚠ FORA de /opt: o deploy apaga o que não está no tarball, e levaria o marco
+# d'água junto — o serviço reanunciaria tudo de novo a cada deploy.
+Environment=ESTADO=/var/lib/issues-discord/estado.json
+# O DISCORD_BOT_TOKEN vem do drop-in 10-token.conf, modo 0600, que não vai para o
+# repositório: esta unit é pública.
+
+ExecStart=/usr/bin/node --max-old-space-size=64 /opt/issues-discord/tools/anunciar-discord.mjs
+
+# Teto menor que o intervalo do timer: garante que nunca há dois rodando juntos.
+TimeoutStartSec=120
+
+# Máquina compartilhada: nada aqui pode derrubar os vizinhos.
+MemoryMax=128M
+CPUWeight=20
+IOWeight=20
+Nice=10
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/issues-discord
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=issues-discord

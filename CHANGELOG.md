@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.3.0
+
+- Card novo e público vira embed no canal de reports do Discord: projeto, tipo,
+  título, trecho da descrição, nick (quando tem) e link do card.
+- Quem anuncia é `tools/anunciar-discord.mjs`, one-shot do systemd na EC2 a cada
+  2 min. Consulta o Firestore **sem autenticação**: as regras negam
+  `privado/contato` a um anônimo, então o serviço é incapaz de vazar o contato de
+  quem reportou, e não só "programado para não vazar".
+- Gravação do "Ajude o simulador" continua fora — nasce arquivada, e a consulta
+  só enxerga card público.
+- O texto do usuário vai saneado: sem `@everyone`, sem URL na descrição, markdown
+  escapado, invisíveis removidos. Enxurrada de 25 cards num intervalo trava o
+  anúncio em vez de repassar.
+
 ## 1.2.1
 
 - O painel lateral do `/admin` agora mora na URL (`/admin?card=<id>`): dá para

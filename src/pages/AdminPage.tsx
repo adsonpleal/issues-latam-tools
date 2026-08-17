@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { t } from "../i18n";
@@ -24,7 +24,7 @@ export function AdminPage() {
 }
 
 function QuadroAdmin({ sessao }: { sessao: import("../lib/auth").Sessao }) {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const projeto = parseProjeto(params.get("projeto"));
   const tipoBruto = params.get("tipo");
   const tipo = isTipo(tipoBruto) ? tipoBruto : null;
@@ -35,7 +35,16 @@ function QuadroAdmin({ sessao }: { sessao: import("../lib/auth").Sessao }) {
   const { issues, carregando, erro } = useBoard({ admin: true });
   const { mover, comentar, editar, erro: erroAcao } = useAcoesAdmin(sessao);
 
-  const [aberto, setAberto] = useState<string | null>(null);
+  // O painel aberto mora na querystring, junto dos filtros: assim a URL da barra
+  // de endereço já é o link do card, e voltar no navegador fecha o painel.
+  const aberto = params.get("card");
+  function abrir(id: string | null) {
+    const novos = new URLSearchParams(params);
+    if (id) novos.set("card", id);
+    else novos.delete("card");
+    setParams(novos);
+  }
+
   const colunas = useMemo(
     () => agruparAdmin(issues, { projeto, tipo, busca }),
     [issues, projeto, tipo, busca],
@@ -50,12 +59,12 @@ function QuadroAdmin({ sessao }: { sessao: import("../lib/auth").Sessao }) {
         carregando={carregando}
         erro={erro}
         onMover={(id, coluna) => void mover(id, coluna)}
-        onAbrir={setAberto}
+        onAbrir={abrir}
       />
       {issueAberta && (
         <PainelIssue
           issue={issueAberta}
-          onFechar={() => setAberto(null)}
+          onFechar={() => abrir(null)}
           onComentar={(texto) => void comentar(issueAberta.id, texto)}
           onEditar={(campos) => void editar(issueAberta.id, campos)}
         />

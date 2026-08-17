@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1
+
+- O painel lateral do `/admin` agora mora na URL (`/admin?card=<id>`): dá para
+  linkar um card específico da triagem e o botão voltar do navegador fecha o
+  painel. Os filtros continuam compondo com ele.
+
 ## 1.2.0
 
 - Fichas de `tipo: "replay"`: as gravações `.rrf` do "Ajude o simulador a acertar

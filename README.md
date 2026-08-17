@@ -26,7 +26,7 @@ formulário.
 | `/` | o quadro; aceita `?projeto=`, `?tipo=` e `?busca=` |
 | `/novo` | formulário de envio; aceita `?projeto=` para pré-selecionar |
 | `/t/:id` | um card, com os comentários |
-| `/admin` | quadro editável, exige login |
+| `/admin` | quadro editável, exige login; aceita os mesmos filtros e `?card=` para abrir um card no painel |
 | `/:slug` | atalho: `/visuais` redireciona para `/?projeto=visuais` |
 
 Os filtros vivem na querystring em vez de virarem rota própria porque eles

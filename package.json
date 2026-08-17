@@ -1,6 +1,6 @@
 {
   "name": "issues-latam-tools",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "type": "module",
   "description": "Quadro público de issues das ferramentas do RO LATAM",

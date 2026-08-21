@@ -26,13 +26,19 @@ formulário.
 | `/` | o quadro; aceita `?projeto=`, `?tipo=` e `?busca=` |
 | `/novo` | formulário de envio; aceita `?projeto=` para pré-selecionar |
 | `/t/:id` | um card, com os comentários |
-| `/admin` | quadro editável, exige login; aceita os mesmos filtros e `?card=` para abrir um card no painel |
-| `/admin/gravacoes` | a caixa de entrada das gravações do simulador, e o botão que promove uma para card |
+| `/entrar` | a porta do admin; não é linkada de lugar nenhum |
+| `/gravacoes` | a caixa de entrada das gravações do simulador, e o botão que promove uma para card; sem sessão, é "não encontrado" |
 | `/:slug` | atalho: `/visuais` redireciona para `/?projeto=visuais` |
+
+**Não existe espaço de URL de admin.** As rotas são as mesmas para todo mundo, e
+é ter ou não sessão que decide o que aparece: com sessão, `/` ganha a gaveta de
+arquivados, o arrastar, o seletor de coluna e o painel `?card=`, e `/t/:id` ganha
+editar, mover, contato, comentar e apagar anexo. Sem sessão, as mesmas URLs são o
+quadro público de sempre.
 
 Os filtros vivem na querystring em vez de virarem rota própria porque eles
 compõem (projeto × tipo × busca) e porque `/visuais` na raiz brigaria por
-espaço de nome com `/admin`, `/novo` e `/t/:id`.
+espaço de nome com `/novo`, `/t/:id` e `/gravacoes`.
 
 ### Colunas
 
@@ -73,7 +79,7 @@ caber — um PNG de 12 MB sai em ~800 kB no pior caso.
 
 Apagar anexo é a única exceção ao `delete: if false` que vale para todo o resto:
 qualquer pessoa anexa arquivo, então precisa existir moderação. Só o admin
-apaga, pelo painel do `/admin`.
+apaga, pelo painel do quadro ou pela própria página do card.
 
 Imagem colada num comentário vive na **mesma subcoleção**, com um campo
 `comentarioId` a mais — é o que decide se ela é renderizada na lista de anexos
@@ -100,7 +106,7 @@ de propósito, para as gravações não ficarem atrás de uma URL adivinhável, 
 consentimento que a pessoa marca fala em o arquivo virar teste no repositório
 aberto — não em ficar publicado num quadro.
 
-**Promover é o que publica, e publicar é criar o card**: `/admin/gravacoes` →
+**Promover é o que publica, e publicar é criar o card**: `/gravacoes` →
 *Promover* escreve uma ficha pública em `backlog` com o `.rrf` anexado, o contato
 no subdocumento privado e o mesmo id da gravação, numa escrita atômica só. O card
 herda a data do envio, não a de hoje — o crédito é do dia em que a pessoa gravou.
@@ -222,9 +228,26 @@ service account; senão usa o token que o `firebase login` já deixou na máquin
 
 ## Administração
 
-`/admin` → entrar com Google. **Qualquer conta Google consegue entrar** e ganha
+`/entrar` → entrar com Google. **Qualquer conta Google consegue entrar** e ganha
 um registro de usuário; nenhuma delas consegue escrever nada. O portão é a regra
-`isAdmin()` em `firestore.rules`, não a interface.
+`isAdmin()` em `firestore.rules`, não a interface — o que a interface faz é
+mostrar ou esconder controles.
+
+Depois disso não há para onde ir: os poderes aparecem nas próprias URLs
+públicas. `/entrar` só é útil de novo para sair, ou quando a marca abaixo some.
+
+### Por que existe uma marca em localStorage
+
+O SDK de auth são ~40 kB gz. Enquanto o admin tinha rota própria, bastava
+carregá-la em `lazy()` para o público nunca baixá-lo. Com as ações morando nas
+mesmas URLs de todo mundo, algo precisa dizer se vale a pena perguntar se há
+sessão — e é `issues.latamtools.admin` (ver `src/lib/auth.ts`).
+
+Sem a marca, `SessaoProvider` resolve "sem sessão" já na primeira render e nunca
+toca no import. Ela **não é segurança**: forjá-la só faz baixar o SDK e descobrir
+que não há sessão. E perdê-la não tranca ninguém para fora — `/entrar` liga o
+observador sem consultá-la, então a sessão que ainda estiver no IndexedDB é
+reconhecida sem popup nenhum.
 
 Arrastar card funciona no desktop. No celular, use o seletor de coluna que
 aparece em cada card — arrastar (HTML5 drag and drop) não funciona em toque

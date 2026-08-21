@@ -7,7 +7,7 @@ type Props = {
   coluna: TipoColuna;
   quantidade: number;
   children: ReactNode;
-  /** Só no /admin: transforma a coluna em alvo de drop. */
+  /** Só com sessão de admin: transforma a coluna em alvo de drop. */
   onSoltar?: (id: string, coluna: TipoColuna) => void;
 };
 

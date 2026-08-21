@@ -18,7 +18,7 @@ export type EstadoFila = {
 /**
  * A caixa de entrada ao vivo, mais as ações da triagem.
  *
- * Só a rota /admin/gravacoes usa: a regra de leitura da coleção é `isAdmin()`,
+ * Só a rota /gravacoes usa: a regra de leitura da coleção é `isAdmin()`,
  * então para qualquer outra pessoa isto não devolve nada — nem uma lista vazia,
  * um erro de permissão.
  */

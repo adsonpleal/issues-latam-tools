@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.6.0
+
+- **Acabou o `/admin`.** As URLs são as mesmas para todo mundo; o que muda é ter
+  ou não sessão. Com sessão, `/` ganha a gaveta de arquivados, o arrastar, o
+  seletor de coluna e o painel `?card=`; sem ela, é o quadro público de sempre.
+- **`/t/:id` virou editável.** A ficha que o público lê é a mesma que a triagem
+  edita: contato de quem reportou, editar, seletor de coluna, comentar com
+  imagem e apagar anexo, tudo embaixo da ficha. Antes só o painel do quadro
+  fazia isso, e o link direto era um beco sem saída.
+- Como o seletor de coluna chegou ali, a página do card é agora o único jeito de
+  **desarquivar** por link direto — e o admin passa a enxergar card arquivado em
+  `/t/:id`, que para o público continua sendo "não encontrado".
+- `/admin/gravacoes` → `/gravacoes`, e sem sessão ela é "não encontrado" em vez
+  de um portão de login: nem a existência da fila é resposta que se deva a
+  alguém.
+- Entrar mudou para `/entrar`, que não é linkada de lugar nenhum. Sair mora na
+  barra do topo, junto do nome e do link das gravações.
+- **Uma marca em `localStorage` decide se vale baixar o SDK de auth.** Com as
+  ações nas mesmas URLs do público, alguém precisava dizer se a pergunta "há
+  sessão?" vale ~40 kB gz — e a resposta é quase sempre não. Sem a marca, nada
+  toca o import. Ela não é segurança (forjá-la só faz baixar o SDK e descobrir
+  que não há sessão) e perdê-la não tranca ninguém para fora: `/entrar` liga o
+  observador sem consultá-la.
+- Correção: as assinaturas de `/t/:id` agora esperam a sessão resolver. Um
+  `onSnapshot` que toma `permission-denied` **morre** — não tenta de novo quando
+  o token chega. Assinar antes da hora deixaria o admin olhando um "não
+  encontrado" que nada mais consertaria.
+
 ## 1.5.0
 
 - Rota `/admin/gravacoes`: a caixa de entrada das gravações do "Ajude o

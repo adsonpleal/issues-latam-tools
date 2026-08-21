@@ -160,7 +160,7 @@ export async function promoverGravacao(g: Gravacao): Promise<string> {
     anexos: arquivo ? 1 : 0,
     criadoEm: g.criadoEm ? Timestamp.fromDate(g.criadoEm) : serverTimestamp(),
     atualizadoEm: serverTimestamp(),
-    // Desnormalizado no card para o painel do /admin mostrar o resumo sem ir
+    // Desnormalizado no card para o painel da triagem mostrar o resumo sem ir
     // buscar a gravação de origem.
     replay: g.resumo,
     ...(g.nick ? { autor: g.nick } : {}),

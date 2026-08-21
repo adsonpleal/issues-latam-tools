@@ -10,7 +10,7 @@ type Props = {
   comentarios: Comentario[];
   /** Só os anexos amarrados a comentário; os do card ficam na `ListaAnexos`. */
   imagens?: Anexo[];
-  /** Presente só no /admin: dá para tirar o print colado por engano. */
+  /** Só com sessão de admin: dá para tirar o print colado por engano. */
   onApagarImagem?: (anexoId: string) => void;
 };
 

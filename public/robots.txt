@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
-Disallow: /admin
+Disallow: /entrar
+Disallow: /gravacoes
 
 Sitemap: https://issues.latam-tools.com.br/sitemap.xml

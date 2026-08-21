@@ -281,7 +281,7 @@ service cloud.firestore {
     // Caixa de entrada, não quadro.
     //
     // Elas não são card: o diálogo do simulador escreve aqui, só o admin lê, e
-    // quem decide se aquilo vira ficha pública é a triagem em /admin/gravacoes
+    // quem decide se aquilo vira ficha pública é a triagem em /gravacoes
     // — promover CRIA um card normal, com o .rrf copiado para os anexos dele.
     //
     // Antes disso não existe URL que devolva o conteúdo para ninguém. É a mesma

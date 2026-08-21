@@ -128,8 +128,14 @@ h2 {
   flex: 1 1 auto;
 }
 
+/* Flex mesmo com um filho só: com sessão de admin entram o nome, as gravações e
+   o Sair ao lado do Reportar, e sem isto eles empilhariam. */
 .topbar-acoes {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 select,
@@ -655,17 +661,39 @@ input[type="file"]::file-selector-button {
   padding: 1.5rem 0;
 }
 
+/* Vive dentro da `.topbar-acoes`, em linha — por isso sem margem própria: quem
+   dá o espaçamento é o gap da barra. */
 .admin-sessao {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   color: var(--muted);
   font-size: 0.85rem;
-  margin-bottom: 1rem;
+}
+
+/* Bloco de poderes na página do card. Fica destacado do resto de propósito: a
+   ficha acima é a mesma que o público lê, e a moldura é o que separa "isto todo
+   mundo vê" de "isto sou eu mexendo". */
+.acoes-admin {
+  border: 1px solid var(--border);
+  border-radius: var(--raio);
+  background: var(--bg-inset);
+  padding: 0.9rem 1rem;
+  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.acoes-admin-linha {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 /* --- Fila de gravações ---------------------------------------------------
-   A lista de /admin/gravacoes. Não é card de quadro: aqui a linha inteira é o
+   A lista de /gravacoes. Não é card de quadro: aqui a linha inteira é o
    resumo do parser, que é o que decide se a gravação vale a conferência. */
 
 .gravacoes-secao {
@@ -815,7 +843,7 @@ input[type="file"]::file-selector-button {
 }
 
 .painel-meta,
-.painel-contato {
+.linha-contato {
   color: var(--muted);
   font-size: 0.85rem;
 }
@@ -828,7 +856,7 @@ input[type="file"]::file-selector-button {
   padding: 0.75rem;
 }
 
-.painel-edicao {
+.form-edicao {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -838,18 +866,18 @@ input[type="file"]::file-selector-button {
    conteúdo, e o `width: 100%` do textarea passava a ser 100% de quase nada. O
    stretch padrão é o que dá a largura toda ao campo — só o botão volta a ter
    tamanho de botão. */
-.painel-comentar {
+.form-comentar {
   margin-top: 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.painel-comentar textarea {
+.form-comentar textarea {
   width: 100%;
 }
 
-.painel-comentar > .botao {
+.form-comentar > .botao {
   align-self: flex-start;
 }
 

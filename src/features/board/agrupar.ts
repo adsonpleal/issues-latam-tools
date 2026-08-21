@@ -57,7 +57,7 @@ export function agrupar(issues: Issue[], filtros: Filtros): Agrupado[] {
   }));
 }
 
-/** Igual ao `agrupar`, mais a gaveta de arquivados no fim. Só a rota /admin usa. */
+/** Igual ao `agrupar`, mais a gaveta de arquivados no fim. Só com sessão. */
 export function agruparAdmin(issues: Issue[], filtros: Filtros): Agrupado[] {
   const todos = filtrar(issues, filtros);
   const ativos = todos.filter((i) => !i.arquivado);

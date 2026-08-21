@@ -17,7 +17,6 @@ export const t = {
   buscarPlaceholder: "Buscar por texto…",
   reportar: "Reportar",
   reportarTitulo: "Reportar um bug ou sugerir uma melhoria",
-  admin: "Admin",
   voltar: "Voltar ao quadro",
 
   // Quadro
@@ -82,10 +81,9 @@ export const t = {
   comentar: "Comentar",
   comentarPlaceholder: "Escreva uma atualização…",
 
-  // Admin
+  // Sessão de admin
   entrar: "Entrar com Google",
   sair: "Sair",
-  adminTitulo: "Administração",
   adminEntrarAjuda: "Entre com a conta de administrador para mexer no quadro.",
   semPermissao: "Esta conta não tem permissão para administrar o quadro.",
   semPermissaoAjuda: "Entrar com uma conta Google não dá nenhum acesso de escrita.",
@@ -102,7 +100,6 @@ export const t = {
   gravacoesSub:
     'Os .rrf que chegam do "Ajude o simulador a acertar as contas". Não são cards: ficam aqui, privadas, até a triagem promover uma — é isso que cria a ficha pública, com a gravação anexada.',
   gravacoesLink: "Gravações",
-  voltarQuadroAdmin: "Voltar para o quadro",
   erroGravacoes: "Não consegui carregar a fila. Recarregue a página.",
   gravacoesFila: "Na fila",
   gravacoesFilaAjuda: "Esperando decisão. Nada daqui está publicado.",

@@ -1,5 +1,6 @@
 import { Link, useSearchParams } from "react-router-dom";
 
+import { useSessao } from "../features/admin/SessaoContext";
 import { LABEL_TIPO, t } from "../i18n";
 import { PROJETOS, SLUGS_PROJETO, parseProjeto } from "../lib/projetos";
 import { TIPOS, isTipo } from "../lib/status";
@@ -8,8 +9,13 @@ import { TIPOS, isTipo } from "../lib/status";
  * Os filtros moram na querystring, não em estado local: mudar o filtro já deixa
  * a URL pronta para compartilhar, e é essa mesma URL que o botão "Acompanhar"
  * dos outros sites abre (`/?projeto=visuais`).
+ *
+ * A barra é a mesma para todo mundo. Com sessão de admin ela ganha o nome, o
+ * link das gravações e o Sair — que era o cabeçalho do portão de /admin, na
+ * época em que existia uma rota para pendurá-lo.
  */
 export function TopBar() {
+  const { sessao, admin, sair } = useSessao();
   const [params, setParams] = useSearchParams();
   const projeto = parseProjeto(params.get("projeto"));
   const tipoBruto = params.get("tipo");
@@ -76,6 +82,15 @@ export function TopBar() {
       </div>
 
       <div className="topbar-acoes">
+        {admin && (
+          <span className="admin-sessao">
+            <span>{sessao?.nome}</span>
+            <Link to="/gravacoes">{t.gravacoesLink}</Link>
+            <button type="button" className="botao botao-pequeno" onClick={() => void sair()}>
+              {t.sair}
+            </button>
+          </span>
+        )}
         <Link
           className="botao botao-primario"
           to={projeto ? `/novo?projeto=${projeto}` : "/novo"}

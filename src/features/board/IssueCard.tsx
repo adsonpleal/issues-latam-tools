@@ -10,9 +10,9 @@ type Props = {
   issue: Issue;
   jaVotou: boolean;
   onVotar: (id: string) => void;
-  /** Presente só no /admin: liga o arrastar e o seletor de coluna. */
+  /** Presente só com sessão de admin: liga o arrastar e o seletor de coluna. */
   onMover?: (id: string, coluna: Coluna) => void;
-  /** Presente só no /admin: abre o painel lateral em vez de navegar. */
+  /** Presente só com sessão de admin: abre o painel em vez de navegar. */
   onAbrir?: (id: string) => void;
 };
 
@@ -23,7 +23,7 @@ export function IssueCard({ issue, jaVotou, onVotar, onMover, onAbrir }: Props) 
   return (
     <article
       className="issue-card"
-      // `draggable` só existe no modo admin — o DOM público nem recebe o atributo.
+      // `draggable` só existe com sessão — o DOM público nem recebe o atributo.
       draggable={admin || undefined}
       onDragStart={
         admin

@@ -10,7 +10,7 @@ type Props = {
   colunas: Agrupado[];
   carregando: boolean;
   erro: string | null;
-  /** Só o /admin passa: liga o arrastar, o seletor de coluna e o painel lateral. */
+  /** Passados só com sessão de admin: arrastar, seletor de coluna e painel. */
   onMover?: (id: string, coluna: TipoColuna) => void;
   onAbrir?: (id: string) => void;
 };

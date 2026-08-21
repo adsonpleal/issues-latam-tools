@@ -11,7 +11,7 @@ export default defineConfig({
     target: "es2022",
     sourcemap: true,
     // O SDK do Firestore sozinho passa de 500 kB. O de auth já sai num chunk
-    // separado (só /admin importa), e o resto é react + router.
+    // separado (só quem entra importa), e o resto é react + router.
     chunkSizeWarningLimit: 700,
   },
   test: {

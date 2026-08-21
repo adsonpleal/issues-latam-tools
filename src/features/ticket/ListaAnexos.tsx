@@ -5,7 +5,7 @@ import { formataTamanho, urlDoAnexo, type Anexo } from "../../lib/anexos";
 
 type Props = {
   anexos: Anexo[];
-  /** Presente só no /admin: qualquer pessoa anexa, então precisa dar para tirar. */
+  /** Só com sessão de admin: qualquer pessoa anexa, então precisa dar para tirar. */
   onApagar?: (anexoId: string) => void;
 };
 

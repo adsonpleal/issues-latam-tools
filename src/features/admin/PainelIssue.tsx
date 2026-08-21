@@ -1,51 +1,39 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { LABEL_TIPO, t } from "../../i18n";
-import {
-  apagarAnexo,
-  subscribeAnexos,
-  type Anexo,
-  type AnexoPronto,
-} from "../../lib/anexos";
+import { apagarAnexo, subscribeAnexos, type Anexo, type AnexoPronto } from "../../lib/anexos";
 import { subscribeComentarios, type Comentario } from "../../lib/comentarios";
-import { getContato, type Issue } from "../../lib/issues";
-import { PROJETOS, SLUGS_PROJETO, type Projeto } from "../../lib/projetos";
-import { TIPOS, type Tipo } from "../../lib/status";
-import { CampoAnexos } from "../enviar/CampoAnexos";
+import type { Issue } from "../../lib/issues";
+import { PROJETOS } from "../../lib/projetos";
 import { ListaAnexos } from "../ticket/ListaAnexos";
 import { ListaComentarios } from "../ticket/ListaComentarios";
+import {
+  FormularioComentario,
+  FormularioEdicao,
+  useContato,
+  type CamposEditaveis,
+} from "./AcoesIssue";
 import { ResumoGravacao } from "./ResumoGravacao";
 
 type Props = {
   issue: Issue;
   onFechar: () => void;
   onComentar: (texto: string, imagens: AnexoPronto[]) => void;
-  onEditar: (campos: Partial<Pick<Issue, "titulo" | "descricao" | "tipo" | "projeto">>) => void;
+  onEditar: (campos: CamposEditaveis) => void;
 };
 
+/**
+ * O card aberto sem sair do quadro — é onde a triagem acontece, porque dá para
+ * ler a ficha e arrastar a coluna na mesma tela. A mesma ficha, inteira e com os
+ * mesmos poderes, também abre em `/t/:id`; as peças de edição são as mesmas.
+ */
 export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
   const [comentarios, setComentarios] = useState<Comentario[]>([]);
   const [anexos, setAnexos] = useState<Anexo[]>([]);
-  const [contato, setContato] = useState<string | null>(null);
-  const [texto, setTexto] = useState("");
-  const [imagens, setImagens] = useState<AnexoPronto[]>([]);
   const [editando, setEditando] = useState(false);
-  const [rascunho, setRascunho] = useState({
-    titulo: issue.titulo,
-    descricao: issue.descricao,
-    tipo: issue.tipo,
-    projeto: issue.projeto,
-  });
+  const contato = useContato(issue.id);
 
-  useEffect(() => {
-    setRascunho({
-      titulo: issue.titulo,
-      descricao: issue.descricao,
-      tipo: issue.tipo,
-      projeto: issue.projeto,
-    });
-    setEditando(false);
-  }, [issue.id, issue.titulo, issue.descricao, issue.tipo, issue.projeto]);
+  useEffect(() => setEditando(false), [issue.id]);
 
   useEffect(
     () => subscribeComentarios(issue.id, setComentarios, () => setComentarios([])),
@@ -61,14 +49,6 @@ export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
     [anexos],
   );
 
-  useEffect(() => {
-    // Contato de quem reportou: mora num subdocumento que só o admin lê. Ausente
-    // na maioria dos cards — é campo opcional, e os migrados das planilhas só têm
-    // quando a pessoa preencheu.
-    setContato(null);
-    void getContato(issue.id).then(setContato).catch(() => setContato(null));
-  }, [issue.id]);
-
   return (
     <aside className="painel" aria-label={issue.titulo}>
       <div className="painel-topo">
@@ -79,66 +59,14 @@ export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
       </div>
 
       {editando ? (
-        <div className="painel-edicao">
-          <label className="campo">
-            <span>{t.campoTituloLabel}</span>
-            <input
-              value={rascunho.titulo}
-              onChange={(e) => setRascunho({ ...rascunho, titulo: e.target.value })}
-              maxLength={120}
-            />
-          </label>
-          <label className="campo">
-            <span>{t.campoDescricao}</span>
-            <textarea
-              rows={8}
-              value={rascunho.descricao}
-              onChange={(e) => setRascunho({ ...rascunho, descricao: e.target.value })}
-              maxLength={4000}
-            />
-          </label>
-          <label className="campo">
-            <span>{t.campoProjeto}</span>
-            <select
-              value={rascunho.projeto}
-              onChange={(e) => setRascunho({ ...rascunho, projeto: e.target.value as Projeto })}
-            >
-              {SLUGS_PROJETO.map((s) => (
-                <option key={s} value={s}>
-                  {PROJETOS[s].nome}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="campo">
-            <span>{t.campoTipo}</span>
-            <select
-              value={rascunho.tipo}
-              onChange={(e) => setRascunho({ ...rascunho, tipo: e.target.value as Tipo })}
-            >
-              {TIPOS.map((tp) => (
-                <option key={tp} value={tp}>
-                  {LABEL_TIPO[tp]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="formulario-acoes">
-            <button
-              type="button"
-              className="botao botao-primario"
-              onClick={() => {
-                onEditar(rascunho);
-                setEditando(false);
-              }}
-            >
-              {t.salvar}
-            </button>
-            <button type="button" className="botao" onClick={() => setEditando(false)}>
-              {t.cancelar}
-            </button>
-          </div>
-        </div>
+        <FormularioEdicao
+          issue={issue}
+          onSalvar={(campos) => {
+            onEditar(campos);
+            setEditando(false);
+          }}
+          onCancelar={() => setEditando(false)}
+        />
       ) : (
         <>
           <p className="painel-meta">
@@ -147,7 +75,7 @@ export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
           </p>
           {issue.descricao && <p className="painel-descricao">{issue.descricao}</p>}
           {issue.replay && <ResumoGravacao replay={issue.replay} />}
-          <p className="painel-contato">
+          <p className="linha-contato">
             <strong>{t.contatoLabel}:</strong> {contato ?? t.semContato}
           </p>
           <button type="button" className="botao botao-pequeno" onClick={() => setEditando(true)}>
@@ -156,10 +84,7 @@ export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
         </>
       )}
 
-      <ListaAnexos
-        anexos={anexosDoCard}
-        onApagar={(anexoId) => void apagarAnexo(issue.id, anexoId)}
-      />
+      <ListaAnexos anexos={anexosDoCard} onApagar={(anexoId) => void apagarAnexo(issue.id, anexoId)} />
 
       <h3 className="secao">{t.comentariosLabel(comentarios.length)}</h3>
       <ListaComentarios
@@ -168,32 +93,7 @@ export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
         onApagarImagem={(anexoId) => void apagarAnexo(issue.id, anexoId)}
       />
 
-      <form
-        className="painel-comentar"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!texto.trim()) return;
-          onComentar(texto, imagens);
-          setTexto("");
-          setImagens([]);
-        }}
-      >
-        <label className="campo">
-          <span className="visually-hidden">{t.comentar}</span>
-          <textarea
-            rows={3}
-            value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            placeholder={t.comentarPlaceholder}
-            maxLength={4000}
-          />
-        </label>
-        {/* id próprio: o painel e o formulário de envio podem coexistir na aba. */}
-        <CampoAnexos id="imagens-comentario" apenasImagens anexos={imagens} onChange={setImagens} />
-        <button type="submit" className="botao botao-primario">
-          {t.comentar}
-        </button>
-      </form>
+      <FormularioComentario id="imagens-comentario-painel" onEnviar={onComentar} />
     </aside>
   );
 }

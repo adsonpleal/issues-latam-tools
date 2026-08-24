@@ -2,7 +2,13 @@ import { useCallback, useState } from "react";
 
 import type { AnexoPronto } from "../../lib/anexos";
 import { addComentario } from "../../lib/comentarios";
-import { editarIssue, moverIssue, type Issue } from "../../lib/issues";
+import {
+  editarIssue,
+  moverIssue,
+  ordenarIssues,
+  type Issue,
+  type Posicao,
+} from "../../lib/issues";
 import type { Sessao } from "../../lib/auth";
 import type { Coluna } from "../../lib/status";
 
@@ -15,6 +21,15 @@ export function useAcoesAdmin(sessao: Sessao | null) {
       // Sem estado local: o onSnapshot do quadro já compensa a latência e pinta
       // o card na coluna nova antes da escrita chegar em São Paulo.
       await moverIssue(id, coluna).catch((e: Error) => setErro(e.message));
+    },
+    [],
+  );
+
+  const ordenar = useCallback(
+    async (posicoes: Posicao[], movido?: { id: string; coluna: Coluna }) => {
+      if (posicoes.length === 0 && !movido) return;
+      setErro(null);
+      await ordenarIssues(posicoes, movido).catch((e: Error) => setErro(e.message));
     },
     [],
   );
@@ -38,5 +53,5 @@ export function useAcoesAdmin(sessao: Sessao | null) {
     [sessao],
   );
 
-  return { mover, editar, comentar, erro };
+  return { mover, ordenar, editar, comentar, erro };
 }

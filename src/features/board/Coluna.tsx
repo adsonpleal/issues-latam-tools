@@ -9,9 +9,11 @@ type Props = {
   children: ReactNode;
   /** Só com sessão de admin: transforma a coluna em alvo de drop. */
   onSoltar?: (id: string, coluna: TipoColuna) => void;
+  /** Só quando a pilha está arrumada à mão: devolve a coluna ao automático. */
+  onOrdemAutomatica?: () => void;
 };
 
-export function Coluna({ coluna, quantidade, children, onSoltar }: Props) {
+export function Coluna({ coluna, quantidade, children, onSoltar, onOrdemAutomatica }: Props) {
   // dragenter/dragleave disparam para cada filho: sem contar a profundidade, o
   // destaque pisca sempre que o ponteiro passa por cima de um card.
   const profundidade = useRef(0);
@@ -34,9 +36,18 @@ export function Coluna({ coluna, quantidade, children, onSoltar }: Props) {
           if (profundidade.current <= 0) setSobre(false);
         },
         onDrop: (e: React.DragEvent) => {
-          e.preventDefault();
           profundidade.current = 0;
           setSobre(false);
+          // O drop sobe do card para cá. Se um card já o atendeu, ele chamou
+          // preventDefault — e aí a coluna só apaga o destaque: soltar EM CIMA
+          // de um card escolhe a posição, e mover sem posição jogaria fora a
+          // escolha que acabou de ser feita.
+          //
+          // A pergunta é feita ao evento nativo, não ao sintético: o sintético é
+          // um objeto do React, e ler dele um estado que muda no meio do
+          // caminho é depender de detalhe interno dele.
+          if (e.nativeEvent.defaultPrevented) return;
+          e.preventDefault();
           const id = e.dataTransfer.getData("text/plain");
           if (id) onSoltar(id, coluna);
         },
@@ -54,6 +65,16 @@ export function Coluna({ coluna, quantidade, children, onSoltar }: Props) {
         <span className="coluna-contador" aria-hidden="true">
           {quantidade}
         </span>
+        {onOrdemAutomatica && (
+          <button
+            type="button"
+            className="coluna-auto"
+            onClick={onOrdemAutomatica}
+            title={t.ordemAutomaticaTitulo}
+          >
+            {t.ordemAutomatica}
+          </button>
+        )}
       </header>
       {isStatus(coluna) && <p className="coluna-ajuda">{AJUDA_STATUS[coluna]}</p>}
       <div className="coluna-lista">

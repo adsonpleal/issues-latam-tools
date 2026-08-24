@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 
 import { t } from "../i18n";
@@ -22,6 +22,10 @@ import { useSessao } from "../features/admin/SessaoContext";
 export function EntrarPage() {
   useSeo({ title: `${t.entrar} — ${t.siteNome}` });
   const { sessao, admin, carregando, ativar, entrar, sair } = useSessao();
+  // O que o popup respondeu de errado. Sem isto, falhar em entrar é um clique
+  // que não faz nada — e popup bloqueado, que é a falha mais comum, some sem
+  // deixar rastro na tela.
+  const [erro, setErro] = useState<string | null>(null);
 
   useEffect(ativar, [ativar]);
 
@@ -38,10 +42,16 @@ export function EntrarPage() {
             <button
               type="button"
               className="botao botao-primario"
-              onClick={() => void entrar()}
+              onClick={() => {
+                setErro(null);
+                entrar().catch((e: { code?: string; message?: string }) =>
+                  setErro(e.code ?? e.message ?? "desconhecido"),
+                );
+              }}
             >
               {t.entrar}
             </button>
+            {erro && <p className="aviso aviso-erro">{t.erroEntrar(erro)}</p>}
           </>
         )}
 

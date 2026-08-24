@@ -87,7 +87,14 @@ export const t = {
   adminEntrarAjuda: "Entre com a conta de administrador para mexer no quadro.",
   semPermissao: "Esta conta não tem permissão para administrar o quadro.",
   semPermissaoAjuda: "Entrar com uma conta Google não dá nenhum acesso de escrita.",
+  erroEntrar: (codigo: string) =>
+    `Não consegui entrar: ${codigo}. Se for popup bloqueado, libere popups para este endereço no navegador e tente de novo.`,
   moverPara: "Mover para",
+  subirNaPilha: "Subir na coluna",
+  descerNaPilha: "Descer na coluna",
+  ordemAutomatica: "Ordem automática",
+  ordemAutomaticaTitulo:
+    "Solta a ordem arrumada à mão e devolve a coluna à ordem padrão (votos, ou data nas colunas de encerramento)",
   arquivar: "Arquivar",
   salvar: "Salvar",
   cancelar: "Cancelar",

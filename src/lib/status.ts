@@ -42,8 +42,9 @@ export function isTipo(valor: unknown): valor is Tipo {
 
 /**
  * Colunas de encerramento ordenam pela última mexida, não pelos votos: o que
- * interessa ali é "o que saiu agora", e não "o que foi mais pedido".
+ * interessa ali é "o que saiu agora", e não "o que foi mais pedido". A gaveta de
+ * arquivados é a mesma ideia — ninguém procura ali pelo mais votado.
  */
-export function ordenaPorAtualizacao(status: Status): boolean {
-  return status === "resolvido" || status === "nao_sera_feito";
+export function ordenaPorAtualizacao(coluna: Coluna): boolean {
+  return coluna === "resolvido" || coluna === "nao_sera_feito" || coluna === "arquivado";
 }

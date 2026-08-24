@@ -147,7 +147,9 @@ service cloud.firestore {
       }
 
       // --- ATUALIZAÇÃO ---------------------------------------------------
-      allow update: if isAdmin() ? isEdicaoAdmin() : isUpvotePublico();
+      allow update: if isAdmin()
+                    ? (isReordenacaoAdmin() || isEdicaoAdmin())
+                    : isUpvotePublico();
 
       // A única mutação pública do sistema. `increment(1)` é resolvido no
       // servidor ANTES da regra rodar, então a conta abaixo enxerga o valor
@@ -161,6 +163,21 @@ service cloud.firestore {
                && request.resource.data.upvotes == resource.data.upvotes + 1;
       }
 
+      // Arrastar card dentro da pilha mexe só na chave de ordenação — e de
+      // propósito NÃO carimba `atualizadoEm`: "Resolvido" e a gaveta ordenam
+      // por essa data, e arrumar a pilha não é mexer no card. Um lote de
+      // reordenação bate nesta regra uma vez por documento; o card que mudou de
+      // coluna no mesmo gesto leva status junto e cai na regra de baixo.
+      //
+      // `hasOnly` cobre também apagar o campo, que é o botão de voltar à ordem
+      // automática.
+      function isReordenacaoAdmin() {
+        return request.resource.data.diff(resource.data)
+                 .affectedKeys().hasOnly(['ordem'])
+               && (!request.resource.data.keys().hasAny(['ordem'])
+                   || request.resource.data.ordem is int);
+      }
+
       // O admin move, edita e arquiva — mas os enums continuam valendo, senão
       // uma edição errada no console escreve um status sem coluna e o card
       // some de todas as telas sem erro nenhum.
@@ -169,6 +186,8 @@ service cloud.firestore {
                && request.resource.data.projeto in projetos()
                && request.resource.data.tipo in tipos()
                && request.resource.data.arquivado is bool
+               && (!request.resource.data.keys().hasAny(['ordem'])
+                   || request.resource.data.ordem is int)
                && request.resource.data.criadoEm == resource.data.criadoEm
                && request.resource.data.atualizadoEm == request.time;
       }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Issue } from "../../lib/issues";
-import { agrupar, agruparAdmin, filtrar, FILTROS_VAZIOS } from "./agrupar";
+import { agrupar, agruparAdmin, filtrar, FILTROS_VAZIOS, pilha } from "./agrupar";
 
 function issue(over: Partial<Issue> & { id: string }): Issue {
   return {
@@ -17,6 +17,7 @@ function issue(over: Partial<Issue> & { id: string }): Issue {
     criadoEm: new Date("2026-01-01"),
     atualizadoEm: new Date("2026-01-01"),
     autor: null,
+    ordem: null,
     replay: null,
     ...over,
   };
@@ -110,6 +111,49 @@ describe("agrupar", () => {
     expect(resolvido?.issues.map((i) => i.id)).toEqual(["recente", "antigo"]);
   });
 
+  it("ordem arrumada à mão manda mais que os votos", () => {
+    const r = agrupar(
+      [
+        issue({ id: "campeao", upvotes: 99 }),
+        issue({ id: "fixado", upvotes: 0, ordem: 0 }),
+      ],
+      FILTROS_VAZIOS,
+    );
+    expect(r[0]?.issues.map((i) => i.id)).toEqual(["fixado", "campeao"]);
+  });
+
+  it("quem não foi arrumado flui embaixo da pilha arrumada, pela regra da coluna", () => {
+    const r = agrupar(
+      [
+        issue({ id: "solto-pouco", upvotes: 1 }),
+        issue({ id: "fixado-2", ordem: 1 }),
+        issue({ id: "solto-muito", upvotes: 8 }),
+        issue({ id: "fixado-1", ordem: 0 }),
+      ],
+      FILTROS_VAZIOS,
+    );
+    expect(r[0]?.issues.map((i) => i.id)).toEqual([
+      "fixado-1",
+      "fixado-2",
+      "solto-muito",
+      "solto-pouco",
+    ]);
+  });
+
+  it("a ordem manual também vale nas colunas de encerramento", () => {
+    const r = agrupar(
+      [
+        issue({ id: "recente", status: "resolvido", atualizadoEm: new Date("2026-08-01") }),
+        issue({ id: "fixado", status: "resolvido", atualizadoEm: new Date("2026-01-01"), ordem: 0 }),
+      ],
+      FILTROS_VAZIOS,
+    );
+    expect(r.find((c) => c.coluna === "resolvido")?.issues.map((i) => i.id)).toEqual([
+      "fixado",
+      "recente",
+    ]);
+  });
+
   it("aplica o filtro de projeto dentro das colunas", () => {
     const r = agrupar(
       [
@@ -119,6 +163,25 @@ describe("agrupar", () => {
       { ...FILTROS_VAZIOS, projeto: "recap" },
     );
     expect(r.flatMap((c) => c.issues).map((i) => i.id)).toEqual(["a"]);
+  });
+});
+
+describe("pilha", () => {
+  it("devolve a coluna inteira, ignorando qualquer filtro", () => {
+    const r = pilha(
+      [
+        issue({ id: "a", status: "backlog", upvotes: 1, projeto: "recap" }),
+        issue({ id: "b", status: "backlog", upvotes: 5, projeto: "calc" }),
+        issue({ id: "fora", status: "reportado" }),
+      ],
+      "backlog",
+    );
+    expect(r.map((i) => i.id)).toEqual(["b", "a"]);
+  });
+
+  it("a gaveta de arquivados é uma pilha como as outras", () => {
+    const r = pilha([issue({ id: "x", status: "resolvido", arquivado: true })], "arquivado");
+    expect(r.map((i) => i.id)).toEqual(["x"]);
   });
 });
 

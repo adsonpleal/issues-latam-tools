@@ -1,7 +1,7 @@
 import type { Issue } from "../../lib/issues";
 import type { Projeto } from "../../lib/projetos";
-import type { Coluna, Status, Tipo } from "../../lib/status";
-import { COLUNAS, ordenaPorAtualizacao } from "../../lib/status";
+import type { Coluna, Tipo } from "../../lib/status";
+import { COLUNAS, COLUNAS_ADMIN, ordenaPorAtualizacao } from "../../lib/status";
 
 export type Filtros = {
   projeto: Projeto | null;
@@ -33,8 +33,24 @@ function tempo(d: Date | null): number {
   return d ? d.getTime() : 0;
 }
 
-function comparar(a: Issue, b: Issue, status: Status): number {
-  if (ordenaPorAtualizacao(status)) {
+/**
+ * A coluna onde o card aparece. `arquivado` não é status: é o booleano que tira
+ * o card das cinco colunas e o joga na gaveta.
+ */
+export function colunaDe(issue: Issue): Coluna {
+  return issue.arquivado ? "arquivado" : issue.status;
+}
+
+function comparar(a: Issue, b: Issue, coluna: Coluna): number {
+  // Arrumado à mão manda em tudo. Quem não foi arrumado flui embaixo, pela
+  // regra da coluna — é o que faz um card novo cair no fim de uma pilha
+  // arrumada em vez de se enfiar no meio dela.
+  if (a.ordem !== null || b.ordem !== null) {
+    if (a.ordem === null) return 1;
+    if (b.ordem === null) return -1;
+    if (a.ordem !== b.ordem) return a.ordem - b.ordem;
+  }
+  if (ordenaPorAtualizacao(coluna)) {
     // Colunas de encerramento: o que saiu mais recentemente vem primeiro.
     return tempo(b.atualizadoEm) - tempo(a.atualizadoEm);
   }
@@ -46,30 +62,32 @@ function comparar(a: Issue, b: Issue, status: Status): number {
 export type Agrupado = { coluna: Coluna; issues: Issue[] };
 
 /**
+ * A pilha de uma coluna, na ordem da tela.
+ *
+ * O agrupamento passa a lista já filtrada; quem vai **gravar** ordem passa a
+ * lista inteira, sem filtro. Isso não é detalhe: arrastar com um filtro ligado
+ * não pode embaralhar o que o filtro está escondendo. Como a pilha completa
+ * preserva a posição relativa dos escondidos, "soltar antes do card X" quer
+ * dizer a mesma coisa nas duas.
+ */
+export function pilha(issues: Issue[], coluna: Coluna): Issue[] {
+  return issues.filter((i) => colunaDe(i) === coluna).sort((a, b) => comparar(a, b, coluna));
+}
+
+/**
  * Filtra, agrupa por status e ordena. Função pura de propósito — é a única parte
  * do quadro que dá para testar sem Firestore, e é onde mora toda a lógica.
  */
 export function agrupar(issues: Issue[], filtros: Filtros): Agrupado[] {
-  const visiveis = filtrar(issues, filtros).filter((i) => !i.arquivado);
+  const visiveis = filtrar(issues, filtros);
   return COLUNAS.map((coluna) => ({
     coluna: coluna as Coluna,
-    issues: visiveis.filter((i) => i.status === coluna).sort((a, b) => comparar(a, b, coluna)),
+    issues: pilha(visiveis, coluna),
   }));
 }
 
 /** Igual ao `agrupar`, mais a gaveta de arquivados no fim. Só com sessão. */
 export function agruparAdmin(issues: Issue[], filtros: Filtros): Agrupado[] {
-  const todos = filtrar(issues, filtros);
-  const ativos = todos.filter((i) => !i.arquivado);
-  const colunas: Agrupado[] = COLUNAS.map((coluna) => ({
-    coluna: coluna as Coluna,
-    issues: ativos.filter((i) => i.status === coluna).sort((a, b) => comparar(a, b, coluna)),
-  }));
-  colunas.push({
-    coluna: "arquivado",
-    issues: todos
-      .filter((i) => i.arquivado)
-      .sort((a, b) => tempo(b.atualizadoEm) - tempo(a.atualizadoEm)),
-  });
-  return colunas;
+  const visiveis = filtrar(issues, filtros);
+  return COLUNAS_ADMIN.map((coluna) => ({ coluna, issues: pilha(visiveis, coluna) }));
 }

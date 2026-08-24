@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.7.0
+
+- **A triagem arruma a ordem dos cards dentro da coluna.** Arrastar um card em
+  cima de outro o encaixa acima ou abaixo dele, conforme a metade da altura em
+  que se solta; soltar no vazio da coluna continua sendo só mudar de coluna. A
+  ordem é do quadro: o que a triagem arruma é o que o público vê.
+- A posição mora num inteiro `ordem` no card, e o gesto **numera a pilha inteira
+  num lote só**. Prender só o card arrastado não pararia em pé — ele não tem como
+  ficar entre vizinhos sem número, e voltaria sozinho para outro lugar no
+  primeiro voto que chegasse.
+- O preço é a coluna arrumada parar de responder aos votos, então cada uma ganha
+  um **Ordem automática** no topo, que só aparece quando há o que soltar.
+- Cada card ganhou **setas ↑↓** ao lado do seletor de coluna: arrastar não
+  funciona em toque nenhum, e elas são o mesmo gesto para celular, teclado e
+  leitor de tela.
+- A conta roda sempre sobre a pilha **completa** da coluna, nunca sobre o que
+  está na tela — arrastar com um filtro ligado não embaralha o que o filtro está
+  escondendo.
+- Reordenar **não carimba `atualizadoEm`**: *Resolvido* e a gaveta ordenam por
+  essa data, e arrumar a pilha não é mexer no card. A regra do Firestore tem uma
+  entrada só para isso, que aceita mexer em `ordem` e em mais nada.
+
 ## 1.6.0
 
 - **Acabou o `/admin`.** As URLs são as mesmas para todo mundo; o que muda é ter

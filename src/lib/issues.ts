@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteField,
   doc,
   getDoc,
   increment,
@@ -11,6 +12,7 @@ import {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
   type DocumentData,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
@@ -43,6 +45,12 @@ export type Issue = {
   atualizadoEm: Date | null;
   /** Nick público e opcional de quem reportou. */
   autor: string | null;
+  /**
+   * Posição fixada à mão dentro da coluna, menor em cima. `null` é o normal: o
+   * card não foi arrumado e continua fluindo pela regra da coluna (votos ou
+   * data). Só a triagem escreve isto, arrastando um card em cima de outro.
+   */
+  ordem: number | null;
   /**
    * Só nas fichas `tipo: "replay"`: o que o parser leu da gravação (classe,
    * níveis, golpes, trocas de equipamento, talentos). Fica desnormalizado aqui
@@ -92,6 +100,7 @@ function toIssue(snap: QueryDocumentSnapshot<DocumentData>): Issue | null {
     criadoEm: d["criadoEm"]?.toDate?.() ?? null,
     atualizadoEm: d["atualizadoEm"]?.toDate?.() ?? null,
     autor: typeof d["autor"] === "string" && d["autor"] ? d["autor"] : null,
+    ordem: typeof d["ordem"] === "number" ? d["ordem"] : null,
     replay: d["replay"] && typeof d["replay"] === "object" ? (d["replay"] as ResumoReplay) : null,
   };
 }
@@ -218,13 +227,52 @@ export async function upvoteIssue(id: string): Promise<void> {
   await updateDoc(doc(getDb(), "issues", id), { upvotes: increment(1) });
 }
 
-/** Move o card. Arquivar preserva o status real, para desarquivar devolver certo. */
+/** Arquivar preserva o status real, para desarquivar devolver certo. */
+function patchColuna(coluna: Coluna): Record<string, unknown> {
+  return coluna === "arquivado"
+    ? { arquivado: true, atualizadoEm: serverTimestamp() }
+    : { arquivado: false, status: coluna, atualizadoEm: serverTimestamp() };
+}
+
+/**
+ * Move o card de coluna — e apaga a ordem manual, porque ela só quer dizer
+ * alguma coisa dentro da pilha onde foi arrumada. Quem quiser mover E escolher
+ * a posição solta o card em cima de outro, o que cai em `ordenarIssues`.
+ */
 export async function moverIssue(id: string, coluna: Coluna): Promise<void> {
-  const patch =
-    coluna === "arquivado"
-      ? { arquivado: true, atualizadoEm: serverTimestamp() }
-      : { arquivado: false, status: coluna, atualizadoEm: serverTimestamp() };
-  await updateDoc(doc(getDb(), "issues", id), patch);
+  await updateDoc(doc(getDb(), "issues", id), {
+    ...patchColuna(coluna),
+    ordem: deleteField(),
+  });
+}
+
+/** Uma escrita de ordenação. `ordem: null` apaga o campo e devolve o card ao fluxo. */
+export type Posicao = { id: string; ordem: number | null };
+
+/**
+ * Grava a pilha renumerada num lote só — ou o quadro pisca com metade dos cards
+ * na posição nova e metade na velha.
+ *
+ * `movido` é o card que mudou de coluna no mesmo gesto (soltar em cima de um
+ * card de outra pilha): status e posição saem juntos, na mesma escrita.
+ */
+export async function ordenarIssues(
+  posicoes: Posicao[],
+  movido?: { id: string; coluna: Coluna },
+): Promise<void> {
+  if (posicoes.length === 0 && !movido) return;
+  const db = getDb();
+  const lote = writeBatch(db);
+  for (const p of posicoes) {
+    lote.update(doc(db, "issues", p.id), {
+      ordem: p.ordem === null ? deleteField() : p.ordem,
+      ...(movido?.id === p.id ? patchColuna(movido.coluna) : {}),
+    });
+  }
+  if (movido && !posicoes.some((p) => p.id === movido.id)) {
+    lote.update(doc(db, "issues", movido.id), patchColuna(movido.coluna));
+  }
+  await lote.commit();
 }
 
 export async function editarIssue(

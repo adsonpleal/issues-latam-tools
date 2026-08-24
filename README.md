@@ -57,6 +57,34 @@ desarquivar devolve o card para o status real em vez de jogá-lo em *Reportado*.
 regra dar erro e derruba a consulta do quadro para todo mundo — por isso o seed
 valida isso e falha alto.
 
+### Ordem dentro da coluna
+
+Por padrão ninguém escolhe: as colunas abertas ordenam por **votos** (empate
+desempatado pelo mais novo) e as de encerramento — *Resolvido*, *Não será feito*
+e a gaveta — pela **última mexida**.
+
+Com sessão, dá para arrumar a coluna à mão: arrastar um card **em cima de
+outro** o encaixa acima ou abaixo dele, conforme a metade da altura em que se
+solta. Soltar no vazio da coluna continua sendo só mudar de coluna.
+
+O que fica gravado é um inteiro `ordem` por card, começando em 0. Duas
+consequências que valem saber de cor:
+
+- **A pilha inteira é numerada de uma vez**, num lote só. Prender só o card
+  arrastado não funcionaria — ele não tem como ficar entre dois vizinhos que não
+  têm número, e voltaria sozinho para outro lugar no primeiro voto que chegasse.
+  Em troca, a coluna arrumada para de responder aos votos: quem quiser desfazer
+  usa o **Ordem automática** no topo dela, que só aparece quando há o que soltar.
+- **Card que chega depois entra no fim**, embaixo do que foi arrumado — é o que
+  acontece com um relato novo numa coluna já arrumada, e com quem for movido
+  para lá pelo seletor (mudar de coluna apaga a `ordem`, que só quer dizer algo
+  dentro da pilha onde foi arrumada).
+
+A conta roda sempre sobre a **pilha completa** da coluna, nunca sobre o que está
+na tela: arrastar com um filtro ligado não pode embaralhar o que o filtro está
+escondendo. E a ordem é do quadro, não da sessão — o que a triagem arruma é o
+que o público vê.
+
 ### Votos
 
 Um por navegador, guardado em `localStorage`. Limpar o storage vota de novo, e
@@ -249,9 +277,12 @@ que não há sessão. E perdê-la não tranca ninguém para fora — `/entrar` l
 observador sem consultá-la, então a sessão que ainda estiver no IndexedDB é
 reconhecida sem popup nenhum.
 
-Arrastar card funciona no desktop. No celular, use o seletor de coluna que
-aparece em cada card — arrastar (HTML5 drag and drop) não funciona em toque
-nenhum, nem no Safari do iPhone nem no Chrome do Android.
+Arrastar card funciona no desktop. No celular, use o seletor de coluna e as
+setas ↑↓ que aparecem em cada card — arrastar (HTML5 drag and drop) não funciona
+em toque nenhum, nem no Safari do iPhone nem no Chrome do Android. As setas
+fazem o mesmo que arrastar em cima do vizinho de cima ou de baixo, e por isso
+continuam certas com filtro ligado; de quebra funcionam no teclado e no leitor
+de tela.
 
 ### Endurecer depois, se precisar
 

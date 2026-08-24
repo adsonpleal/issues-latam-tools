@@ -303,6 +303,24 @@ a:focus-visible {
   padding: 0 0.5rem;
 }
 
+/* Só aparece na coluna que foi arrumada à mão — é a saída de emergência da
+   ordem manual, e não faz sentido oferecer onde não há o que soltar. */
+.coluna-auto {
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  padding: 0.05rem 0.45rem;
+}
+
+.coluna-auto:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .coluna-ajuda {
   color: var(--muted);
   font-size: 0.78rem;
@@ -333,6 +351,32 @@ a:focus-visible {
   border-radius: var(--raio);
   box-shadow: var(--sombra);
   padding: 0.65rem 0.7rem;
+  /* Âncora do risco de encaixe, abaixo. */
+  position: relative;
+}
+
+.issue-card-arrastando {
+  opacity: 0.4;
+}
+
+/* O risco que mostra onde o card vai cair. Fica no meio do gap de 0.6rem entre
+   os cards, para não parecer borda de nenhum dos dois. */
+.issue-card-alvo::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.issue-card-antes::after {
+  top: -0.31rem;
+}
+
+.issue-card-depois::after {
+  bottom: -0.31rem;
 }
 
 .issue-card[draggable="true"] {
@@ -426,9 +470,47 @@ a:focus-visible {
   cursor: default;
 }
 
+.issue-card-admin {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
 .issue-card-mover {
   display: block;
-  margin-top: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+/* As setas são o arrastar para quem não pode arrastar: toque, teclado e leitor
+   de tela. */
+.issue-card-degrau {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.issue-card-degrau button {
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+  background: var(--bg-inset);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--raio);
+  padding: 0.25rem 0.4rem;
+}
+
+.issue-card-degrau button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.issue-card-degrau button:disabled {
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.5;
 }
 
 .issue-card-mover select {

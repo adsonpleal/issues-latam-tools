@@ -170,11 +170,20 @@ retorno sem publicar nada.
 Card novo e público vira um embed no canal de reports do Discord, com projeto,
 tipo, título, um trecho da descrição, o nick (quando tem) e o link do card.
 
-Quem faz isso é `tools/anunciar-discord.mjs`, rodando na EC2 compartilhada como
+Quem faz isso é `tools/anunciar-discord.mjs`, rodando na instância Oracle do ragassets como
 one-shot do systemd a cada 2 min (`infra/issues-discord.{service,timer}`). O
 plano gratuito do Firebase não tem Cloud Functions, então o gatilho tem que vir
 de fora; e como o serviço não escuta em porta nenhuma, não há endpoint público
 para ninguém abusar.
+
+O host é `ubuntu@129.159.50.6`, acessado com `~/.ssh/ragassets-oracle`. O código
+fica em `/opt/issues-discord`, o estado em `/var/lib/issues-discord/estado.json`
+(não o apague em deploys) e o token em um drop-in root-only do systemd. Para
+configurar ou trocar o token sem passá-lo pelo chat ou histórico do shell, rode
+`/opt/issues-discord/infra/configure-token.sh` em uma sessão SSH interativa.
+Na primeira instalação, execute `sudo systemctl start issues-discord.service`
+antes de `sudo systemctl enable --now issues-discord.timer`: a primeira execução
+marca o último report existente e não anuncia os antigos.
 
 **Ele consulta o Firestore sem autenticação, de propósito.** Com a identidade de
 um visitante anônimo, as regras o deixam listar só card com `arquivado == false`

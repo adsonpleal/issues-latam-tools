@@ -44,7 +44,7 @@ Environment=ESTADO=/var/lib/issues-discord/estado.json
 # O DISCORD_BOT_TOKEN vem do drop-in 10-token.conf, modo 0600, que não vai para o
 # repositório: esta unit é pública.
 
-ExecStart=/usr/bin/node --max-old-space-size=64 /opt/issues-discord/tools/anunciar-discord.mjs
+ExecStart=/usr/bin/env node --max-old-space-size=64 /opt/issues-discord/tools/anunciar-discord.mjs
 
 # Teto menor que o intervalo do timer: garante que nunca há dois rodando juntos.
 TimeoutStartSec=120

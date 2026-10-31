@@ -95,30 +95,59 @@ async function cabecalhos() {
 }
 
 /**
- * Lista tudo e filtra na memória, em vez de montar um `runQuery` com `status ==`
- * e `orderBy criadoEm`: essa combinação exige índice composto, e o acervo tem
- * algumas centenas de cards. Uma listagem paginada custa o mesmo e não depende
- * de nada provisionado no console.
+ * Só os dois status que a fila enxerga: `reportado` (o que dá para pegar) e
+ * `em_progresso` (o que já está em voo). Filtro de campo único, que usa o índice
+ * automático; a ordenação segue em memória, no `maduros`, justamente para não
+ * exigir índice composto.
+ *
+ * Antes isto listava a coleção inteira. Como `fila` e `reconciliar` chamam a
+ * cada ciclo do despachante, eram ~580 leituras a cada 15 min: a cota diária do
+ * plano gratuito acabava no meio da tarde, e ela é a **mesma** cota do quadro
+ * público — a automação derrubava o site para os visitantes.
  */
-async function todosOsCards() {
-  const h = await cabecalhos();
-  const docs = [];
-  let pageToken = "";
-  do {
-    const url = `${BASE}/issues?pageSize=300${pageToken ? `&pageToken=${pageToken}` : ""}`;
-    const r = await fetch(url, { headers: h });
-    const j = await r.json();
-    if (j.error) throw new Error(`Firestore: ${j.error.message}`);
-    docs.push(...(j.documents ?? []));
-    pageToken = j.nextPageToken ?? "";
-  } while (pageToken);
-  return docs.map(paraCard);
+async function cardsAtivos() {
+  const r = await fetch(`${BASE}:runQuery`, {
+    method: "POST",
+    headers: await cabecalhos(),
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: "issues" }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: "status" },
+            op: "IN",
+            value: { arrayValue: { values: [str("reportado"), str("em_progresso")] } },
+          },
+        },
+      },
+    }),
+  });
+  return cardsDaConsulta(await r.json());
 }
 
+/**
+ * O `runQuery` responde em lista, e **o erro também vem como linha dentro dela**:
+ * cota estourada chega como `[{ error: { code: 429, ... } }]`, não como objeto
+ * solto. Quem olhar só `corpo.error` lê isso como "nenhum card" e faz a fila
+ * anunciar que não há o que fazer — falha silenciosa, no caminho que justamente
+ * existe para avisar.
+ */
+export function cardsDaConsulta(corpo) {
+  const falha = Array.isArray(corpo) ? corpo.find((l) => l.error)?.error : corpo?.error;
+  if (falha) throw new Error(`Firestore: ${falha.message}`);
+  if (!Array.isArray(corpo)) throw new Error(`Firestore: runQuery devolveu ${typeof corpo}, não uma lista`);
+  // Consulta sem resultado devolve uma linha só com `readTime`, sem documento.
+  return corpo.filter((l) => l.document).map((l) => paraCard(l.document));
+}
+
+/** Um card pelo id: uma leitura, em vez de varrer a coleção atrás dele. */
 async function buscaCard(id) {
-  const card = (await todosOsCards()).find((c) => c.id === id);
-  if (!card) throw new Error(`card ${id} não existe`);
-  return card;
+  const r = await fetch(`${BASE}/issues/${encodeURIComponent(id)}`, { headers: await cabecalhos() });
+  if (r.status === 404) throw new Error(`card ${id} não existe`);
+  const j = await r.json();
+  if (j.error) throw new Error(`card ${id}: ${j.error.message}`);
+  if (!r.ok) throw new Error(`card ${id}: HTTP ${r.status}`);
+  return paraCard(j);
 }
 
 /** `--flag valor`, como o resto da automação já escreve na linha de comando. */
@@ -260,7 +289,7 @@ const comandos = {
     const desde = new Date().toISOString();
     const estado = { ...leEstado(), desde };
     gravaEstado(estado);
-    const { fila } = maduros(await todosOsCards(), { desde: null });
+    const { fila } = maduros(await cardsAtivos(), { desde: null });
     console.log(
       `marca d'água: ${desde}\n` +
         `${fila.length} card(s) em 'reportado' ficaram para trás — a automação não vai pegá-los.\n` +
@@ -271,7 +300,7 @@ const comandos = {
   async fila() {
     const estado = leEstado();
     if (!estado.desde) throw new Error("sem marca d'água — rode 'bootstrap' primeiro");
-    const r = maduros(await todosOsCards(), { desde: estado.desde });
+    const r = maduros(await cardsAtivos(), { desde: estado.desde });
     console.log(
       JSON.stringify(
         {
@@ -339,7 +368,7 @@ const comandos = {
   async reconciliar(...args) {
     const seco = args.includes("--dry-run");
     const { execFileSync } = await import("node:child_process");
-    const cards = (await todosOsCards()).filter(
+    const cards = (await cardsAtivos()).filter(
       (c) => !c.arquivado && c.status === "em_progresso" && c.pr,
     );
     let movidos = 0;
@@ -417,7 +446,7 @@ const comandos = {
 
   async estado() {
     const estado = leEstado();
-    const cards = await todosOsCards();
+    const cards = await cardsAtivos();
     const r = maduros(cards, { desde: estado.desde ?? null });
     console.log(
       `marca d'água : ${estado.desde ?? "(sem bootstrap)"}\n` +

@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.9.0
+
+- **O aviso da triagem passa a chegar pelo ntfy.sh** em vez da notificação do
+  app. O nome do tópico não entra no repositório, que é público: tópico de ntfy
+  é senha de quem publica, e quem soubesse o nome mandaria notificação para o
+  celular dele com `click` para qualquer URL. Ele fica em `ntfyTopico`, no
+  `estado.json` fora do repositório onde a marca d'água já mora.
+- **O link do aviso é decidido pelo card, não pelo texto**: com PR registrado
+  abre o PR; sem PR abre o card. Aviso sem PR é card que não virou PR — relato
+  que não procede, ou sessão travada —, e é no card que está o comentário
+  dizendo o porquê. Quem escreve a frase é a sessão, mas o link não é dela: sai
+  do campo `pr`, então ela não consegue apontar para um PR que não abriu.
+- Publica em JSON na raiz do ntfy, não pelos cabeçalhos `Title`/`Click`:
+  cabeçalho HTTP não carrega UTF-8, e título de card daqui vem acentuado
+  ("Localização", "Colisão Astral").
+- `alarme` é o aviso do próprio despachante, que não tem card para apontar — aí
+  o toque abre o quadro. É comando separado em vez de `avisar` sem id porque
+  `avisar "$ID"` com a variável vazia tem que falhar, não virar uma notificação
+  genérica que parece ter dado certo.
+- O POST do aviso tem prazo de 10 s, ao contrário das escritas no Firestore: ele
+  é o último passo da sessão, e pendurado deixaria o card resolvido sem ninguém
+  avisado.
+- **A sessão que abriu o PR continua ouvindo.** Ela liga o monitor do app
+  (`auto_fix`/`address_comments`) em vez de consultar o CI em laço, e acorda
+  quando o check falha ou quando chega comentário.
+- **Comentário no PR só é atendido se vier de `adsonpleal`.** O que decide é o
+  `author.login` que o `gh` devolve: comentário de outro autor — gente, ou o
+  `github-actions` que comenta o link do preview em todo PR — é informação, não
+  ordem. Pedido fora do código daquele PR (mesclar, mexer em outro repositório,
+  mover card) não é atendido nem vindo dele.
+- **Sessão que gerou PR se fila na seção `Auto issues`** da barra lateral, no
+  passo em que o PR nasce. Sessão que concluiu que o relato não procede fica
+  fora: não há PR para revisar ali.
+
 ## 1.8.0
 
 - **Card novo abre sozinho uma sessão que vai até o PR.** Ela valida o relato

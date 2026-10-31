@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.8.0
+
+- **Card novo abre sozinho uma sessão que vai até o PR.** Ela valida o relato
+  contra o código e as fontes antes de programar, e se ele não procede para ali,
+  com o porquê comentado no card.
+- **O quadro é a fila.** Não entrou banco nem arquivo de pendências: `status` *é*
+  a fila, e pegar um card é movê-lo para `em_progresso` com precondição de
+  `updateTime` — dois despachantes não conseguem pegar o mesmo card. Tirar um
+  card da fila é arrastá-lo, como sempre foi.
+- **Marca d'água, pelo mesmo motivo do anunciador.** `bootstrap` grava "a partir
+  de agora"; sem ela, ligar isto com a fila cheia despejaria uma sessão por card
+  acumulado. Um turno automático nunca grava a marca.
+- **Card só fecha com merge como prova.** A sessão registra o PR no card e o
+  `reconciliar` pergunta ao `gh` se ele foi mesclado — nenhuma sessão move card
+  para `resolvido` por conta própria, e nenhuma mescla nada.
+- Relato que não procede vai para o **backlog**, não para *Não será feito*:
+  fechar um card na cara de quem reportou continua sendo decisão de gente.
+- Teto de sessões simultâneas, porque o limite é a máquina e não a cota. Card
+  movido à mão para `em_progresso` não ocupa vaga.
+- `tools/triagem.test.mjs` cobra a tabela de repositórios contra
+  `src/lib/projetos.ts`: projeto novo sem repositório mapeado é teste vermelho,
+  não uma sessão abrindo PR no lugar errado.
+- **`*.mjs` agora nasce com LF.** Um checkout novo nesta máquina — um worktree,
+  por exemplo — trazia as ferramentas com CRLF, e aí `npm test` morria em
+  `SyntaxError: Invalid or unexpected token` ao importar `tools/*.mjs`. O
+  checkout antigo passava porque os arquivos tinham sido reescritos em LF depois,
+  o que fazia o defeito aparecer só para quem clona ou cria worktree.
+
 ## 1.7.0
 
 - **A triagem arruma a ordem dos cards dentro da coluna.** Arrastar um card em

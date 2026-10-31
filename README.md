@@ -210,6 +210,59 @@ node tools/anunciar-discord.mjs --dry-run --desde 2020-01-01T00:00:00Z --max 100
 Renderiza os cards existentes como embeds sem postar nada — é o teste de olho
 antes de qualquer mudança no formato.
 
+### Triagem automática
+
+Card novo também abre uma sessão do Claude Code que vai validar o relato e, se
+ele proceder, levá-lo até um PR com CI verde no repositório do projeto.
+
+```bash
+npm run triagem estado        # o que a automação enxerga agora
+npm run triagem fila          # o que ela pegaria no próximo tique
+npm run triagem reconciliar   # PR mesclado -> card resolvido
+```
+
+**O quadro é a fila.** Não há banco nem arquivo de pendências à parte: `status`
+no Firestore *é* a fila. Pegar um card é movê-lo para `em_progresso`, e a escrita
+vai com precondição de `updateTime`, então dois despachantes não conseguem pegar
+o mesmo card. A consequência boa é que a fila é a coluna que você já olha: tirar
+um card dela é arrastá-lo para outra coluna, e nada aqui precisa saber disso.
+
+**Marca d'água, como no anunciador.** `npm run triagem bootstrap` grava "a partir
+de agora" e o que já estava em `reportado` fica para trás. Sem isso, ligar a
+automação com a fila cheia despejaria uma sessão por card acumulado. Rode uma vez
+só, à mão: um turno automático nunca grava a marca.
+
+**Teto de sessões simultâneas** (`TRIAGEM_EM_VOO_MAX`, padrão 2). O limite não é
+do Firestore nem do GitHub — é da máquina, que roda os testes, sobe instância e
+tira captura de cada sessão. Só conta o que a automação pegou: card que você
+moveu à mão para `em_progresso` não ocupa vaga.
+
+**O caminho de volta é o PR.** A sessão registra o PR no card (`npm run triagem
+pr <id> <dono/repo#N>`), e `reconciliar` pergunta ao `gh` se ele foi mesclado —
+só então o card vira `resolvido`, com o link no comentário. Card só fecha com
+merge como prova; nenhuma sessão move card para `resolvido` por conta própria.
+
+| projeto | repositório |
+|---|---|
+| `simulador` | `adsonpleal/latam-ro-calc` |
+| `visuais` | `adsonpleal/latamvisuais` |
+| `recap` | `adsonpleal/ragreplaystats` |
+| `calc` | `adsonpleal/ragcalc` |
+| `mercado` | `adsonpleal/latam-market` |
+
+`tools/triagem.test.mjs` cobra essa tabela contra `src/lib/projetos.ts`: projeto
+novo no quadro sem repositório mapeado é `npm test` vermelho, não uma sessão
+abrindo PR no lugar errado.
+
+**Este escreve autenticado**, ao contrário do anunciador — mover card e comentar
+são escritas que as regras só liberam para o admin. Em compensação ele nunca lê
+`privado/contato`: não há caminho de código para isso.
+
+O passo a passo que cada sessão segue está em
+`.agents/skills/triagem-automatica/SKILL.md`, e o relógio é uma tarefa agendada
+do Claude Code (`triagem-automatica`, a cada 15 min), que só dispara com o app
+aberto.
+
 ## Desenvolvimento
 
 ```bash

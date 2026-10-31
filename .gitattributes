@@ -6,3 +6,11 @@
 *.sh text eol=lf
 *.service text eol=lf
 *.timer text eol=lf
+
+# Mesma doença, outro sintoma. Um checkout novo nesta máquina (um worktree, por
+# exemplo) trazia as ferramentas com CRLF, e aí `npm test` morria em
+# "SyntaxError: Invalid or unexpected token" ao importar tools/*.mjs — o esbuild
+# do vitest não engole o \r dentro delas. O checkout antigo passava porque os
+# arquivos tinham sido reescritos em LF depois, o que faz o bug aparecer só para
+# quem clona ou cria worktree, que é justamente a triagem automática.
+*.mjs text eol=lf

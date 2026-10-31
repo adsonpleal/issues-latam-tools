@@ -1,6 +1,6 @@
 {
   "name": "issues-latam-tools",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "private": true,
   "type": "module",
   "description": "Quadro público de issues das ferramentas do RO LATAM",
@@ -13,7 +13,8 @@
     "importar": "node tools/importar-planilhas.mjs",
     "seed": "node tools/seed.mjs",
     "anunciar": "node tools/anunciar-discord.mjs",
-    "mover-gravacoes": "node tools/mover-gravacoes.mjs"
+    "mover-gravacoes": "node tools/mover-gravacoes.mjs",
+    "triagem": "node tools/triagem.mjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",

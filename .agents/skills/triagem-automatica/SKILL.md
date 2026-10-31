@@ -16,8 +16,14 @@ A ferramenta que fala com o quadro é sempre a mesma, e mora no checkout
 principal, não no seu worktree:
 
 ```bash
-node /c/Users/adson/dev/issues-latam-tools/tools/triagem.mjs <comando>
+node C:/Users/adson/dev/issues-latam-tools/tools/triagem.mjs <comando>
 ```
+
+**Escreva o caminho exatamente assim, com `C:/` e barras normais.** A forma MSYS
+(`/c/Users/...`) quebra no `node`: com `MSYS_NO_PATHCONV=1` ligado — que é comum
+em turno que mexe com git no Windows — ela chega crua ao executável e vira
+`C:\c\Users\...`, morrendo em `Cannot find module`. A forma `C:/` funciona com ou
+sem conversão, e é por isso que ela está aqui e a outra não.
 
 ## O que você recebeu
 
@@ -59,7 +65,7 @@ no teste.
 ### Se não procede, pare aqui
 
 ```bash
-node /c/Users/adson/dev/issues-latam-tools/tools/triagem.mjs parar <id> --motivo "<o porquê, em português, para quem reportou ler>"
+node C:/Users/adson/dev/issues-latam-tools/tools/triagem.mjs parar <id> --motivo "<o porquê, em português, para quem reportou ler>"
 ```
 
 O card vai para `backlog` com o seu texto como comentário público — **não** para
@@ -123,7 +129,7 @@ Registre o PR no card assim que ele existir — é por este campo que o card vir
 `resolvido` sozinho quando o PR for mesclado:
 
 ```bash
-node /c/Users/adson/dev/issues-latam-tools/tools/triagem.mjs pr <id> adsonpleal/<repo>#<numero>
+node C:/Users/adson/dev/issues-latam-tools/tools/triagem.mjs pr <id> adsonpleal/<repo>#<numero>
 ```
 
 ## 7. Acompanhar o CI até verde

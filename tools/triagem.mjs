@@ -7,6 +7,8 @@
 //   node tools/triagem.mjs pr <id> <dono/repo#N>
 //   node tools/triagem.mjs parar <id> --motivo "..."   # não procede: -> backlog, com comentário
 //   node tools/triagem.mjs reconciliar          # PR mesclado -> resolvido
+//   node tools/triagem.mjs avisar <id> --mensagem "..."  # notificação no celular
+//   node tools/triagem.mjs alarme --mensagem "..."       # idem, sem card: o despachante
 //   node tools/triagem.mjs estado               # o que a automação enxerga agora
 //
 // Não há fila em arquivo à parte, e isso é a decisão central: `status` no
@@ -43,6 +45,9 @@ const ESTADO =
  * e tira captura de cada sessão. Dois já deixam o ventilador ligado.
  */
 const EM_VOO_MAX = Number(process.env["TRIAGEM_EM_VOO_MAX"] || 2);
+
+const SITE = "https://issues.latam-tools.com.br";
+const urlDoCard = (id) => `${SITE}/t/${encodeURIComponent(id)}`;
 
 /** Espelho de src/lib/projetos.ts — e o repositório de cada um. */
 export const REPOS = {
@@ -110,6 +115,18 @@ async function todosOsCards() {
   return docs.map(paraCard);
 }
 
+async function buscaCard(id) {
+  const card = (await todosOsCards()).find((c) => c.id === id);
+  if (!card) throw new Error(`card ${id} não existe`);
+  return card;
+}
+
+/** `--flag valor`, como o resto da automação já escreve na linha de comando. */
+const flag = (args, nome) => {
+  const i = args.indexOf(nome);
+  return i >= 0 ? args[i + 1] : "";
+};
+
 export function paraCard(doc) {
   const f = doc.fields ?? {};
   const s = (k) => f[k]?.stringValue ?? null;
@@ -161,6 +178,60 @@ async function comenta(id, texto) {
     }),
   });
   return r.ok;
+}
+
+// --- Aviso no celular ------------------------------------------------------
+
+/**
+ * Para onde o toque na notificação leva.
+ *
+ * A regra é a única coisa que o Adson precisa saber de cor: **se o PR existe, o
+ * link é o PR; se não existe, é o card.** Um aviso que chega sem PR é um card
+ * que não virou PR — relato que não procede, ou sessão que travou —, e o que ele
+ * precisa ler nesse caso é justamente o comentário que a triagem acabou de
+ * deixar no card. Mandá-lo para o GitHub ali seria mandá-lo para lugar nenhum.
+ *
+ * Quem decide não é o texto que a sessão escreve, é o campo `pr` do card. Não dá
+ * para a sessão errar o link elogiando um PR que ela não abriu.
+ */
+export function linkDoAviso(card) {
+  if (!card.pr) return urlDoCard(card.id);
+  const [repo, numero] = card.pr.split("#");
+  return `https://github.com/${repo}/pull/${numero}`;
+}
+
+/**
+ * O tópico do ntfy, que **não tem padrão no código de propósito**. Este
+ * repositório é público, e tópico do ntfy é senha de quem publica: quem souber o
+ * nome manda notificação para o celular dele, com `click` para qualquer URL —
+ * um pescador perfeito. Então ele mora onde o resto do estado da automação já
+ * mora, fora do repositório (`estado.json`), ou na variável de ambiente.
+ */
+function topico() {
+  const t = process.env["TRIAGEM_NTFY_TOPICO"] || leEstado().ntfyTopico;
+  if (!t) throw new Error(`sem tópico do ntfy — grave 'ntfyTopico' em ${ESTADO} ou defina TRIAGEM_NTFY_TOPICO`);
+  return t;
+}
+
+/**
+ * Publica em JSON na raiz do ntfy, e não com os cabeçalhos `Title`/`Click` no
+ * POST do tópico: cabeçalho HTTP não carrega UTF-8, e título de card daqui vem
+ * acentuado ("Localização", "Colisão Astral"). Pelo caminho dos cabeçalhos ele
+ * chegaria ao celular truncado ou em mojibake.
+ *
+ * Com prazo, ao contrário das escritas no Firestore aqui em cima: este é o
+ * último passo da sessão, e um POST pendurado deixaria o card resolvido sem
+ * ninguém avisado.
+ */
+async function notifica({ titulo, mensagem, link, tags }) {
+  const r = await fetch("https://ntfy.sh", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ topic: topico(), title: titulo, message: mensagem, click: link, tags }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!r.ok) return { ok: false, corpo: (await r.text()).slice(0, 300) };
+  return { ok: true };
 }
 
 // --- Regras da fila --------------------------------------------------------
@@ -216,7 +287,7 @@ const comandos = {
             autor: c.autor,
             titulo: c.titulo,
             descricao: c.descricao,
-            url: `https://issues.latam-tools.com.br/t/${c.id}`,
+            url: urlDoCard(c.id),
           })),
         },
         null,
@@ -227,8 +298,7 @@ const comandos = {
 
   async pegar(id) {
     if (!id) throw new Error("uso: pegar <id>");
-    const card = (await todosOsCards()).find((c) => c.id === id);
-    if (!card) throw new Error(`card ${id} não existe`);
+    const card = await buscaCard(id);
     if (card.status !== "reportado") throw new Error(`card ${id} está em '${card.status}', não em 'reportado'`);
 
     const r = await escreve(
@@ -254,8 +324,7 @@ const comandos = {
   },
 
   async parar(id, ...resto) {
-    const i = resto.indexOf("--motivo");
-    const motivo = i >= 0 ? resto[i + 1] : "";
+    const motivo = flag(resto, "--motivo");
     if (!id || !motivo) throw new Error('uso: parar <id> --motivo "texto"');
     // Vai para `backlog`, não para `nao_sera_feito`: fechar um card na cara de
     // quem reportou é decisão sua, não da automação. No backlog ele sai da fila
@@ -308,6 +377,42 @@ const comandos = {
       movidos++;
     }
     console.log(`reconciliados: ${movidos} de ${cards.length} card(s) com PR`);
+  },
+
+  /**
+   * O aviso de fim de card. A sessão escreve a frase; o link não é dela — sai do
+   * card, por `linkDoAviso`. Uma notificação por card, no fim: progresso não vai
+   * para o celular de ninguém.
+   *
+   * O id é obrigatório, e `--mensagem` no lugar dele é erro em vez de virar
+   * alarme: `avisar "$ID" --mensagem ...` com a variável vazia precisa falhar,
+   * não mandar uma notificação genérica que parece ter dado certo.
+   */
+  async avisar(id, ...resto) {
+    const mensagem = flag(resto, "--mensagem");
+    if (!id || id.startsWith("--") || !mensagem) throw new Error('uso: avisar <id> --mensagem "texto"');
+
+    const card = await buscaCard(id);
+    const link = linkDoAviso(card);
+    const r = await notifica({
+      titulo: card.titulo || card.id,
+      mensagem,
+      link,
+      // O projeto vira etiqueta em vez de entrar no título: na tela do celular o
+      // título é o que se lê primeiro, e ali o que importa é o card.
+      tags: [card.projeto, card.pr ? "rocket" : "speech_balloon"],
+    });
+    if (!r.ok) throw new Error(`não consegui avisar sobre ${id}: ${r.corpo}`);
+    console.log(`avisado: ${id} -> ${link}`);
+  },
+
+  /** O alarme do próprio despachante, que não tem card para apontar. */
+  async alarme(...resto) {
+    const mensagem = flag(resto, "--mensagem");
+    if (!mensagem) throw new Error('uso: alarme --mensagem "texto"');
+    const r = await notifica({ titulo: "Triagem automática", mensagem, link: SITE, tags: ["warning"] });
+    if (!r.ok) throw new Error(`não consegui dar o alarme: ${r.corpo}`);
+    console.log(`alarme -> ${SITE}`);
   },
 
   async estado() {

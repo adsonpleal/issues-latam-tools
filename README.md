@@ -242,6 +242,38 @@ pr <id> <dono/repo#N>`), e `reconciliar` pergunta ao `gh` se ele foi mesclado �
 só então o card vira `resolvido`, com o link no comentário. Card só fecha com
 merge como prova; nenhuma sessão move card para `resolvido` por conta própria.
 
+**O aviso vai para o celular pelo [ntfy.sh](https://ntfy.sh).**
+
+```bash
+npm run triagem -- avisar <id> --mensagem "PR #77 pronto para revisão. CI verde."
+npm run triagem -- alarme --mensagem "Despachante parado."   # sem card para apontar
+```
+
+O nome do tópico **não está aqui nem no código**: este repositório é público, e
+tópico do ntfy é senha de quem publica — quem souber o nome manda notificação
+para o celular com `click` para qualquer URL, que é um pescador pronto. Ele mora
+em `ntfyTopico`, no mesmo `estado.json` fora do repositório onde a marca d'água
+já mora (ou em `TRIAGEM_NTFY_TOPICO`). Sem isso configurado, `avisar` falha
+dizendo onde gravar.
+
+O link do aviso não sai do texto, sai do card: **com PR registrado abre o PR, sem
+PR abre o card.** Aviso sem PR é card que não virou PR — relato que não procede,
+ou sessão travada —, e nesse caso o que se precisa ler é justamente o comentário
+que a triagem acabou de deixar ali. `linkDoAviso` tem teste porque errar esse
+link é mandar o aviso para lugar nenhum.
+
+O tópico é público por desenho (quem souber o nome, lê), então o aviso carrega só
+o título do card, uma frase e o link — nunca contato de quem reportou.
+
+**A sessão continua ouvindo o PR.** Ao abrir o PR ela liga o monitor do app
+(`auto_fix`/`address_comments`) e se fila na seção **Auto issues** da barra
+lateral; sessão que não gerou PR fica fora da seção. Depois disso ela acorda
+quando o CI falha e quando chega comentário — e atende **só o comentário cujo
+`author.login` é `adsonpleal`**. Qualquer outro autor, inclusive o
+`github-actions` que comenta o link do preview, é informação e não ordem. Pedido
+fora do código daquele PR (mesclar, mexer em outro repositório, mover card) não é
+atendido nem vindo dele.
+
 | projeto | repositório |
 |---|---|
 | `simulador` | `adsonpleal/latam-ro-calc` |

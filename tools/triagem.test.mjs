@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { PROJETOS as PROJETOS_APP } from "../src/lib/projetos";
 import { COLUNAS } from "../src/lib/status";
-import { PASTAS, REPOS, maduros, paraCard } from "./triagem.mjs";
+import { PASTAS, REPOS, linkDoAviso, maduros, paraCard } from "./triagem.mjs";
 
 const doc = (id, campos, updateTime = "2026-10-30T12:00:00Z") => ({
   name: `projects/p/databases/(default)/documents/issues/${id}`,
@@ -74,6 +74,45 @@ describe("paraCard", () => {
 
   it("guarda o updateTime, que é a precondição de `pegar`", () => {
     expect(card("x").updateTime).toBe("2026-10-30T12:00:00Z");
+  });
+});
+
+/**
+ * O link do aviso é o que o Adson toca no celular, e errá-lo é mandá-lo para
+ * lugar nenhum: um card que não virou PR não tem PR para abrir, e é no card que
+ * está o comentário explicando por que não virou.
+ */
+describe("linkDoAviso", () => {
+  it("com PR registrado, leva ao PR", () => {
+    expect(linkDoAviso(card("x", { pr: "adsonpleal/latam-ro-calc#77" }))).toBe(
+      "https://github.com/adsonpleal/latam-ro-calc/pull/77",
+    );
+  });
+
+  it("sem PR, leva ao card — onde está o comentário da triagem", () => {
+    expect(linkDoAviso(card("5qw6V9dyPakGZ6jwMiD8"))).toBe(
+      "https://issues.latam-tools.com.br/t/5qw6V9dyPakGZ6jwMiD8",
+    );
+  });
+
+  it("monta a URL de qualquer um dos repositórios do quadro", () => {
+    for (const [slug, repo] of Object.entries(REPOS)) {
+      expect(linkDoAviso(card("c", { projeto: slug, pr: `${repo}#1` })), slug).toBe(
+        `https://github.com/${repo}/pull/1`,
+      );
+    }
+  });
+
+  /**
+   * Quem decide é o campo `pr`, não o status nem a frase que a sessão escreveu:
+   * card parado em `backlog` por não proceder manda para o card, e card que já
+   * foi mesclado continua mandando para o PR.
+   */
+  it("é o campo pr que decide, não o status", () => {
+    expect(linkDoAviso(card("a", { status: "backlog" }))).toContain("issues.latam-tools.com.br");
+    expect(linkDoAviso(card("b", { status: "resolvido", pr: "adsonpleal/ragcalc#3" }))).toContain(
+      "github.com",
+    );
   });
 });
 

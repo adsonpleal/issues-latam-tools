@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { PROJETOS as PROJETOS_APP } from "../src/lib/projetos";
 import { COLUNAS } from "../src/lib/status";
-import { PASTAS, REPOS, linkDoAviso, maduros, paraCard } from "./triagem.mjs";
+import { PASTAS, REPOS, cardsDaConsulta, linkDoAviso, maduros, paraCard } from "./triagem.mjs";
 
 const doc = (id, campos, updateTime = "2026-10-30T12:00:00Z") => ({
   name: `projects/p/databases/(default)/documents/issues/${id}`,
@@ -205,6 +205,39 @@ describe("maduros", () => {
         card("fila"),
       ];
       expect(maduros(cards, { desde, emVooMax: 1 }).pegaveis).toEqual([]);
+    });
+  });
+describe("cardsDaConsulta", () => {
+    it("lê os documentos que o runQuery devolve", () => {
+      const corpo = [
+        { document: doc("a", { projeto: "simulador", titulo: "um", status: "reportado" }) },
+        { document: doc("b", { projeto: "calc", titulo: "dois", status: "em_progresso" }) },
+      ];
+      expect(cardsDaConsulta(corpo).map((c) => c.id)).toEqual(["a", "b"]);
+    });
+
+    it("consulta sem resultado é lista vazia, não erro", () => {
+      expect(cardsDaConsulta([{ readTime: "2026-10-31T22:00:00Z" }])).toEqual([]);
+    });
+
+    /**
+     * Corpo copiado de uma resposta de verdade: o Firestore manda o erro COMO
+     * LINHA da lista. Ler só `corpo.error` devolveria [] e a fila anunciaria
+     * "nada a fazer" com a cota no chão — era esse o defeito.
+     */
+    it("cota estourada estoura aqui, em vez de virar lista vazia", () => {
+      const corpo = [{ error: { code: 429, message: "Quota exceeded.", status: "RESOURCE_EXHAUSTED" } }];
+      expect(() => cardsDaConsulta(corpo)).toThrow(/Quota exceeded/);
+    });
+
+    it("erro em objeto solto também estoura", () => {
+      expect(() => cardsDaConsulta({ error: { message: "Missing or insufficient permissions." } })).toThrow(
+        /insufficient permissions/,
+      );
+    });
+
+    it("resposta que não é lista estoura em vez de passar batido", () => {
+      expect(() => cardsDaConsulta({ documents: [] })).toThrow(/não uma lista/);
     });
   });
 });

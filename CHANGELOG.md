@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.9.1
+
+- **A triagem parou de listar a coleção inteira a cada ciclo.** `fila` e
+  `reconciliar` chamavam uma listagem completa cada um, de 15 em 15 minutos:
+  ~580 leituras por ciclo, ~55 mil por dia, contra o teto de 50 mil do plano
+  gratuito. E a cota de leitura é **a mesma do quadro público** — a automação
+  derrubou o site para os visitantes, que passaram a receber 429. Agora as duas
+  consultam só `status in (reportado, em_progresso)`, que é tudo que a fila
+  enxerga: cerca de 20 documentos, ~2,5 mil leituras por dia.
+- Filtro de campo único de propósito: usa o índice automático, e a ordenação
+  continua em memória no `maduros`, então nada precisa ser provisionado no
+  console.
+- `buscaCard` busca o documento pelo id em vez de varrer a coleção atrás dele.
+  Era a observação que a revisão do `/simplify` tinha feito e eu descartei como
+  "economiza milissegundos num processo que morre em seguida" — o custo não era
+  latência, era cota.
+- **Erro de `runQuery` vem como linha dentro da lista**, não como objeto solto:
+  cota estourada chega como `[{ error: { code: 429, ... } }]`. Lendo só
+  `corpo.error`, isso viraria lista vazia e a fila anunciaria "nada a fazer"
+  justamente quando precisava gritar. `cardsDaConsulta` olha linha a linha, com
+  teste em cima do corpo copiado de uma resposta de verdade.
+
 ## 1.9.0
 
 - **O aviso da triagem passa a chegar pelo ntfy.sh** em vez da notificação do

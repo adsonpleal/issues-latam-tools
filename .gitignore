@@ -11,6 +11,9 @@ prompts/
 service-account*.json
 *-firebase-adminsdk-*.json
 
-# A skill de deploy tem endereco, usuario e chave do servidor: uso interno.
+# Internal use only: local settings, and the deploy skill, which names the host,
+# the login user and the key file while this repository is public. The skill's
+# only copy is .claude/skills/deploy/ — untracked on purpose.
 .claude/settings.local.json
 .claude/skills/deploy/
+.agents/skills/deploy/

@@ -373,9 +373,9 @@ firebase deploy --only firestore
 Assim a credencial do CI não precisa de escrita no banco, e uma regressão de
 regra não entra de carona num push de rotina.
 
-O anunciador do Discord **não sai neste caminho** — ele mora na EC2 e é deploy
-manual (tar + scp + `infra/apply-unit.sh`). Os comandos estão na skill de deploy,
-que não vai para o repositório porque tem endereço e chave do servidor.
+O anunciador do Discord **não sai neste caminho** — ele mora na instância Oracle
+do ragassets e é deploy manual (tar + scp + `infra/apply-unit.sh`). Os comandos
+estão em `.agents/skills/deploy/SKILL.md`.
 
 ## Migração
 

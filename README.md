@@ -333,6 +333,20 @@ rules allow listing `arquivado == false` with `limit <= 500`, so the listener
 cannot read `privado/contato` even by accident. An admin credential would
 override the rules and throw that guarantee away.
 
+**It also runs `reconciliar` every 15 minutes**, and that is not an extra: it is
+the half of the dispatcher a listener cannot replace. A card becomes `resolvido`
+when its pull request is merged, and a merge on GitHub pushes nothing here — only
+asking finds out. So that half still needs a clock, and this is the resident
+process we have. It costs no model turn, because it is a CLI command rather than
+a session, and a run reads the same ~20 documents the queue reads.
+
+Everything `reconciliar` writes to stderr is announced **even when it exits 0**,
+because that is how it behaves: when `gh` cannot answer for one card it logs the
+reason, skips the card and carries on, so the run succeeds with a card left
+behind. The `reconciliados: N de M` summary is never announced — it is printed
+every run, and a notification every quarter of an hour teaches whoever reads them
+to stop reading.
+
 ## Desenvolvimento
 
 ```bash

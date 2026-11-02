@@ -47,7 +47,8 @@ const ESTADO =
 const EM_VOO_MAX = Number(process.env["TRIAGEM_EM_VOO_MAX"] || 2);
 
 const SITE = "https://issues.latam-tools.com.br";
-const urlDoCard = (id) => `${SITE}/t/${encodeURIComponent(id)}`;
+/** O link que o aviso e a escuta apontam. Exportado para não virar duas constantes. */
+export const urlDoCard = (id) => `${SITE}/t/${encodeURIComponent(id)}`;
 
 /** Espelho de src/lib/projetos.ts — e o repositório de cada um. */
 export const REPOS = {

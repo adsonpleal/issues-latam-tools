@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.10.0
+
+- **O despachante agendado saiu; quem acorda a triagem agora é o Firestore.**
+  `tools/escuta.mjs` abre um listener anônimo em `status == 'reportado'` e
+  imprime uma linha por card novo. A tarefa agendada perguntava de 15 em 15
+  minutos se havia card novo — 54 leituras por ciclo, 5.184 por dia, e um turno
+  inteiro de modelo por pergunta, quase sempre para ouvir "não". O snapshot
+  inicial custa uma leitura por card em `reportado` (menos de 20) e depois é uma
+  leitura por mudança.
+- Lê **anônimo**, como o anunciador do Discord: as regras liberam listar
+  `arquivado == false` com `limit <= 500` e negam `privado/contato` a quem não é
+  admin, então a escuta não consegue ler o contato de quem reportou nem por
+  engano. Quem escreve continua sendo o `triagem.mjs`, autenticado — mover card
+  exige admin.
+- Marca d'água própria em `escuta.json`, separada do `estado.json` para as duas
+  escritas não se atropelarem. Comparada pelos campos crus do instante e nunca
+  por `Date`: o Firestore carimba microssegundos, o `Date` trunca em
+  milissegundos, e uma marca truncada cai antes do card de onde saiu — que então
+  volta a ser novidade em todo recomeço. É o defeito que o anunciador já
+  documentava, e agora tem teste.
+- Recomeço é parte do desenho, não acidente: quem arma a escuta a reinicia de
+  tempos em tempos, porque processo residente pendurado fica "vivo" para sempre
+  com os anúncios parados — o aviso que o anunciador deixou escrito. A marca em
+  disco faz o recomeço não perder nem repetir card.
+- Só sai linha no stdout quando há card novo ou quando a escuta morre
+  (`ESCUTA MORREU`), porque cada linha vira notificação. Diagnóstico vai para o
+  stderr.
+- A guarda de entrada usa `pathToFileURL`, e não a comparação por
+  `file://${argv[1]}`: no Windows a forma crua nunca casa. Sem ela, importar o
+  módulo — como o teste importa — abria um listener de verdade no Firestore.
+
 ## 1.9.1
 
 - **A triagem parou de listar a coleção inteira a cada ciclo.** `fila` e

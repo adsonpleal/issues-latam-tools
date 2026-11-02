@@ -291,9 +291,45 @@ são escritas que as regras só liberam para o admin. Em compensação ele nunca
 `privado/contato`: não há caminho de código para isso.
 
 O passo a passo que cada sessão segue está em
-`.agents/skills/triagem-automatica/SKILL.md`, e o relógio é uma tarefa agendada
-do Claude Code (`triagem-automatica`, a cada 15 min), que só dispara com o app
-aberto.
+`.agents/skills/triagem-automatica/SKILL.md`.
+
+#### Quem acorda a automação é o Firestore, não um relógio
+
+`tools/escuta.mjs` abre um listener no quadro e imprime uma linha por card novo:
+
+```bash
+npm run escutar               # fica escutando
+npm run escutar -- --marca    # só imprime a marca d'água guardada
+```
+
+Antes era uma tarefa agendada do Claude Code, de 15 em 15 minutos, perguntando ao
+Firestore se havia card novo: 54 leituras por ciclo, 5.184 por dia, e um turno
+inteiro de modelo por pergunta — quase sempre para ouvir "não". O listener
+inverte quem fala primeiro. O snapshot inicial custa uma leitura por card em
+`reportado` (hoje menos de 20) e depois é uma leitura por mudança.
+
+**Cada linha do stdout vira uma notificação** na sessão que armou a escuta, e é
+ela que abre a sessão de triagem do card. Por isso só sai linha quando há card
+novo de verdade, ou quando a escuta morre — todo diagnóstico vai para o stderr,
+que não notifica ninguém. Escuta morta calada é indistinguível de quadro parado,
+e é esse silêncio que o `ESCUTA MORREU` existe para não deixar acontecer.
+
+**Marca d'água própria**, em `escuta.json` ao lado do `estado.json` — arquivo
+separado porque senão as duas escritas se atropelariam. Ela é comparada pelos
+campos crus do instante, nunca por `Date`: o Firestore carimba microssegundos e o
+`Date` trunca em milissegundos, o que faria a marca cair *antes* do card de onde
+ela saiu, e esse card voltar a ser novidade em todo recomeço. É o mesmo cuidado
+que o anunciador documenta, pelo mesmo motivo.
+
+E recomeço é rotina, não exceção: quem arma a escuta a reinicia de tempos em
+tempos de propósito, porque processo residente pendurado fica "vivo" para sempre
+com os anúncios parados. A marca em disco é o que faz o recomeço não perder nem
+repetir card.
+
+**Este lê anônimo**, como o anunciador e ao contrário do `triagem.mjs`: as regras
+liberam listar `arquivado == false` com `limit <= 500`, então a escuta não
+consegue ler `privado/contato` nem por engano. Credencial de admin passaria por
+cima das regras e jogaria essa garantia fora.
 
 ## Desenvolvimento
 

@@ -27,10 +27,11 @@
 // the clock of whoever arms the listener, which restarts it from time to time,
 // and the on-disk watermark makes a restart neither lose nor repeat a card.
 
+import { execFile } from "node:child_process";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { initializeApp } from "firebase/app";
 import { collection, getFirestore, limit, onSnapshot, query, where } from "firebase/firestore";
@@ -53,6 +54,27 @@ const MARK_FILE =
 
 const STATE_FILE =
   process.env["TRIAGEM_ESTADO"] || join(homedir(), ".claude", "triagem-automatica", "estado.json");
+
+/**
+ * How often `reconciliar` runs. It is the half of the old dispatcher that a
+ * listener cannot replace: a card becomes `resolvido` when its pull request is
+ * merged, and a merge on GitHub pushes nothing to us — only asking finds out. So
+ * this half still needs a clock, and this process is the resident one we have.
+ *
+ * It costs no model turn, which is what made the old 15-minute tick expensive:
+ * this is a CLI command, not a session. One run reads the same ~20 documents the
+ * queue reads, plus one `gh` call per card that carries a pull request.
+ */
+const RECONCILE_EVERY_MS = Number(process.env["LISTEN_RECONCILE_MS"] || 15 * 60 * 1000);
+
+/**
+ * Resolved when it is needed, not at import time. Under `vitest` the module's
+ * own `import.meta.url` is not a `file:` URL, so doing this at the top level
+ * threw before a single test could run.
+ */
+function triageCli() {
+  return fileURLToPath(new URL("./triagem.mjs", import.meta.url));
+}
 
 // --- The rule, kept apart from the network ---------------------------------
 
@@ -114,6 +136,36 @@ export function announcement(card) {
   return `NEW ${card.id} | ${card.projeto} | ${card.titulo} | ${urlDoCard(card.id)}`;
 }
 
+const lines = (text) =>
+  `${text}`
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+/**
+ * What of a `reconciliar` run deserves a notification.
+ *
+ * The cards that actually moved, and never the `reconciliados: N de M` summary:
+ * that line is printed on every run, and announcing it every quarter of an hour
+ * would train whoever reads these notifications to ignore them.
+ *
+ * **Anything on stderr counts as a problem, even when the exit code is 0.** That
+ * is not defensive padding, it is how `reconciliar` behaves: when `gh` cannot
+ * answer for one card it writes the reason to stderr, skips that card and
+ * carries on, so the run ends successfully with a card left behind. Judging the
+ * run by its exit code alone would let an expired `gh` login keep cards sitting
+ * in `em_progresso` after their work shipped, reporting nothing — the very
+ * defect this whole function exists to end.
+ */
+export function reconcileReport(stdout, stderr, code) {
+  const moved = lines(stdout).filter((line) => line.includes("-> resolvido"));
+  const problems = lines(stderr).map((line) => `RECONCILE PROBLEM: ${line}`);
+  if (code !== 0) {
+    problems.push(`RECONCILE FAILED: ${lines(stderr).pop() || lines(stdout).pop() || `exit ${code}`}`);
+  }
+  return [...moved, ...problems];
+}
+
 // --- Disk -------------------------------------------------------------------
 
 function readJson(path) {
@@ -156,9 +208,25 @@ function die(text, code = 1) {
   process.exit(code);
 }
 
+/**
+ * Runs `reconciliar` and announces what moved. Never throws and never exits: a
+ * listener that died because `gh` had a bad minute would stop announcing new
+ * cards too, and the two jobs fail independently.
+ */
+function reconcile() {
+  execFile(process.execPath, [triageCli(), "reconciliar"], { windowsHide: true }, (error, out, err) => {
+    for (const line of reconcileReport(out, err, error?.code ?? 0)) console.log(line);
+  });
+}
+
 function listen() {
   let mark = storedMark();
   process.stderr.write(`listening from ${mark.seconds}.${mark.nanoseconds}\n`);
+
+  // Once at startup, so a restart always reconciles even if it is cut short
+  // before the first interval comes round.
+  reconcile();
+  setInterval(reconcile, RECONCILE_EVERY_MS).unref();
 
   const db = getFirestore(initializeApp(CONFIG));
   const board = query(

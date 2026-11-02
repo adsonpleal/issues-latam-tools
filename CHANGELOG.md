@@ -32,6 +32,20 @@
   `file://` + `argv[1]`: on Windows the raw form never matches. Without it,
   importing the module — as the test does — opened a real listener against
   Firestore.
+- **The listener also runs `reconciliar`, every 15 minutes.** Dropping the
+  scheduled task took half the dispatcher's job with it: a card becomes
+  `resolvido` when its pull request is merged, and a merge on GitHub pushes
+  nothing to us, so that half still needs a clock. It cost six cards, which sat
+  in `em_progresso` on the public board with their work already shipped and
+  merged. A run costs no model turn — it is a CLI command, not a session.
+- Anything `reconciliar` writes to stderr is announced **even when it exits 0**,
+  because that is how it behaves: a `gh` failure on one card is logged, the card
+  is skipped, and the run still succeeds. Judging it by the exit code alone
+  would let an expired `gh` login stop every card from closing while reporting
+  nothing — the same silence, one layer down.
+- The `reconciliados: N de M` summary is never announced. It is printed on every
+  run, and a notification every quarter of an hour teaches whoever reads them to
+  stop reading.
 
 ## 1.9.1
 

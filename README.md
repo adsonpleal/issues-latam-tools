@@ -293,43 +293,45 @@ são escritas que as regras só liberam para o admin. Em compensação ele nunca
 O passo a passo que cada sessão segue está em
 `.agents/skills/triagem-automatica/SKILL.md`.
 
-#### Quem acorda a automação é o Firestore, não um relógio
+#### The Firestore wakes the automation, not a clock
 
-`tools/escuta.mjs` abre um listener no quadro e imprime uma linha por card novo:
+`tools/listen.mjs` opens a listener on the board and prints one line per new card:
 
 ```bash
-npm run escutar               # fica escutando
-npm run escutar -- --marca    # só imprime a marca d'água guardada
+npm run listen               # keeps listening
+npm run listen -- --mark     # prints the stored watermark
 ```
 
-Antes era uma tarefa agendada do Claude Code, de 15 em 15 minutos, perguntando ao
-Firestore se havia card novo: 54 leituras por ciclo, 5.184 por dia, e um turno
-inteiro de modelo por pergunta — quase sempre para ouvir "não". O listener
-inverte quem fala primeiro. O snapshot inicial custa uma leitura por card em
-`reportado` (hoje menos de 20) e depois é uma leitura por mudança.
+It used to be a scheduled Claude Code task, every 15 minutes, asking Firestore
+whether a new card had arrived: 54 reads per cycle, 5,184 per day, and a whole
+model turn per question — almost always to hear "no". The listener flips who
+speaks first. The initial snapshot costs one read per card in `reportado` (fewer
+than 20 today) and after that it is one read per change.
 
-**Cada linha do stdout vira uma notificação** na sessão que armou a escuta, e é
-ela que abre a sessão de triagem do card. Por isso só sai linha quando há card
-novo de verdade, ou quando a escuta morre — todo diagnóstico vai para o stderr,
-que não notifica ninguém. Escuta morta calada é indistinguível de quadro parado,
-e é esse silêncio que o `ESCUTA MORREU` existe para não deixar acontecer.
+**Every stdout line becomes a notification** in the session that armed the
+listener, and that session is what opens the card's triage session. So a line is
+printed only for a genuinely new card, or when the listener dies — every
+diagnostic goes to stderr, which notifies nobody. A listener that dies in silence
+is indistinguishable from a quiet board, and that is the silence `LISTENER DIED`
+exists to prevent.
 
-**Marca d'água própria**, em `escuta.json` ao lado do `estado.json` — arquivo
-separado porque senão as duas escritas se atropelariam. Ela é comparada pelos
-campos crus do instante, nunca por `Date`: o Firestore carimba microssegundos e o
-`Date` trunca em milissegundos, o que faria a marca cair *antes* do card de onde
-ela saiu, e esse card voltar a ser novidade em todo recomeço. É o mesmo cuidado
-que o anunciador documenta, pelo mesmo motivo.
+**It keeps a watermark of its own**, in `listen.json` next to `estado.json` and
+not inside it: the two writes would collide, and `estado.json` holds the ntfy
+topic. The watermark is compared by the instant's raw fields, never through
+`Date`: Firestore stamps microseconds and `Date` truncates to milliseconds, which
+would land the watermark *before* the card it came from and make that card news
+again on every restart. The announcer documents the same care, for the same
+reason.
 
-E recomeço é rotina, não exceção: quem arma a escuta a reinicia de tempos em
-tempos de propósito, porque processo residente pendurado fica "vivo" para sempre
-com os anúncios parados. A marca em disco é o que faz o recomeço não perder nem
-repetir card.
+And a restart is routine, not an exception: whoever arms the listener restarts it
+from time to time on purpose, because a stalled resident process stays "alive"
+forever with its announcements stopped. The on-disk watermark is what makes the
+restart neither lose nor repeat a card.
 
-**Este lê anônimo**, como o anunciador e ao contrário do `triagem.mjs`: as regras
-liberam listar `arquivado == false` com `limit <= 500`, então a escuta não
-consegue ler `privado/contato` nem por engano. Credencial de admin passaria por
-cima das regras e jogaria essa garantia fora.
+**This one reads anonymously**, like the announcer and unlike `triagem.mjs`: the
+rules allow listing `arquivado == false` with `limit <= 500`, so the listener
+cannot read `privado/contato` even by accident. An admin credential would
+override the rules and throw that guarantee away.
 
 ## Desenvolvimento
 

@@ -47,7 +47,7 @@ const ESTADO =
 const EM_VOO_MAX = Number(process.env["TRIAGEM_EM_VOO_MAX"] || 2);
 
 const SITE = "https://issues.latam-tools.com.br";
-/** O link que o aviso e a escuta apontam. Exportado para não virar duas constantes. */
+/** Where the notification and the listener point. Exported so it is not two constants. */
 export const urlDoCard = (id) => `${SITE}/t/${encodeURIComponent(id)}`;
 
 /** Espelho de src/lib/projetos.ts — e o repositório de cada um. */

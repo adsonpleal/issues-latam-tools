@@ -2,34 +2,36 @@
 
 ## 1.10.0
 
-- **O despachante agendado saiu; quem acorda a triagem agora é o Firestore.**
-  `tools/escuta.mjs` abre um listener anônimo em `status == 'reportado'` e
-  imprime uma linha por card novo. A tarefa agendada perguntava de 15 em 15
-  minutos se havia card novo — 54 leituras por ciclo, 5.184 por dia, e um turno
-  inteiro de modelo por pergunta, quase sempre para ouvir "não". O snapshot
-  inicial custa uma leitura por card em `reportado` (menos de 20) e depois é uma
-  leitura por mudança.
-- Lê **anônimo**, como o anunciador do Discord: as regras liberam listar
-  `arquivado == false` com `limit <= 500` e negam `privado/contato` a quem não é
-  admin, então a escuta não consegue ler o contato de quem reportou nem por
-  engano. Quem escreve continua sendo o `triagem.mjs`, autenticado — mover card
-  exige admin.
-- Marca d'água própria em `escuta.json`, separada do `estado.json` para as duas
-  escritas não se atropelarem. Comparada pelos campos crus do instante e nunca
-  por `Date`: o Firestore carimba microssegundos, o `Date` trunca em
-  milissegundos, e uma marca truncada cai antes do card de onde saiu — que então
-  volta a ser novidade em todo recomeço. É o defeito que o anunciador já
-  documentava, e agora tem teste.
-- Recomeço é parte do desenho, não acidente: quem arma a escuta a reinicia de
-  tempos em tempos, porque processo residente pendurado fica "vivo" para sempre
-  com os anúncios parados — o aviso que o anunciador deixou escrito. A marca em
-  disco faz o recomeço não perder nem repetir card.
-- Só sai linha no stdout quando há card novo ou quando a escuta morre
-  (`ESCUTA MORREU`), porque cada linha vira notificação. Diagnóstico vai para o
-  stderr.
-- A guarda de entrada usa `pathToFileURL`, e não a comparação por
-  `file://${argv[1]}`: no Windows a forma crua nunca casa. Sem ela, importar o
-  módulo — como o teste importa — abria um listener de verdade no Firestore.
+- **The scheduled dispatcher is gone; Firestore now wakes the triage.**
+  `tools/listen.mjs` opens an anonymous listener on `status == 'reportado'` and
+  prints one line per new card. The scheduled task asked every 15 minutes
+  whether a new card had arrived — 54 reads per cycle, 5,184 per day, and a
+  whole model turn per question, almost always to hear "no". The initial
+  snapshot costs one read per card in `reportado` (fewer than 20) and after that
+  it is one read per change.
+- Reads **anonymously**, like the Discord announcer: the rules allow listing
+  `arquivado == false` with `limit <= 500` and deny `privado/contato` to anyone
+  who is not the admin, so the listener cannot read the reporter's contact
+  details even by accident. Writing is still `triagem.mjs`, authenticated,
+  because moving a card demands the admin.
+- A watermark of its own in `listen.json`, separate from `estado.json` so the two
+  writes do not collide. Compared by the instant's raw fields and never through
+  `Date`: Firestore stamps microseconds, `Date` truncates to milliseconds, and a
+  truncated watermark lands before the card it came from — which then becomes
+  news again on every restart. It is the defect the announcer already
+  documented, and now it has a test.
+- A restart is part of the design, not an accident: whoever arms the listener
+  restarts it from time to time, because a stalled resident process stays
+  "alive" forever with its announcements stopped — the warning the announcer
+  left in writing. The on-disk watermark makes the restart neither lose nor
+  repeat a card.
+- A stdout line is printed only for a new card or when the listener dies
+  (`LISTENER DIED`), because every line becomes a notification. Diagnostics go
+  to stderr.
+- The entry-point guard uses `pathToFileURL` rather than comparing against
+  `file://` + `argv[1]`: on Windows the raw form never matches. Without it,
+  importing the module — as the test does — opened a real listener against
+  Firestore.
 
 ## 1.9.1
 

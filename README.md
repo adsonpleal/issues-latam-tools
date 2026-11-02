@@ -291,9 +291,47 @@ são escritas que as regras só liberam para o admin. Em compensação ele nunca
 `privado/contato`: não há caminho de código para isso.
 
 O passo a passo que cada sessão segue está em
-`.agents/skills/triagem-automatica/SKILL.md`, e o relógio é uma tarefa agendada
-do Claude Code (`triagem-automatica`, a cada 15 min), que só dispara com o app
-aberto.
+`.agents/skills/triagem-automatica/SKILL.md`.
+
+#### The Firestore wakes the automation, not a clock
+
+`tools/listen.mjs` opens a listener on the board and prints one line per new card:
+
+```bash
+npm run listen               # keeps listening
+npm run listen -- --mark     # prints the stored watermark
+```
+
+It used to be a scheduled Claude Code task, every 15 minutes, asking Firestore
+whether a new card had arrived: 54 reads per cycle, 5,184 per day, and a whole
+model turn per question — almost always to hear "no". The listener flips who
+speaks first. The initial snapshot costs one read per card in `reportado` (fewer
+than 20 today) and after that it is one read per change.
+
+**Every stdout line becomes a notification** in the session that armed the
+listener, and that session is what opens the card's triage session. So a line is
+printed only for a genuinely new card, or when the listener dies — every
+diagnostic goes to stderr, which notifies nobody. A listener that dies in silence
+is indistinguishable from a quiet board, and that is the silence `LISTENER DIED`
+exists to prevent.
+
+**It keeps a watermark of its own**, in `listen.json` next to `estado.json` and
+not inside it: the two writes would collide, and `estado.json` holds the ntfy
+topic. The watermark is compared by the instant's raw fields, never through
+`Date`: Firestore stamps microseconds and `Date` truncates to milliseconds, which
+would land the watermark *before* the card it came from and make that card news
+again on every restart. The announcer documents the same care, for the same
+reason.
+
+And a restart is routine, not an exception: whoever arms the listener restarts it
+from time to time on purpose, because a stalled resident process stays "alive"
+forever with its announcements stopped. The on-disk watermark is what makes the
+restart neither lose nor repeat a card.
+
+**This one reads anonymously**, like the announcer and unlike `triagem.mjs`: the
+rules allow listing `arquivado == false` with `limit <= 500`, so the listener
+cannot read `privado/contato` even by accident. An admin credential would
+override the rules and throw that guarantee away.
 
 ## Desenvolvimento
 

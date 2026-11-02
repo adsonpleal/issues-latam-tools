@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.10.0
+
+- **The scheduled dispatcher is gone; Firestore now wakes the triage.**
+  `tools/listen.mjs` opens an anonymous listener on `status == 'reportado'` and
+  prints one line per new card. The scheduled task asked every 15 minutes
+  whether a new card had arrived — 54 reads per cycle, 5,184 per day, and a
+  whole model turn per question, almost always to hear "no". The initial
+  snapshot costs one read per card in `reportado` (fewer than 20) and after that
+  it is one read per change.
+- Reads **anonymously**, like the Discord announcer: the rules allow listing
+  `arquivado == false` with `limit <= 500` and deny `privado/contato` to anyone
+  who is not the admin, so the listener cannot read the reporter's contact
+  details even by accident. Writing is still `triagem.mjs`, authenticated,
+  because moving a card demands the admin.
+- A watermark of its own in `listen.json`, separate from `estado.json` so the two
+  writes do not collide. Compared by the instant's raw fields and never through
+  `Date`: Firestore stamps microseconds, `Date` truncates to milliseconds, and a
+  truncated watermark lands before the card it came from — which then becomes
+  news again on every restart. It is the defect the announcer already
+  documented, and now it has a test.
+- A restart is part of the design, not an accident: whoever arms the listener
+  restarts it from time to time, because a stalled resident process stays
+  "alive" forever with its announcements stopped — the warning the announcer
+  left in writing. The on-disk watermark makes the restart neither lose nor
+  repeat a card.
+- A stdout line is printed only for a new card or when the listener dies
+  (`LISTENER DIED`), because every line becomes a notification. Diagnostics go
+  to stderr.
+- The entry-point guard uses `pathToFileURL` rather than comparing against
+  `file://` + `argv[1]`: on Windows the raw form never matches. Without it,
+  importing the module — as the test does — opened a real listener against
+  Firestore.
+
 ## 1.9.1
 
 - **A triagem parou de listar a coleção inteira a cada ciclo.** `fila` e

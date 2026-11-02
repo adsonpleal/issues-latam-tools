@@ -91,8 +91,22 @@ Trabalhe na pasta do projeto, num worktree seu. Cada repositório tem os própri
 comandos: leia o `CLAUDE.md`, o `package.json` e o `.claude/launch.json` dele
 antes de supor qualquer coisa — eles não são iguais entre si.
 
-Escreva como o código ao redor já escreve: mesma língua nos comentários, mesma
-densidade, mesmos nomes. Um comentário explica **por que**, não o que a linha faz.
+Escreva como o código ao redor já escreve: mesma densidade de comentário, mesmos
+nomes, mesmos padrões. Um comentário explica **por que**, não o que a linha faz.
+
+**Mas não a mesma língua: código se escreve sempre em inglês.** Comentário,
+JSDoc, nome de identificador, descrição de teste, mensagem de commit, título e
+corpo do PR, README, CHANGELOG. Em qualquer um dos cinco repositórios, inclusive
+onde a vizinhança está em português — o português do `issues-latam-tools` é
+dívida, não convenção a imitar. "Escrever como o código ao redor" vale para o
+estilo e para os nomes que você precisa chamar, **nunca** para a língua do texto
+que você escreve.
+
+A exceção é o texto que alguém lê como produto, e esse segue em português: o
+comentário público no card, a mensagem do `avisar` e as notas de versão
+("Novidades"), que vão nos três idiomas porque é o jogador que as lê. Citação
+literal do que quem reportou escreveu fica como ele escreveu, erro de digitação
+incluído; rótulo de interface em legenda de captura fica como a tela mostra.
 
 ## 3. Testar
 
@@ -128,6 +142,11 @@ O corpo do PR é o relatório, e tem obrigatoriamente:
 4. **A fonte** de cada número novo.
 5. O que você decidiu **não** fazer, e por quê.
 
+**Título e corpo em inglês**, como todo o resto que você escreve (passo 2). O
+`latam-ro-calc` faz squash merge, então o título do PR vira a mensagem do commit
+no histórico — é a razão de não deixar esse escapar. Dentro do corpo, só as notas
+de "Novidades" e a citação de quem reportou ficam na língua original.
+
 Termine a descrição com a linha de atribuição:
 
 ```
@@ -161,9 +180,16 @@ concluiu que o relato não procede, ou que travou, fica fora da seção: ela nã
 PR para revisar, e o que o Adson precisa saber dela já chegou pela notificação.
 
 Daí em diante o app te acorda quando o CI falha, quando aparece conflito e quando
-chega comentário. **Não fique consultando o GitHub**: nada de `gh pr checks` em
-laço, nada de relógio agendado, nada de turno parado esperando. Um turno assim
-gasta a máquina e não vê nada que o monitor não veja.
+chega comentário. **Não fique consultando o GitHub em laço**: nada de `gh pr
+checks` repetido, nada de relógio agendado, nada de turno parado esperando. Um
+turno assim gasta a máquina e não vê nada que o monitor não veja.
+
+O monitor tem um ponto cego, e vale saber qual é: ele acorda a sessão **ociosa**.
+Comentário que chega enquanto o seu turno ainda está rodando pode não virar evento
+nenhum — aconteceu no PR #89, em que um comentário do Adson ficou no GitHub sem
+acordar a sessão, e só apareceu porque ele perguntou. Por isso a leitura única do
+passo 8 **não** é consulta em laço: é a rede de segurança desse ponto cego, e é
+obrigatória.
 
 Se o CI vier vermelho, leia o log, decida se é sua a culpa e conserte — **menos**
 nestes casos, em que a falha não é sua e você não deve mexer:
@@ -174,7 +200,12 @@ nestes casos, em que a falha não é sua e você não deve mexer:
 
 Não mescle nada. Nunca. O merge é do Adson.
 
-## 8. Avisar
+## 8. Ler os comentários uma vez, e avisar
+
+**Antes de avisar, leia os comentários do PR uma vez** — a leitura do passo 9. Se
+já houver pedido do `adsonpleal` ali, atenda **antes** de notificar: a notificação
+diz "pronto para revisão", e PR com pedido pendente não está pronto. Essa leitura
+é uma só, no fim do turno, e existe por causa do ponto cego do passo 7.
 
 ```bash
 node C:/Users/adson/dev/issues-latam-tools/tools/triagem.mjs avisar <id> --mensagem "PR #<n> pronto para revisão — <o que mudou, em meia dúzia de palavras>. CI <verde|vermelho: motivo>."
@@ -189,8 +220,11 @@ log.
 
 ## 9. Quando o Adson comentar no PR
 
-O monitor te acorda. Antes de fazer o que o comentário pede, veja **quem**
-escreveu:
+Você chega aqui de dois jeitos: o monitor te acorda, ou a leitura do passo 8
+encontra o comentário. Em qualquer um dos dois, **leia a lista inteira**, não só o
+comentário que o evento citou — o evento pode ter pulado um, e um pedido antigo
+sem resposta continua pendente. Antes de fazer o que o comentário pede, veja
+**quem** escreveu:
 
 ```bash
 gh pr view <n> --repo adsonpleal/<repo> --json comments,reviews --jq '[.comments[], (.reviews[]? | select(.body != ""))] | map({autor: .author.login, createdAt, body})'
@@ -212,7 +246,9 @@ Atendido o pedido:
 2. Se mexeu em tela, confira à mão de novo (passo 4).
 3. Empurre para o **mesmo branch** do PR. Não abra PR novo.
 4. Responda no PR, em uma linha, o que mudou.
-5. Avise de novo com `avisar`, dizendo o que você atendeu.
+5. Leia a lista de comentários de novo: trabalhar demora, e o que chegou nesse
+   meio-tempo é justamente o que o monitor não te contou.
+6. Avise de novo com `avisar`, dizendo o que você atendeu.
 
 O pedido dele vale para o código **deste** PR. Fora disso nada muda: não mescle
 — nem se o comentário pedir, porque o merge é no botão dele —, não mexa em outro

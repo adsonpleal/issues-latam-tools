@@ -5,7 +5,8 @@
 #
 # Provisionamento manual necessário uma vez (o deploy NÃO faz):
 #   install -d -o ubuntu -g ubuntu /opt/issues-discord /var/lib/issues-discord
-#   o drop-in 10-token.conf com o DISCORD_BOT_TOKEN (ver a skill de deploy)
+#   infra/configure-token.sh   -> drop-in 10-token.conf (DISCORD_BOT_TOKEN)
+#   infra/configure-ntfy.sh    -> drop-in 20-ntfy.conf  (NTFY_TOPICO)
 #   systemctl start issues-discord.service   # bootstrap, NÃO anuncia nada
 #   systemctl enable --now issues-discord.timer
 #
@@ -43,6 +44,12 @@ Environment=SITE_URL=https://issues.latam-tools.com.br
 Environment=ESTADO=/var/lib/issues-discord/estado.json
 # O DISCORD_BOT_TOKEN vem do drop-in 10-token.conf, modo 0600, que não vai para o
 # repositório: esta unit é pública.
+#
+# O NTFY_TOPICO vem do 20-ntfy.conf, pelo mesmo motivo — tópico de ntfy é senha
+# de quem publica. É por onde o deadman avisa quando o problema é o próprio
+# Discord, que foi exatamente o que aconteceu em 20/10/2026 e passou treze dias
+# sem ninguém saber, porque o único aviso ia para o canal que estava quebrado.
+# Sem ele o serviço roda igual; só perde essa saída.
 
 ExecStart=/usr/bin/env node --max-old-space-size=64 /opt/issues-discord/tools/anunciar-discord.mjs
 

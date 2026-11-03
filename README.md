@@ -170,6 +170,14 @@ retorno sem publicar nada.
 Card novo e público vira um embed no canal de reports do Discord, com projeto,
 tipo, título, um trecho da descrição, o nick (quando tem) e o link do card.
 
+Cada anúncio abre um **tópico**, e o card passa a ser acompanhado: quando um PR
+é gravado nele, ou quando o status muda, isso é postado dentro do tópico. É o
+que faz um report parar de ser uma mensagem que rolou para cima e virar um lugar
+onde dá para ver o que aconteceu com ele. O acompanhamento acaba sozinho quando
+o card chega a `resolvido` ou `nao_sera_feito`, e a checagem roda a cada 10 min
+— não a cada tique — porque cada uma custa uma leitura por card acompanhado, e
+ler demais já estourou a cota do plano gratuito uma vez.
+
 Quem faz isso é `tools/anunciar-discord.mjs`, rodando na instância Oracle do ragassets como
 one-shot do systemd a cada 2 min (`infra/issues-discord.{service,timer}`). O
 plano gratuito do Firebase não tem Cloud Functions, então o gatilho tem que vir
@@ -195,6 +203,21 @@ e negam `issues/{id}/privado/contato` — ou seja, o anunciador *não consegue* 
 o contato de quem reportou. A privacidade é garantida pelo banco, não pelo
 cuidado do script, que é por que aqui não entra `firebase-admin` nem service
 account.
+
+O acompanhamento do tópico não mudou isso: `status` e `pr` são campos públicos
+do card, e lê-los um documento por vez cabe nas mesmas regras. Trocar a consulta
+anônima por credencial de admin para ganhar isso teria sido pagar a garantia
+inteira por algo que ela já permitia.
+
+### Quando o próprio Discord é o problema
+
+O deadman avisa por **dois** caminhos: o canal e um tópico do ntfy. A razão está
+em 20/10/2026, quando o bot perdeu `Enviar mensagens` no canal: o serviço caiu, o
+alerta sobre isso foi postado nesse mesmo canal, levou 403 nas 8.755 tentativas e
+foi engolido pelo `catch`. Treze dias de silêncio. Vigia que avisa pelo caminho
+que ele vigia não é vigia. O tópico do ntfy vem de um drop-in root-only em
+`NTFY_TOPICO`, igual ao token, e **não tem padrão no código**: o repositório é
+público e tópico de ntfy é senha de quem publica.
 
 Duas consequências de graça: gravação do "Ajude o simulador" não é card até
 alguém promover, então nunca é anunciada na chegada; e o marco d'água em disco

@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.11.0
+
+- **The announcer had been dead for thirteen days, and the alarm died with it.**
+  On 2026-10-20 the bot lost Send Messages on the reports channel. Every run
+  since failed, and the deadman posted its alert to that same channel, where it
+  was refused 8755 times in a row and swallowed by a `catch`. A watchdog that
+  reports through the thing it watches cannot report that thing breaking. It now
+  warns down a second path, an ntfy topic, which does not depend on Discord
+  being healthy; either path succeeding is enough to go quiet, so a dead channel
+  no longer leaves the alarm permanently un-sent.
+- **The saturation guard could not clear itself.** It fired on "the query page
+  came back full", which cannot tell a spam burst from a backlog — and since the
+  watermark only moves when something is posted, a backlog over one page blocked
+  every run forever and grew more certain to block the next. That is what turned
+  one lost permission into thirteen silent days. Saturation is now a rate over a
+  window, which a backlog spread across days never trips; a backlog is drained
+  `--max` per run instead, and the journal says how many are left.
+- **Each announcement opens a thread, and the card is followed into it.** When a
+  pull request is recorded on a card, or its status moves, that is posted inside
+  the card's thread, so a report stops being a message that scrolled away. The
+  follow-up ends on its own at `resolvido` or `nao_sera_feito`.
+- The follow-up kept the anonymous Firestore identity. `status` and `pr` are
+  public fields, so reading them one document at a time fits the same rules that
+  deny `privado/contato` — using an admin credential would have paid the whole
+  privacy guarantee for something the rules already allowed.
+- Checking follow-ups runs every 10 minutes rather than every 2, because each
+  check costs one read per followed card and this service wakes 720 times a day.
+  Reading too much is what exhausted the free quota once already.
+- `infra/configure-ntfy.sh` installs the ntfy topic the same way the bot token is
+  installed: a root-only drop-in, prompted from the terminal, never in the
+  repository — which is public, and an ntfy topic is the password of whoever
+  publishes to it.
+
 ## 1.10.1
 
 - **1.10.0 shipped without half of what it replaced: the listener now runs

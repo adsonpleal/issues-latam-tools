@@ -1,16 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-import { LABEL_TIPO as LABEL_TIPO_APP } from "../src/i18n";
+import { LABEL_STATUS as LABEL_STATUS_APP, LABEL_TIPO as LABEL_TIPO_APP } from "../src/i18n";
 import { PROJETOS as PROJETOS_APP } from "../src/lib/projetos";
 import {
+  LABEL_STATUS,
   LABEL_TIPO,
   PROJETOS,
   chaveOrdem,
   documentoParaCard,
+  mensagemDeMudanca,
   montarMensagem,
+  nomeDoTopico,
+  podar,
   sanitizarDescricao,
   sanitizarTitulo,
+  saturado,
+  statusFinal,
   truncar,
+  urlDoPr,
   valor,
 } from "./anunciar-discord.mjs";
 
@@ -30,6 +37,10 @@ describe("deriva das constantes", () => {
 
   it("os rótulos de tipo batem com src/i18n.ts", () => {
     expect(LABEL_TIPO).toEqual(LABEL_TIPO_APP);
+  });
+
+  it("os rótulos de status batem com src/i18n.ts", () => {
+    expect(LABEL_STATUS).toEqual(LABEL_STATUS_APP);
   });
 });
 
@@ -271,5 +282,135 @@ describe("montarMensagem", () => {
     const m = montarMensagem({ ...base, titulo: "t".repeat(500), descricao: "d".repeat(5000) });
     expect([...m.embeds[0].title].length).toBeLessThanOrEqual(201);
     expect([...m.embeds[0].description].length).toBeLessThanOrEqual(501);
+  });
+});
+
+describe("documentoParaCard traz status e pr", () => {
+  it("carrega os dois campos que o acompanhamento usa", () => {
+    const card = documentoParaCard({
+      name: "a/b/c/issues/x",
+      fields: { status: { stringValue: "em_progresso" }, pr: { stringValue: "o/r#7" } },
+    });
+    expect(card.status).toBe("em_progresso");
+    expect(card.pr).toBe("o/r#7");
+  });
+
+  it("o card tem exatamente estas chaves, e nenhuma a mais", () => {
+    // Trava a promessa do cabecalho do script: o que sai daqui e o que vai para
+    // o Discord. Uma chave nova entra por este teste, nao por descuido.
+    expect(Object.keys(documentoParaCard({ name: "a/b/c/issues/x" })).sort()).toEqual([
+      "autor",
+      "criadoEm",
+      "descricao",
+      "id",
+      "pr",
+      "projeto",
+      "status",
+      "tipo",
+      "titulo",
+    ]);
+  });
+});
+
+describe("urlDoPr", () => {
+  it("monta o link a partir de dono/repo#N", () => {
+    expect(urlDoPr("adsonpleal/latam-ro-calc#90")).toBe(
+      "https://github.com/adsonpleal/latam-ro-calc/pull/90",
+    );
+  });
+
+  it("recusa qualquer coisa fora do formato", () => {
+    // O campo e dado, nao codigo: o que nao casa exato nao vira link nenhum,
+    // porque este link e postado sob a identidade do bot.
+    for (const ruim of ["", "sem-numero", "o/r#", "o/r#abc", "http://evil.com", "o/r#1 extra", null, 7]) {
+      expect(urlDoPr(ruim)).toBe(null);
+    }
+  });
+
+  it("nao deixa barra a mais virar outro caminho", () => {
+    expect(urlDoPr("a/b/c#1")).toBe(null);
+  });
+});
+
+describe("saturado", () => {
+  const agora = Date.parse("2026-11-03T12:00:00Z");
+  const card = (minutosAtras) => ({
+    criadoEm: new Date(agora - minutosAtras * 60000).toISOString(),
+  });
+
+  it("rajada na janela satura", () => {
+    expect(saturado(Array.from({ length: 10 }, () => card(1)), { agora })).toBe(true);
+  });
+
+  it("represamento espalhado por dias NAO satura", () => {
+    // Esta e a regressao que deixou o servico 13 dias vermelho: a pagina cheia
+    // disparava o guard, o guard impedia o post, e sem post o marco nao andava.
+    const atrasados = Array.from({ length: 26 }, (_, i) => card((i + 1) * 60 * 12));
+    expect(saturado(atrasados, { agora })).toBe(false);
+  });
+
+  it("card sem data nao conta", () => {
+    expect(saturado([{ criadoEm: null }, { criadoEm: "nao e data" }], { agora })).toBe(false);
+  });
+});
+
+describe("mensagemDeMudanca", () => {
+  it("anuncia o PR quando ele aparece", () => {
+    const m = mensagemDeMudanca({ pr: null, status: "em_progresso" }, { pr: "o/r#3", status: "em_progresso" });
+    expect(m.content).toContain("https://github.com/o/r/pull/3");
+    expect(m.allowed_mentions).toEqual({ parse: [] });
+  });
+
+  it("anuncia a mudanca de status com o rotulo do site", () => {
+    const m = mensagemDeMudanca({ pr: null, status: "reportado" }, { pr: null, status: "resolvido" });
+    expect(m.content).toContain("Resolvido");
+  });
+
+  it("junta as duas quando mudam juntas", () => {
+    const m = mensagemDeMudanca(
+      { pr: null, status: "reportado" },
+      { pr: "o/r#3", status: "em_progresso" },
+    );
+    expect(m.content).toContain("https://github.com/o/r/pull/3");
+    expect(m.content).toContain("Em progresso");
+  });
+
+  it("sem mudanca, nao posta nada", () => {
+    const igual = { pr: "o/r#3", status: "em_progresso" };
+    expect(mensagemDeMudanca(igual, { ...igual })).toBe(null);
+  });
+
+  it("PR malformado nao vira linha", () => {
+    expect(mensagemDeMudanca({ pr: null, status: "x" }, { pr: "lixo", status: "x" })).toBe(null);
+  });
+});
+
+describe("podar", () => {
+  it("devolve intacto quando cabe", () => {
+    const a = { um: 1, dois: 2 };
+    expect(podar(a, 5)).toEqual(a);
+  });
+
+  it("mantem os mais novos e descarta os mais velhos", () => {
+    expect(Object.keys(podar({ a: 1, b: 2, c: 3 }, 2))).toEqual(["b", "c"]);
+  });
+
+  it("aguenta vazio e ausente", () => {
+    expect(podar(undefined, 2)).toEqual({});
+  });
+});
+
+describe("tópico e status final", () => {
+  it("o nome do topico e o titulo saneado e cortado em 100", () => {
+    expect([...nomeDoTopico({ titulo: "t".repeat(300) })].length).toBeLessThanOrEqual(100);
+    expect(nomeDoTopico({ titulo: "" })).toBe("(sem título)");
+  });
+
+  it("so resolvido e nao_sera_feito encerram o acompanhamento", () => {
+    expect(statusFinal("resolvido")).toBe(true);
+    expect(statusFinal("nao_sera_feito")).toBe(true);
+    for (const aberto of ["reportado", "backlog", "em_progresso", null, undefined]) {
+      expect(statusFinal(aberto)).toBe(false);
+    }
   });
 });

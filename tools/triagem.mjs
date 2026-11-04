@@ -264,6 +264,128 @@ async function notifica({ titulo, mensagem, link, tags }) {
   return { ok: true };
 }
 
+// --- Screening for prompt injection ---------------------------------------
+
+/**
+ * The board is public: anybody can file a card. A card's `titulo` and
+ * `descricao` are then pasted verbatim into the brief of a session that runs
+ * unattended with write access to the board, `git push` and `gh`. So a card is
+ * text from a stranger that reaches a tool-using agent, and some of it may be
+ * addressed to that agent rather than describing a bug.
+ *
+ * This runs **before** any model reads the card, and that ordering is the whole
+ * point: a detector that asks a model "is this an injection?" has already fed
+ * it the injection. `maduros` and `pegar` are the only two ways a card becomes
+ * a session, so both consult this, independently — the dispatcher can call
+ * `pegar <id>` straight past the queue, and has.
+ *
+ * It is a speed bump, not a wall. This repository is public, so these patterns
+ * are public too, and whoever reads them can write around them. The defences
+ * that actually hold are the two behind it: the triage skill treats card text
+ * as data and never as instructions, and a screened card waits for a person.
+ * What this buys is that the careless attempt never reaches an agent at all.
+ *
+ * Biased towards flagging, because the two mistakes do not cost the same. A
+ * false positive costs Adson a glance at one card. A false negative hands a
+ * stranger's instructions to a process that can push code.
+ */
+
+/**
+ * Zero-width characters and bidi overrides, checked on the raw text because
+ * normalising strips them. A bug report has no use for either, while hiding
+ * text from the person reviewing the card is exactly what they are good for.
+ */
+const INVISIBLE = /[​-‏‪-‮⁠-⁩﻿]/u;
+
+/** NFKC folds full-width and compatibility forms onto the letters the rules match. */
+function normalize(text) {
+  return String(text ?? "")
+    .normalize("NFKC")
+    .replace(/[​-‏‪-‮⁠-⁩﻿]/gu, "")
+    .toLowerCase();
+}
+
+/**
+ * Each rule names what it suspects, so whoever reads the flag learns why
+ * without re-reading the card hunting for it. The patterns cover both
+ * languages: the board is answered in Portuguese and may be attacked in either.
+ */
+const SCREEN_RULES = [
+  {
+    rule: "agent-instruction",
+    // "ignore the above", "esqueça as instruções anteriores", "you are now a…"
+    pattern:
+      /\b(ignore|ignora|disregard|forget|esque[çc]a|desconsidere)\b[^.\n]{0,40}\b(previous|prior|above|earlier|instruc|instru[çc])|you are now|from now on you|a partir de agora,? (voc[êe]|tu)|new instructions|novas instru[çc][õo]es|system prompt|prompt do sistema|\bact as\b|\baja como\b/u,
+  },
+  {
+    rule: "role-markup",
+    // Trying to close the data block and speak as the system or the assistant.
+    pattern:
+      /<\/?system|<\|[a-z_]|\[\/?inst\]|#{2,}\s*instruction|^\s*(human|assistant|user|system)\s*:|<function_calls|<\/?tool_use|<\/?antml:/imu,
+  },
+  {
+    rule: "tool-request",
+    // A bug report does not ask for a shell.
+    pattern:
+      /--no-verify|rm\s+-rf|\bcurl\s|\bwget\s|gh\s+(pr\s+merge|auth)|push\s+--force|--force-with-lease|npm\s+publish|\bchmod\s|\bsudo\s|\bfirebase\b|\bfirestore\b|process\.env/u,
+  },
+  {
+    rule: "secret",
+    // Fishing for what the session can reach and the reporter cannot.
+    pattern:
+      /\btokens?\b|\bsecrets?\b|\bcredenciais?\b|\bcredentials?\b|\bsenhas?\b|\bid_rsa\b|\.env\b|private key|chave privada|service account|api[\s_-]?key|chave de api|\bakia[0-9a-z]{16}/u,
+  },
+  {
+    rule: "false-authority",
+    // Authority cannot arrive inside the thing being screened.
+    pattern:
+      /autoriza(do|ção) (por|pelo)|\badson\b[^.\n]{0,30}\b(pediu|autorizou|aprovou|disse|mandou)|\badson\b[^.\n]{0,20}\b(said|asked|approved|authoriz)|admin override|sou o (dono|administrador)|\b(i am|i'm) the (owner|admin)|on behalf of|em nome d(o|a)/u,
+  },
+  {
+    rule: "secrecy",
+    // Asking the session to hide what it did is asking it to defeat the review.
+    pattern:
+      /n[ãa]o (avise|comente|informe|conte|mencione|diga)|sem (avisar|comentar|notificar)|do ?n[o']?t tell|don't mention|without notifying|\bsilently\b|\bquietly\b|em sigilo|secretamente/u,
+  },
+];
+
+/**
+ * Screens the three fields that reach an agent: `titulo` and `descricao` go
+ * into the brief, and `autor` goes into a pull request body as the credit line.
+ *
+ * Returns `null` for a card that reads like a bug report, or
+ * `{ rule, field, excerpt }` naming the rule, the field it fired on, and
+ * enough text around the match to judge it by. The excerpt is what makes
+ * dismissing a false positive cheap.
+ */
+export function screenForInjection(card) {
+  for (const field of ["titulo", "descricao", "autor"]) {
+    const raw = String(card?.[field] ?? "");
+    if (!raw) continue;
+
+    if (INVISIBLE.test(raw)) {
+      return { rule: "invisible-characters", field, excerpt: around(raw, raw.search(INVISIBLE)) };
+    }
+
+    const text = normalize(raw);
+    for (const { rule, pattern } of SCREEN_RULES) {
+      const hit = pattern.exec(text);
+      if (hit) return { rule, field, excerpt: around(text, hit.index) };
+    }
+  }
+  return null;
+}
+
+/** Sixty characters around the match: enough to read the sentence, not the essay. */
+function around(text, index) {
+  const start = Math.max(0, index - 20);
+  return (
+    (start > 0 ? "…" : "") +
+    text.slice(start, index + 60).replace(/\s+/g, " ").trim() +
+    (index + 60 < text.length ? "…" : "")
+  );
+}
+
 // --- Regras da fila --------------------------------------------------------
 
 /**
@@ -274,13 +396,25 @@ export function maduros(cards, { desde, emVooMax = EM_VOO_MAX } = {}) {
   const emVoo = cards.filter((c) => !c.arquivado && c.auto && c.status === "em_progresso");
   const vagas = Math.max(0, emVooMax - emVoo.length);
 
-  const fila = cards
+  const candidates = cards
     .filter((c) => !c.arquivado && c.status === "reportado" && c.tipo !== "replay")
     .filter((c) => c.projeto in REPOS)
     .filter((c) => !desde || (c.criadoEm && c.criadoEm > desde))
     .sort((a, b) => String(a.criadoEm).localeCompare(String(b.criadoEm)));
 
-  return { fila, emVoo, vagas, pegaveis: fila.slice(0, vagas) };
+  // Screened out instead of queued. A card addressed to the agent stays in
+  // `reportado`, out of the automation's reach, until a person has read it. It
+  // is deliberately not sent to `backlog` with a public comment: naming the
+  // rule that caught it would tell whoever wrote it what to avoid next time.
+  const blocked = [];
+  const fila = [];
+  for (const c of candidates) {
+    const screen = screenForInjection(c);
+    if (screen) blocked.push({ ...c, screen });
+    else fila.push(c);
+  }
+
+  return { fila, emVoo, vagas, pegaveis: fila.slice(0, vagas), blocked };
 }
 
 // --- Comandos --------------------------------------------------------------
@@ -319,6 +453,13 @@ const comandos = {
             descricao: c.descricao,
             url: urlDoCard(c.id),
           })),
+          barrados: r.blocked.map((c) => ({
+            id: c.id,
+            projeto: c.projeto,
+            titulo: c.titulo,
+            ...c.screen,
+            url: urlDoCard(c.id),
+          })),
         },
         null,
         2,
@@ -330,6 +471,16 @@ const comandos = {
     if (!id) throw new Error("uso: pegar <id>");
     const card = await buscaCard(id);
     if (card.status !== "reportado") throw new Error(`card ${id} está em '${card.status}', não em 'reportado'`);
+
+    // Checked here as well as in `maduros`, because a dispatcher can call
+    // `pegar <id>` straight past the queue — and has.
+    const screen = screenForInjection(card);
+    if (screen) {
+      throw new Error(
+        `card ${id} refused by the injection screen: ${screen.rule} in \`${screen.field}\` — ` +
+          `"${screen.excerpt}". Read the card and decide by hand; the automation will not take it.`,
+      );
+    }
 
     const r = await escreve(
       id,
@@ -454,6 +605,12 @@ const comandos = {
         `em voo       : ${r.emVoo.length}/${EM_VOO_MAX}${r.emVoo.length ? ` — ${r.emVoo.map((c) => `${c.id}${c.pr ? ` (${c.pr})` : ""}`).join(", ")}` : ""}\n` +
         `fila madura  : ${r.fila.length}\n` +
         `pegáveis já  : ${r.pegaveis.length}\n` +
+        // Shown here and in `fila`, and deliberately NOT pushed to the phone:
+        // a notification per screened card would hand a stranger a way to ring
+        // Adson's phone at will, by filing cards. The dispatcher reads this
+        // every cycle, which is where a blocked card belongs.
+        `barrados     : ${r.blocked.length}${r.blocked.length ? ` — ${r.blocked.map((c) => `${c.id} (${c.screen.rule})`).join(", ")}` : ""}
+` +
         `estado em    : ${ESTADO}`,
     );
   },

@@ -3,9 +3,9 @@
 //
 //   node tools/triagem.mjs bootstrap            # marca d'água = agora, não pega nada do passado
 //   node tools/triagem.mjs fila                 # o que está maduro para pegar, em JSON
-//   node tools/triagem.mjs pegar <id>           # reportado -> em_progresso, trava o card
+//   node tools/triagem.mjs pegar <id>           # backlog -> em_progresso, trava o card
 //   node tools/triagem.mjs pr <id> <dono/repo#N>
-//   node tools/triagem.mjs parar <id> --motivo "..."   # não procede: -> backlog, com comentário
+//   node tools/triagem.mjs parar <id> --motivo "..."   # recusa: fica em backlog, auto: false
 //   node tools/triagem.mjs reconciliar          # PR mesclado -> resolvido
 //   node tools/triagem.mjs avisar <id> --mensagem "..."  # notificação no celular
 //   node tools/triagem.mjs alarme --mensagem "..."       # idem, sem card: o despachante
@@ -17,9 +17,17 @@
 // despachantes simultâneos não podem pegar o mesmo card. De quebra, você vê a
 // fila no quadro e tira um card dela arrastando — sem mexer em nada aqui.
 //
-// A marca d'água existe pelo mesmo motivo do anunciador: ligar isto com 16
-// cards parados em `reportado` despejaria 16 sessões de uma vez. `bootstrap`
-// grava "a partir de agora" e o passado fica onde está.
+// The queue reads `backlog`, never `reportado`, and that is the whole defence
+// against a card written to be read by an agent. A stranger can only create a
+// card in `reportado` -- the rules pin `status == 'reportado'` on public create
+// and allow the public nothing but `upvotes += 1` afterwards -- so no text
+// reaches this automation until Adson has read it and moved it himself.
+// Placement in `backlog` IS the authorization, and it arrives through a channel
+// an attacker cannot write to.
+//
+// The watermark is keyed on `atualizadoEm` (when a card was moved) and not on
+// `criadoEm` (when it was filed), because a card approved today may have been
+// reported weeks ago.
 //
 // Escreve AUTENTICADO (tools/credencial.mjs), ao contrário do anunciador, que
 // consulta anônimo de propósito. Aqui não tem escolha: mover card e comentar
@@ -96,10 +104,12 @@ async function cabecalhos() {
 }
 
 /**
- * Só os dois status que a fila enxerga: `reportado` (o que dá para pegar) e
- * `em_progresso` (o que já está em voo). Filtro de campo único, que usa o índice
- * automático; a ordenação segue em memória, no `maduros`, justamente para não
- * exigir índice composto.
+ * Only the two statuses the queue can see: `backlog` (what it may take) and
+ * `em_progresso` (what is already in flight). `reportado` is deliberately not
+ * fetched -- not filtered out downstream, not fetched -- so a card nobody has
+ * reviewed has no code path into this process at all. Single-field filter, so
+ * it uses the automatic index; the ordering stays in memory, in `maduros`,
+ * precisely to avoid needing a composite one.
  *
  * Antes isto listava a coleção inteira. Como `fila` e `reconciliar` chamam a
  * cada ciclo do despachante, eram ~580 leituras a cada 15 min: a cota diária do
@@ -117,7 +127,7 @@ async function cardsAtivos() {
           fieldFilter: {
             field: { fieldPath: "status" },
             op: "IN",
-            value: { arrayValue: { values: [str("reportado"), str("em_progresso")] } },
+            value: { arrayValue: { values: [str("backlog"), str("em_progresso")] } },
           },
         },
       },
@@ -172,7 +182,14 @@ export function paraCard(doc) {
     pr: s("pr"),
     arquivado: Boolean(f["arquivado"]?.booleanValue),
     auto: Boolean(f["auto"]?.booleanValue),
+    // Set by `parar` when the automation refuses a card Adson approved. It is a
+    // field of its own and not `auto: false`, because an absent `auto` already
+    // reads as `false` on the line above -- that is every card nobody picked.
+    refused: Boolean(f["refused"]?.booleanValue),
     criadoEm: f["criadoEm"]?.timestampValue ?? null,
+    // When the card last moved, which for a card in `backlog` is when Adson
+    // approved it. The queue's watermark keys on this, not on `criadoEm`.
+    atualizadoEm: f["atualizadoEm"]?.timestampValue ?? null,
   };
 }
 
@@ -264,23 +281,166 @@ async function notifica({ titulo, mensagem, link, tags }) {
   return { ok: true };
 }
 
+// --- Screening for prompt injection ---------------------------------------
+
+/**
+ * The board is public: anybody can file a card. A card's `titulo` and
+ * `descricao` are then pasted verbatim into the brief of a session that runs
+ * unattended with write access to the board, `git push` and `gh`. So a card is
+ * text from a stranger that reaches a tool-using agent, and some of it may be
+ * addressed to that agent rather than describing a bug.
+ *
+ * This runs **before** any model reads the card, and that ordering is the whole
+ * point: a detector that asks a model "is this an injection?" has already fed
+ * it the injection. `maduros` and `pegar` are the only two ways a card becomes
+ * a session, so both consult this, independently — the dispatcher can call
+ * `pegar <id>` straight past the queue, and has.
+ *
+ * It is a speed bump, not a wall. This repository is public, so these patterns
+ * are public too, and whoever reads them can write around them. The defences
+ * that actually hold are the two behind it: the triage skill treats card text
+ * as data and never as instructions, and a screened card waits for a person.
+ * What this buys is that the careless attempt never reaches an agent at all.
+ *
+ * Biased towards flagging, because the two mistakes do not cost the same. A
+ * false positive costs Adson a glance at one card. A false negative hands a
+ * stranger's instructions to a process that can push code.
+ */
+
+/**
+ * Zero-width characters and bidi overrides, checked on the raw text because
+ * normalising strips them. A bug report has no use for either, while hiding
+ * text from the person reviewing the card is exactly what they are good for.
+ */
+const INVISIBLE = /[​-‏‪-‮⁠-⁩﻿]/u;
+
+/** NFKC folds full-width and compatibility forms onto the letters the rules match. */
+function normalize(text) {
+  return String(text ?? "")
+    .normalize("NFKC")
+    .replace(/[​-‏‪-‮⁠-⁩﻿]/gu, "")
+    .toLowerCase();
+}
+
+/**
+ * Each rule names what it suspects, so whoever reads the flag learns why
+ * without re-reading the card hunting for it. The patterns cover both
+ * languages: the board is answered in Portuguese and may be attacked in either.
+ */
+const SCREEN_RULES = [
+  {
+    rule: "agent-instruction",
+    // "ignore the above", "esqueça as instruções anteriores", "you are now a…"
+    pattern:
+      /\b(ignore|ignora|disregard|forget|esque[çc]a|desconsidere)\b[^.\n]{0,40}\b(previous|prior|above|earlier|instruc|instru[çc])|you are now|from now on you|a partir de agora,? (voc[êe]|tu)|new instructions|novas instru[çc][õo]es|system prompt|prompt do sistema|\bact as\b|\baja como\b/u,
+  },
+  {
+    rule: "role-markup",
+    // Trying to close the data block and speak as the system or the assistant.
+    pattern:
+      /<\/?system|<\|[a-z_]|\[\/?inst\]|#{2,}\s*instruction|^\s*(human|assistant|user|system)\s*:|<function_calls|<\/?tool_use|<\/?antml:/imu,
+  },
+  {
+    rule: "tool-request",
+    // A bug report does not ask for a shell.
+    pattern:
+      /--no-verify|rm\s+-rf|\bcurl\s|\bwget\s|gh\s+(pr\s+merge|auth)|push\s+--force|--force-with-lease|npm\s+publish|\bchmod\s|\bsudo\s|\bfirebase\b|\bfirestore\b|process\.env/u,
+  },
+  {
+    rule: "secret",
+    // Fishing for what the session can reach and the reporter cannot.
+    pattern:
+      /\btokens?\b|\bsecrets?\b|\bcredenciais?\b|\bcredentials?\b|\bsenhas?\b|\bid_rsa\b|\.env\b|private key|chave privada|service account|api[\s_-]?key|chave de api|\bakia[0-9a-z]{16}/u,
+  },
+  {
+    rule: "false-authority",
+    // Authority cannot arrive inside the thing being screened.
+    pattern:
+      /autoriza(do|ção) (por|pelo)|\badson\b[^.\n]{0,30}\b(pediu|autorizou|aprovou|disse|mandou)|\badson\b[^.\n]{0,20}\b(said|asked|approved|authoriz)|admin override|sou o (dono|administrador)|\b(i am|i'm) the (owner|admin)|on behalf of|em nome d(o|a)/u,
+  },
+  {
+    rule: "secrecy",
+    // Asking the session to hide what it did is asking it to defeat the review.
+    pattern:
+      /n[ãa]o (avise|comente|informe|conte|mencione|diga)|sem (avisar|comentar|notificar)|do ?n[o']?t tell|don't mention|without notifying|\bsilently\b|\bquietly\b|em sigilo|secretamente/u,
+  },
+];
+
+/**
+ * Screens the three fields that reach an agent: `titulo` and `descricao` go
+ * into the brief, and `autor` goes into a pull request body as the credit line.
+ *
+ * Returns `null` for a card that reads like a bug report, or
+ * `{ rule, field, excerpt }` naming the rule, the field it fired on, and
+ * enough text around the match to judge it by. The excerpt is what makes
+ * dismissing a false positive cheap.
+ */
+export function screenForInjection(card) {
+  for (const field of ["titulo", "descricao", "autor"]) {
+    const raw = String(card?.[field] ?? "");
+    if (!raw) continue;
+
+    if (INVISIBLE.test(raw)) {
+      return { rule: "invisible-characters", field, excerpt: around(raw, raw.search(INVISIBLE)) };
+    }
+
+    const text = normalize(raw);
+    for (const { rule, pattern } of SCREEN_RULES) {
+      const hit = pattern.exec(text);
+      if (hit) return { rule, field, excerpt: around(text, hit.index) };
+    }
+  }
+  return null;
+}
+
+/** Sixty characters around the match: enough to read the sentence, not the essay. */
+function around(text, index) {
+  const start = Math.max(0, index - 20);
+  return (
+    (start > 0 ? "…" : "") +
+    text.slice(start, index + 60).replace(/\s+/g, " ").trim() +
+    (index + 60 < text.length ? "…" : "")
+  );
+}
+
 // --- Regras da fila --------------------------------------------------------
 
 /**
- * O que a automação pode pegar agora. `replay` fica de fora porque gravação não
- * é pedido de ninguém — é material de conferência, e nasce arquivada.
+ * What the automation may take right now: cards Adson has moved to `backlog`
+ * himself. `replay` stays out because a recording is nobody's request -- it is
+ * review material, and it is born archived.
  */
 export function maduros(cards, { desde, emVooMax = EM_VOO_MAX } = {}) {
   const emVoo = cards.filter((c) => !c.arquivado && c.auto && c.status === "em_progresso");
   const vagas = Math.max(0, emVooMax - emVoo.length);
 
-  const fila = cards
-    .filter((c) => !c.arquivado && c.status === "reportado" && c.tipo !== "replay")
+  const candidates = cards
+    .filter((c) => !c.arquivado && c.status === "backlog" && c.tipo !== "replay")
     .filter((c) => c.projeto in REPOS)
-    .filter((c) => !desde || (c.criadoEm && c.criadoEm > desde))
+    // `parar` leaves a refused card in `backlog` with `refused: true`. Without
+    // this the queue would hand it to a fresh session every cycle, forever.
+    .filter((c) => !c.refused)
+    // Keyed on `atualizadoEm`, the moment the card was moved into `backlog`.
+    // Keying on `criadoEm` would silently drop every older card Adson approves
+    // -- the same shape of silent drop that kept the announcer quiet for
+    // thirteen days.
+    .filter((c) => !desde || ((c.atualizadoEm ?? c.criadoEm) > desde))
     .sort((a, b) => String(a.criadoEm).localeCompare(String(b.criadoEm)));
 
-  return { fila, emVoo, vagas, pegaveis: fila.slice(0, vagas) };
+  // A backstop, not the gate. A person read this card before it reached the
+  // queue, so what is left for a regex to catch is what a tired reviewer skims
+  // past, not the obvious attempt. A screened card stays in `backlog` and out
+  // of the queue, with no public comment: naming the rule that caught it would
+  // tell whoever wrote it what to avoid next time.
+  const blocked = [];
+  const fila = [];
+  for (const c of candidates) {
+    const screen = screenForInjection(c);
+    if (screen) blocked.push({ ...c, screen });
+    else fila.push(c);
+  }
+
+  return { fila, emVoo, vagas, pegaveis: fila.slice(0, vagas), blocked };
 }
 
 // --- Comandos --------------------------------------------------------------
@@ -293,7 +453,7 @@ const comandos = {
     const { fila } = maduros(await cardsAtivos(), { desde: null });
     console.log(
       `marca d'água: ${desde}\n` +
-        `${fila.length} card(s) em 'reportado' ficaram para trás — a automação não vai pegá-los.\n` +
+        `${fila.length} card(s) em 'backlog' ficaram para trás — a automação não vai pegá-los.\n` +
         `estado em ${ESTADO}`,
     );
   },
@@ -319,6 +479,13 @@ const comandos = {
             descricao: c.descricao,
             url: urlDoCard(c.id),
           })),
+          barrados: r.blocked.map((c) => ({
+            id: c.id,
+            projeto: c.projeto,
+            titulo: c.titulo,
+            ...c.screen,
+            url: urlDoCard(c.id),
+          })),
         },
         null,
         2,
@@ -329,7 +496,21 @@ const comandos = {
   async pegar(id) {
     if (!id) throw new Error("uso: pegar <id>");
     const card = await buscaCard(id);
-    if (card.status !== "reportado") throw new Error(`card ${id} está em '${card.status}', não em 'reportado'`);
+    if (card.status !== "backlog") {
+      throw new Error(
+        `card ${id} is in '${card.status}', not 'backlog' -- the automation only takes what you moved there yourself`,
+      );
+    }
+
+    // Checked here as well as in `maduros`, because a dispatcher can call
+    // `pegar <id>` straight past the queue — and has.
+    const screen = screenForInjection(card);
+    if (screen) {
+      throw new Error(
+        `card ${id} refused by the injection screen: ${screen.rule} in \`${screen.field}\` — ` +
+          `"${screen.excerpt}". Read the card and decide by hand; the automation will not take it.`,
+      );
+    }
 
     const r = await escreve(
       id,
@@ -356,14 +537,21 @@ const comandos = {
   async parar(id, ...resto) {
     const motivo = flag(resto, "--motivo");
     if (!id || !motivo) throw new Error('uso: parar <id> --motivo "texto"');
-    // Vai para `backlog`, não para `nao_sera_feito`: fechar um card na cara de
-    // quem reportou é decisão sua, não da automação. No backlog ele sai da fila
-    // (que só olha `reportado`), não volta a ser pego e fica visível para você
-    // decidir. O comentário fica no card, público, com o porquê.
+    // Stays in `backlog`, and `refused: true` is what takes it out of the queue.
+    // Not `nao_sera_feito`, because closing a card in the reporter's face is
+    // your decision and not the automation's. Not back to `reportado` either:
+    // your judgement that this is a real bug still stands, and the automation
+    // failing to fix it does not un-make it. The public comment, in the
+    // reporter's language, says why.
     await comenta(id, motivo);
-    const r = await escreve(id, { status: str("backlog"), arquivado: bool(false), atualizadoEm: ts(Date.now()) });
+    const r = await escreve(id, {
+      status: str("backlog"),
+      refused: bool(true),
+      arquivado: bool(false),
+      atualizadoEm: ts(Date.now()),
+    });
     if (!r.ok) throw new Error(`não consegui parar ${id}: ${r.corpo}`);
-    console.log(`${id} -> backlog`);
+    console.log(`${id} -> backlog (refused)`);
   },
 
   async reconciliar(...args) {
@@ -454,6 +642,12 @@ const comandos = {
         `em voo       : ${r.emVoo.length}/${EM_VOO_MAX}${r.emVoo.length ? ` — ${r.emVoo.map((c) => `${c.id}${c.pr ? ` (${c.pr})` : ""}`).join(", ")}` : ""}\n` +
         `fila madura  : ${r.fila.length}\n` +
         `pegáveis já  : ${r.pegaveis.length}\n` +
+        // Shown here and in `fila`, and deliberately NOT pushed to the phone:
+        // a notification per screened card would hand a stranger a way to ring
+        // Adson's phone at will, by filing cards. The dispatcher reads this
+        // every cycle, which is where a blocked card belongs.
+        `barrados     : ${r.blocked.length}${r.blocked.length ? ` — ${r.blocked.map((c) => `${c.id} (${c.screen.rule})`).join(", ")}` : ""}
+` +
         `estado em    : ${ESTADO}`,
     );
   },

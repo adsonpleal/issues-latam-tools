@@ -7,8 +7,11 @@
 // Replaces the scheduled dispatcher. That one woke every 15 minutes to ask
 // Firestore whether a new card had arrived: 54 reads per cycle and a whole model
 // turn per question, almost always to hear "no". Here Firestore does the
-// talking. The initial snapshot costs one read per card in `reportado` (fewer
-// than 20 today) and after that it is one read per change.
+// talking. It watches `backlog`, not `reportado`: a card is interesting to the
+// automation when Adson has reviewed it and moved it, not when a stranger filed
+// it. New arrivals reach him through the Discord announcer instead, which reads
+// `reportado` anonymously and is untouched by this. The initial snapshot costs
+// one read per card in `backlog` and after that it is one read per change.
 //
 // **Every stdout line becomes a notification in the session that is listening.**
 // That is why a line is printed only for a genuinely new card, or when the
@@ -121,9 +124,12 @@ export function freshCards(cards, mark) {
   let highest = mark;
   const fresh = [];
   for (const card of cards) {
-    const createdAt = instant(card.criadoEm);
-    if (!createdAt || !isAfter(createdAt, mark)) continue;
-    if (isAfter(createdAt, highest)) highest = createdAt;
+    // `atualizadoEm`, not `criadoEm`: a card becomes visible to the automation
+    // when Adson moves it into `backlog`, and a card he approves today may have
+    // been filed weeks ago. Keying on the filing date would notify nobody.
+    const movedAt = instant(card.atualizadoEm) ?? instant(card.criadoEm);
+    if (!movedAt || !isAfter(movedAt, mark)) continue;
+    if (isAfter(movedAt, highest)) highest = movedAt;
     if (card.tipo === "replay") continue;
     if (!(card.projeto in REPOS)) continue;
     fresh.push(card);
@@ -133,7 +139,7 @@ export function freshCards(cards, mark) {
 
 /** One line per card, read by a person on a phone: id first, link last. */
 export function announcement(card) {
-  return `NEW ${card.id} | ${card.projeto} | ${card.titulo} | ${urlDoCard(card.id)}`;
+  return `READY ${card.id} | ${card.projeto} | ${card.titulo} | ${urlDoCard(card.id)}`;
 }
 
 const lines = (text) =>
@@ -178,8 +184,7 @@ function readJson(path) {
 
 /**
  * The first watermark is the one `bootstrap` wrote, in `estado.json`. Without it
- * the listener would dump the whole board on its first run: exactly the pile of
- * `reportado` that `bootstrap` exists to leave where it is.
+ * the listener would dump the whole of `backlog` on its first run.
  */
 function storedMark() {
   const stored = instant(readJson(MARK_FILE).mark);
@@ -235,7 +240,7 @@ function listen() {
     // is evaluated against the QUERY, and without it Firestore rejects the whole
     // thing before reading a single document.
     where("arquivado", "==", false),
-    where("status", "==", "reportado"),
+    where("status", "==", "backlog"),
     limit(500),
   );
 

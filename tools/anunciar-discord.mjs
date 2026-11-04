@@ -515,6 +515,45 @@ async function avisaCelular(mensagem) {
   }
 }
 
+/**
+ * One push per newly reported card. This exists because reviewing `reportado`
+ * is now a step only Adson can take: the triage queue reads `backlog`, and a
+ * card moves no further until he has read it and moved it himself. A Discord
+ * message is easy to miss, and a missed one stalls the whole pipeline.
+ *
+ * Deliberately NOT the priority or tags `avisaCelular` uses. An outage alarm
+ * and "somebody filed a bug" must not feel the same on the phone, or the alarm
+ * stops meaning anything -- which is the failure this whole file is shaped
+ * around.
+ *
+ * This is a notification an unauthenticated stranger triggers by filling in a
+ * form, so it inherits the same rate limit as the Discord posts: `--max` cards
+ * per tick, draining a burst at the tick's pace instead of ringing the phone
+ * two hundred times. The title is the reporter's own text, sanitised the same
+ * way the embed sanitises it.
+ */
+async function pushNewCard(card) {
+  if (!NTFY_TOPICO) return false;
+  const projeto = PROJETOS[card.projeto];
+  try {
+    const r = await fetch("https://ntfy.sh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        topic: NTFY_TOPICO,
+        title: `Novo card - ${projeto ? projeto.nome : card.projeto}`,
+        message: truncar(sanitizarTitulo(card.titulo), 200) || "(sem titulo)",
+        click: `${SITE_URL}/t/${encodeURIComponent(card.id)}`,
+        tags: ["inbox_tray"],
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
 /** 429 respeitando o retry_after do corpo; 5xx com backoff e jitter. */
 async function comRetry(nome, fazer) {
   let espera = 1000;
@@ -745,6 +784,11 @@ async function main(argv) {
     }
     estado.falhasSeguidas = 0;
     estado.alertaEnviado = false;
+
+    // After the card is recorded as announced, so a retry can never push twice.
+    // Not conditional on `postado`: the phone is the path that still works when
+    // Discord is the thing that broke.
+    await pushNewCard(card);
 
     // The thread comes after the announcement is already saved as announced:
     // if this fails, the card does not get announced twice to get a thread.

@@ -109,6 +109,14 @@ describe("freshCards", () => {
     expect(r.fresh.map((c) => c.id)).toEqual(["with"]);
   });
 
+  it("keys freshness on when the card was moved, not when it was filed", () => {
+    // A card approved today may have been reported weeks ago. Keyed on
+    // `criadoEm`, that card would notify nobody -- the listener would decide it
+    // was older than the watermark and stay quiet.
+    const r = freshCards([card("old", { criadoEm: stamp(500), atualizadoEm: stamp(5000) })], mark);
+    expect(r.fresh.map((c) => c.id)).toEqual(["old"]);
+  });
+
   it("stores a bare instant, without the SDK's internal shape", () => {
     const r = freshCards([card("new", { criadoEm: stamp(2000, 5) })], mark);
     expect(Object.keys(r.mark).sort()).toEqual(["nanoseconds", "seconds"]);
@@ -175,7 +183,7 @@ describe("reconcileReport", () => {
 describe("announcement", () => {
   it("carries id, project, title and the card link", () => {
     expect(announcement(card("abc", { titulo: "Título com acento" }))).toBe(
-      "NEW abc | simulador | Título com acento | https://issues.latam-tools.com.br/t/abc",
+      "READY abc | simulador | Título com acento | https://issues.latam-tools.com.br/t/abc",
     );
   });
 

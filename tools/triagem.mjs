@@ -3,9 +3,9 @@
 //
 //   node tools/triagem.mjs bootstrap            # marca d'água = agora, não pega nada do passado
 //   node tools/triagem.mjs fila                 # o que está maduro para pegar, em JSON
-//   node tools/triagem.mjs pegar <id>           # reportado -> em_progresso, trava o card
+//   node tools/triagem.mjs pegar <id>           # backlog -> em_progresso, trava o card
 //   node tools/triagem.mjs pr <id> <dono/repo#N>
-//   node tools/triagem.mjs parar <id> --motivo "..."   # não procede: -> backlog, com comentário
+//   node tools/triagem.mjs parar <id> --motivo "..."   # recusa: fica em backlog, auto: false
 //   node tools/triagem.mjs reconciliar          # PR mesclado -> resolvido
 //   node tools/triagem.mjs avisar <id> --mensagem "..."  # notificação no celular
 //   node tools/triagem.mjs alarme --mensagem "..."       # idem, sem card: o despachante
@@ -17,9 +17,17 @@
 // despachantes simultâneos não podem pegar o mesmo card. De quebra, você vê a
 // fila no quadro e tira um card dela arrastando — sem mexer em nada aqui.
 //
-// A marca d'água existe pelo mesmo motivo do anunciador: ligar isto com 16
-// cards parados em `reportado` despejaria 16 sessões de uma vez. `bootstrap`
-// grava "a partir de agora" e o passado fica onde está.
+// The queue reads `backlog`, never `reportado`, and that is the whole defence
+// against a card written to be read by an agent. A stranger can only create a
+// card in `reportado` -- the rules pin `status == 'reportado'` on public create
+// and allow the public nothing but `upvotes += 1` afterwards -- so no text
+// reaches this automation until Adson has read it and moved it himself.
+// Placement in `backlog` IS the authorization, and it arrives through a channel
+// an attacker cannot write to.
+//
+// The watermark is keyed on `atualizadoEm` (when a card was moved) and not on
+// `criadoEm` (when it was filed), because a card approved today may have been
+// reported weeks ago.
 //
 // Escreve AUTENTICADO (tools/credencial.mjs), ao contrário do anunciador, que
 // consulta anônimo de propósito. Aqui não tem escolha: mover card e comentar
@@ -96,10 +104,12 @@ async function cabecalhos() {
 }
 
 /**
- * Só os dois status que a fila enxerga: `reportado` (o que dá para pegar) e
- * `em_progresso` (o que já está em voo). Filtro de campo único, que usa o índice
- * automático; a ordenação segue em memória, no `maduros`, justamente para não
- * exigir índice composto.
+ * Only the two statuses the queue can see: `backlog` (what it may take) and
+ * `em_progresso` (what is already in flight). `reportado` is deliberately not
+ * fetched -- not filtered out downstream, not fetched -- so a card nobody has
+ * reviewed has no code path into this process at all. Single-field filter, so
+ * it uses the automatic index; the ordering stays in memory, in `maduros`,
+ * precisely to avoid needing a composite one.
  *
  * Antes isto listava a coleção inteira. Como `fila` e `reconciliar` chamam a
  * cada ciclo do despachante, eram ~580 leituras a cada 15 min: a cota diária do
@@ -117,7 +127,7 @@ async function cardsAtivos() {
           fieldFilter: {
             field: { fieldPath: "status" },
             op: "IN",
-            value: { arrayValue: { values: [str("reportado"), str("em_progresso")] } },
+            value: { arrayValue: { values: [str("backlog"), str("em_progresso")] } },
           },
         },
       },
@@ -172,7 +182,14 @@ export function paraCard(doc) {
     pr: s("pr"),
     arquivado: Boolean(f["arquivado"]?.booleanValue),
     auto: Boolean(f["auto"]?.booleanValue),
+    // Set by `parar` when the automation refuses a card Adson approved. It is a
+    // field of its own and not `auto: false`, because an absent `auto` already
+    // reads as `false` on the line above -- that is every card nobody picked.
+    refused: Boolean(f["refused"]?.booleanValue),
     criadoEm: f["criadoEm"]?.timestampValue ?? null,
+    // When the card last moved, which for a card in `backlog` is when Adson
+    // approved it. The queue's watermark keys on this, not on `criadoEm`.
+    atualizadoEm: f["atualizadoEm"]?.timestampValue ?? null,
   };
 }
 
@@ -389,23 +406,32 @@ function around(text, index) {
 // --- Regras da fila --------------------------------------------------------
 
 /**
- * O que a automação pode pegar agora. `replay` fica de fora porque gravação não
- * é pedido de ninguém — é material de conferência, e nasce arquivada.
+ * What the automation may take right now: cards Adson has moved to `backlog`
+ * himself. `replay` stays out because a recording is nobody's request -- it is
+ * review material, and it is born archived.
  */
 export function maduros(cards, { desde, emVooMax = EM_VOO_MAX } = {}) {
   const emVoo = cards.filter((c) => !c.arquivado && c.auto && c.status === "em_progresso");
   const vagas = Math.max(0, emVooMax - emVoo.length);
 
   const candidates = cards
-    .filter((c) => !c.arquivado && c.status === "reportado" && c.tipo !== "replay")
+    .filter((c) => !c.arquivado && c.status === "backlog" && c.tipo !== "replay")
     .filter((c) => c.projeto in REPOS)
-    .filter((c) => !desde || (c.criadoEm && c.criadoEm > desde))
+    // `parar` leaves a refused card in `backlog` with `refused: true`. Without
+    // this the queue would hand it to a fresh session every cycle, forever.
+    .filter((c) => !c.refused)
+    // Keyed on `atualizadoEm`, the moment the card was moved into `backlog`.
+    // Keying on `criadoEm` would silently drop every older card Adson approves
+    // -- the same shape of silent drop that kept the announcer quiet for
+    // thirteen days.
+    .filter((c) => !desde || ((c.atualizadoEm ?? c.criadoEm) > desde))
     .sort((a, b) => String(a.criadoEm).localeCompare(String(b.criadoEm)));
 
-  // Screened out instead of queued. A card addressed to the agent stays in
-  // `reportado`, out of the automation's reach, until a person has read it. It
-  // is deliberately not sent to `backlog` with a public comment: naming the
-  // rule that caught it would tell whoever wrote it what to avoid next time.
+  // A backstop, not the gate. A person read this card before it reached the
+  // queue, so what is left for a regex to catch is what a tired reviewer skims
+  // past, not the obvious attempt. A screened card stays in `backlog` and out
+  // of the queue, with no public comment: naming the rule that caught it would
+  // tell whoever wrote it what to avoid next time.
   const blocked = [];
   const fila = [];
   for (const c of candidates) {
@@ -427,7 +453,7 @@ const comandos = {
     const { fila } = maduros(await cardsAtivos(), { desde: null });
     console.log(
       `marca d'água: ${desde}\n` +
-        `${fila.length} card(s) em 'reportado' ficaram para trás — a automação não vai pegá-los.\n` +
+        `${fila.length} card(s) em 'backlog' ficaram para trás — a automação não vai pegá-los.\n` +
         `estado em ${ESTADO}`,
     );
   },
@@ -470,7 +496,11 @@ const comandos = {
   async pegar(id) {
     if (!id) throw new Error("uso: pegar <id>");
     const card = await buscaCard(id);
-    if (card.status !== "reportado") throw new Error(`card ${id} está em '${card.status}', não em 'reportado'`);
+    if (card.status !== "backlog") {
+      throw new Error(
+        `card ${id} is in '${card.status}', not 'backlog' -- the automation only takes what you moved there yourself`,
+      );
+    }
 
     // Checked here as well as in `maduros`, because a dispatcher can call
     // `pegar <id>` straight past the queue — and has.
@@ -507,14 +537,21 @@ const comandos = {
   async parar(id, ...resto) {
     const motivo = flag(resto, "--motivo");
     if (!id || !motivo) throw new Error('uso: parar <id> --motivo "texto"');
-    // Vai para `backlog`, não para `nao_sera_feito`: fechar um card na cara de
-    // quem reportou é decisão sua, não da automação. No backlog ele sai da fila
-    // (que só olha `reportado`), não volta a ser pego e fica visível para você
-    // decidir. O comentário fica no card, público, com o porquê.
+    // Stays in `backlog`, and `refused: true` is what takes it out of the queue.
+    // Not `nao_sera_feito`, because closing a card in the reporter's face is
+    // your decision and not the automation's. Not back to `reportado` either:
+    // your judgement that this is a real bug still stands, and the automation
+    // failing to fix it does not un-make it. The public comment, in the
+    // reporter's language, says why.
     await comenta(id, motivo);
-    const r = await escreve(id, { status: str("backlog"), arquivado: bool(false), atualizadoEm: ts(Date.now()) });
+    const r = await escreve(id, {
+      status: str("backlog"),
+      refused: bool(true),
+      arquivado: bool(false),
+      atualizadoEm: ts(Date.now()),
+    });
     if (!r.ok) throw new Error(`não consegui parar ${id}: ${r.corpo}`);
-    console.log(`${id} -> backlog`);
+    console.log(`${id} -> backlog (refused)`);
   },
 
   async reconciliar(...args) {

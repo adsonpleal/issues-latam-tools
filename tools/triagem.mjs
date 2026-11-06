@@ -1,21 +1,22 @@
 #!/usr/bin/env node
-// A fila da triagem automática: o quadro é a própria fila.
+// The automatic triage queue: the board itself is the queue.
 //
-//   node tools/triagem.mjs bootstrap            # marca d'água = agora, não pega nada do passado
-//   node tools/triagem.mjs fila                 # o que está maduro para pegar, em JSON
-//   node tools/triagem.mjs pegar <id>           # backlog -> em_progresso, trava o card
-//   node tools/triagem.mjs pr <id> <dono/repo#N>
-//   node tools/triagem.mjs parar <id> --motivo "..."   # recusa: fica em backlog, auto: false
-//   node tools/triagem.mjs reconciliar          # PR mesclado -> resolvido
-//   node tools/triagem.mjs avisar <id> --mensagem "..."  # notificação no celular
-//   node tools/triagem.mjs alarme --mensagem "..."       # idem, sem card: o despachante
-//   node tools/triagem.mjs estado               # o que a automação enxerga agora
+//   node tools/triagem.mjs bootstrap          # watermark = now, nothing from the past is taken
+//   node tools/triagem.mjs queue              # what is ready to take, as JSON
+//   node tools/triagem.mjs take <id>          # backlog -> em_progresso, locks the card
+//   node tools/triagem.mjs pr <id> <owner/repo#N>
+//   node tools/triagem.mjs refuse <id> --reason "..."    # stays in backlog, refused: true
+//   node tools/triagem.mjs reconcile          # merged PR -> resolvido
+//   node tools/triagem.mjs notify <id> --message "..."   # push to the phone
+//   node tools/triagem.mjs alarm --message "..."         # same, with no card: the dispatcher
+//   node tools/triagem.mjs state              # what the automation can see right now
 //
-// Não há fila em arquivo à parte, e isso é a decisão central: `status` no
-// Firestore É a fila. Pegar um card é movê-lo para `em_progresso`, e o
-// Firestore recusa a segunda escrita (precondição de updateTime), então dois
-// despachantes simultâneos não podem pegar o mesmo card. De quebra, você vê a
-// fila no quadro e tira um card dela arrastando — sem mexer em nada aqui.
+// There is no queue in a file of its own, and that is the central decision:
+// `status` in Firestore IS the queue. Taking a card means moving it to
+// `em_progresso`, and Firestore refuses the second write (an updateTime
+// precondition), so two dispatchers running at once cannot take the same card.
+// As a bonus you see the queue on the board and pull a card out of it by
+// dragging, without touching anything here.
 //
 // The queue reads `backlog`, never `reportado`, and that is the whole defence
 // against a card written to be read by an agent. A stranger can only create a
@@ -29,10 +30,20 @@
 // `criadoEm` (when it was filed), because a card approved today may have been
 // reported weeks ago.
 //
-// Escreve AUTENTICADO (tools/credencial.mjs), ao contrário do anunciador, que
-// consulta anônimo de propósito. Aqui não tem escolha: mover card e comentar
-// são escritas que as regras só liberam para o admin. Em compensação, este
-// script nunca lê `privado/contato` — não há caminho de código para isso.
+// Writes are AUTHENTICATED (tools/credencial.mjs), unlike the announcer, which
+// reads anonymously on purpose. Here there is no choice: moving a card and
+// commenting are writes the rules only allow the admin. In exchange, this
+// script never reads `privado/contato` -- there is no code path to it.
+//
+// Two vocabularies meet in this file, and keeping them apart is deliberate.
+// Firestore field names (`titulo`, `descricao`, `criadoEm`, `atualizadoEm`,
+// `projeto`, `tipo`, `autor`, `arquivado`, `upvotes`) and status values
+// (`backlog`, `em_progresso`, `resolvido`) are a wire contract shared with the
+// live board and the deployed site, so they stay exactly as the database spells
+// them. Everything this file calls its own -- functions, locals, the card shape
+// `toCard` returns -- is English. `toCard` is the one place the two meet, and
+// every document write below names its fields explicitly rather than leaning on
+// object shorthand, so no rename here can quietly rename a stored field.
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -40,11 +51,11 @@ import { dirname, join } from "node:path";
 
 import { accessToken } from "./credencial.mjs";
 
-const PROJETO_FIREBASE = process.env["FIREBASE_PROJECT_ID"] || "issues-latam-tools";
-const BASE = `https://firestore.googleapis.com/v1/projects/${PROJETO_FIREBASE}/databases/(default)/documents`;
+const FIREBASE_PROJECT = process.env["FIREBASE_PROJECT_ID"] || "issues-latam-tools";
+const BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/(default)/documents`;
 
-/** Fora do repositório: o estado não pode ir junto num commit nem sumir num clone novo. */
-const ESTADO =
+/** Outside the repository: state must not ride along in a commit nor vanish in a fresh clone. */
+const STATE_FILE =
   process.env["TRIAGEM_ESTADO"] || join(homedir(), ".claude", "triagem-automatica", "estado.json");
 
 /**
@@ -58,13 +69,17 @@ const ESTADO =
  * of them. If the machine starts thrashing, this is the number to turn back
  * down -- or set `TRIAGEM_EM_VOO_MAX` for one run without editing the file.
  */
-const EM_VOO_MAX = Number(process.env["TRIAGEM_EM_VOO_MAX"] || 5);
+const IN_FLIGHT_MAX = Number(process.env["TRIAGEM_EM_VOO_MAX"] || 5);
 
 const SITE = "https://issues.latam-tools.com.br";
 /** Where the notification and the listener point. Exported so it is not two constants. */
-export const urlDoCard = (id) => `${SITE}/t/${encodeURIComponent(id)}`;
+export const cardUrl = (id) => `${SITE}/t/${encodeURIComponent(id)}`;
 
-/** Espelho de src/lib/projetos.ts — e o repositório de cada um. */
+/**
+ * Mirror of src/lib/projetos.ts -- and each project's repository. The keys are
+ * the `projeto` values stored on a card, so they stay as the database spells
+ * them.
+ */
 export const REPOS = {
   mercado: "adsonpleal/latam-market",
   simulador: "adsonpleal/latam-ro-calc",
@@ -73,8 +88,8 @@ export const REPOS = {
   calc: "adsonpleal/ragcalc",
 };
 
-/** Onde cada repositório está clonado nesta máquina. */
-export const PASTAS = {
+/** Where each repository is cloned on this machine. */
+export const FOLDERS = {
   mercado: join(homedir(), "dev", "latam-market"),
   simulador: join(homedir(), "dev", "latam-ro-calc"),
   recap: join(homedir(), "dev", "ragreplaystats"),
@@ -82,19 +97,29 @@ export const PASTAS = {
   calc: join(homedir(), "dev", "ragcalc"),
 };
 
-// --- Estado local ----------------------------------------------------------
+// --- Local state -----------------------------------------------------------
 
-function leEstado() {
+/**
+ * The keys in `estado.json` (`desde`, `ntfyTopico`) are persisted data, not
+ * code: the file already exists on this machine, outside the repository, and
+ * renaming a key there would read as "never bootstrapped" and quietly take the
+ * whole backlog. So the stored spelling stays and the translation happens here,
+ * at the boundary, the same way `toCard` handles Firestore's field names.
+ */
+function readState() {
+  let stored = {};
   try {
-    return JSON.parse(readFileSync(ESTADO, "utf8"));
+    stored = JSON.parse(readFileSync(STATE_FILE, "utf8"));
   } catch {
-    return {};
+    return { since: null, ntfyTopic: null, stored: {} };
   }
+  return { since: stored.desde ?? null, ntfyTopic: stored.ntfyTopico ?? null, stored };
 }
 
-function gravaEstado(estado) {
-  mkdirSync(dirname(ESTADO), { recursive: true });
-  writeFileSync(ESTADO, `${JSON.stringify(estado, null, 2)}\n`);
+/** Writes the watermark back under its stored name, keeping any other key the file holds. */
+function writeWatermark(since, stored) {
+  mkdirSync(dirname(STATE_FILE), { recursive: true });
+  writeFileSync(STATE_FILE, `${JSON.stringify({ ...stored, desde: since }, null, 2)}\n`);
 }
 
 // --- Firestore -------------------------------------------------------------
@@ -104,7 +129,7 @@ const bool = (v) => ({ booleanValue: v });
 const ts = (v) => ({ timestampValue: new Date(v).toISOString() });
 
 let tokenCache = null;
-async function cabecalhos() {
+async function headers() {
   tokenCache ??= await accessToken();
   return { Authorization: `Bearer ${tokenCache}`, "Content-Type": "application/json" };
 }
@@ -114,18 +139,19 @@ async function cabecalhos() {
  * `em_progresso` (what is already in flight). `reportado` is deliberately not
  * fetched -- not filtered out downstream, not fetched -- so a card nobody has
  * reviewed has no code path into this process at all. Single-field filter, so
- * it uses the automatic index; the ordering stays in memory, in `maduros`,
+ * it uses the automatic index; the ordering stays in memory, in `triageQueue`,
  * precisely to avoid needing a composite one.
  *
- * Antes isto listava a coleção inteira. Como `fila` e `reconciliar` chamam a
- * cada ciclo do despachante, eram ~580 leituras a cada 15 min: a cota diária do
- * plano gratuito acabava no meio da tarde, e ela é a **mesma** cota do quadro
- * público — a automação derrubava o site para os visitantes.
+ * This used to list the whole collection. Since `queue` and `reconcile` both
+ * run on every dispatcher cycle, that was ~580 reads every 15 minutes: the free
+ * plan's daily quota ran out mid-afternoon, and it is the **same** quota the
+ * public board draws on -- the automation was taking the site down for
+ * visitors.
  */
-async function cardsAtivos() {
+async function activeCards() {
   const r = await fetch(`${BASE}:runQuery`, {
     method: "POST",
-    headers: await cabecalhos(),
+    headers: await headers(),
     body: JSON.stringify({
       structuredQuery: {
         from: [{ collectionId: "issues" }],
@@ -139,90 +165,106 @@ async function cardsAtivos() {
       },
     }),
   });
-  return cardsDaConsulta(await r.json());
+  return cardsFromQuery(await r.json());
 }
 
 /**
- * O `runQuery` responde em lista, e **o erro também vem como linha dentro dela**:
- * cota estourada chega como `[{ error: { code: 429, ... } }]`, não como objeto
- * solto. Quem olhar só `corpo.error` lê isso como "nenhum card" e faz a fila
- * anunciar que não há o que fazer — falha silenciosa, no caminho que justamente
- * existe para avisar.
+ * `runQuery` answers with a list, and **an error arrives as a row inside it**:
+ * a blown quota comes back as `[{ error: { code: 429, ... } }]`, not as a bare
+ * object. Anyone checking only `body.error` reads that as "no cards" and makes
+ * the queue announce there is nothing to do -- a silent failure, on the very
+ * path that exists to raise the alarm.
  */
-export function cardsDaConsulta(corpo) {
-  const falha = Array.isArray(corpo) ? corpo.find((l) => l.error)?.error : corpo?.error;
-  if (falha) throw new Error(`Firestore: ${falha.message}`);
-  if (!Array.isArray(corpo)) throw new Error(`Firestore: runQuery devolveu ${typeof corpo}, não uma lista`);
-  // Consulta sem resultado devolve uma linha só com `readTime`, sem documento.
-  return corpo.filter((l) => l.document).map((l) => paraCard(l.document));
+export function cardsFromQuery(body) {
+  const failure = Array.isArray(body) ? body.find((row) => row.error)?.error : body?.error;
+  if (failure) throw new Error(`Firestore: ${failure.message}`);
+  if (!Array.isArray(body)) {
+    throw new Error(`Firestore: runQuery returned ${typeof body}, not a list`);
+  }
+  // A query with no results answers with a single row holding only `readTime`.
+  return body.filter((row) => row.document).map((row) => toCard(row.document));
 }
 
-/** Um card pelo id: uma leitura, em vez de varrer a coleção atrás dele. */
-async function buscaCard(id) {
-  const r = await fetch(`${BASE}/issues/${encodeURIComponent(id)}`, { headers: await cabecalhos() });
-  if (r.status === 404) throw new Error(`card ${id} não existe`);
+/** One card by id: a single read, instead of sweeping the collection for it. */
+async function fetchCard(id) {
+  const r = await fetch(`${BASE}/issues/${encodeURIComponent(id)}`, { headers: await headers() });
+  if (r.status === 404) throw new Error(`card ${id} does not exist`);
   const j = await r.json();
   if (j.error) throw new Error(`card ${id}: ${j.error.message}`);
   if (!r.ok) throw new Error(`card ${id}: HTTP ${r.status}`);
-  return paraCard(j);
+  return toCard(j);
 }
 
-/** `--flag valor`, como o resto da automação já escreve na linha de comando. */
-const flag = (args, nome) => {
-  const i = args.indexOf(nome);
-  return i >= 0 ? args[i + 1] : "";
+/**
+ * `--flag value`, the way the rest of the automation already writes a command
+ * line. Several names so the Portuguese spellings the skill still uses keep
+ * working next to the English ones.
+ */
+const flag = (args, ...names) => {
+  for (const name of names) {
+    const i = args.indexOf(name);
+    if (i >= 0) return args[i + 1] ?? "";
+  }
+  return "";
 };
 
-export function paraCard(doc) {
+/**
+ * The one place Firestore's field names cross into this file's own vocabulary.
+ * Everything to the left of a colon is ours and English; everything inside
+ * `f[...]` and `s(...)` is the name the database stores and must not change.
+ */
+export function toCard(doc) {
   const f = doc.fields ?? {};
   const s = (k) => f[k]?.stringValue ?? null;
   return {
     id: doc.name.split("/").pop(),
     updateTime: doc.updateTime,
-    projeto: s("projeto"),
-    titulo: s("titulo") ?? "",
-    descricao: s("descricao") ?? "",
-    tipo: s("tipo"),
+    project: s("projeto"),
+    title: s("titulo") ?? "",
+    description: s("descricao") ?? "",
+    type: s("tipo"),
     status: s("status"),
-    autor: s("autor"),
+    author: s("autor"),
     pr: s("pr"),
-    arquivado: Boolean(f["arquivado"]?.booleanValue),
+    archived: Boolean(f["arquivado"]?.booleanValue),
     auto: Boolean(f["auto"]?.booleanValue),
-    // Set by `parar` when the automation refuses a card Adson approved. It is a
-    // field of its own and not `auto: false`, because an absent `auto` already
-    // reads as `false` on the line above -- that is every card nobody picked.
+    // Set by `refuse` when the automation turns down a card Adson approved. It
+    // is a field of its own and not `auto: false`, because an absent `auto`
+    // already reads as `false` on the line above -- that is every card nobody
+    // picked.
     refused: Boolean(f["refused"]?.booleanValue),
-    criadoEm: f["criadoEm"]?.timestampValue ?? null,
+    createdAt: f["criadoEm"]?.timestampValue ?? null,
     // When the card last moved, which for a card in `backlog` is when Adson
-    // approved it. The queue's watermark keys on this, not on `criadoEm`.
-    atualizadoEm: f["atualizadoEm"]?.timestampValue ?? null,
+    // approved it. The queue's watermark keys on this, not on `createdAt`.
+    updatedAt: f["atualizadoEm"]?.timestampValue ?? null,
   };
 }
 
-async function escreve(id, fields, { updateTime } = {}) {
+async function write(id, fields, { updateTime } = {}) {
   const mask = Object.keys(fields)
     .map((f) => `updateMask.fieldPaths=${f}`)
     .join("&");
-  // A precondição é o que torna `pegar` seguro: se outro despachante mexeu no
-  // card entre a leitura e esta escrita, o servidor recusa com 400/409 em vez
-  // de os dois acharem que pegaram.
+  // The precondition is what makes `take` safe: if another dispatcher touched
+  // the card between the read and this write, the server refuses with 400/409
+  // instead of both of them believing they took it.
   const pre = updateTime ? `&currentDocument.updateTime=${encodeURIComponent(updateTime)}` : "";
   const r = await fetch(`${BASE}/issues/${id}?${mask}${pre}`, {
     method: "PATCH",
-    headers: await cabecalhos(),
+    headers: await headers(),
     body: JSON.stringify({ fields }),
   });
-  if (!r.ok) return { ok: false, corpo: (await r.text()).slice(0, 300) };
+  if (!r.ok) return { ok: false, body: (await r.text()).slice(0, 300) };
   return { ok: true };
 }
 
-async function comenta(id, texto) {
+/** The text is the reporter's to read, so it arrives in Portuguese and is stored as written. */
+async function comment(id, text) {
   const r = await fetch(`${BASE}/issues/${id}/comentarios`, {
     method: "POST",
-    headers: await cabecalhos(),
+    headers: await headers(),
     body: JSON.stringify({
       fields: {
-        texto: str(texto),
+        texto: str(text),
         autor: str("Triagem automática"),
         autorUid: str("triagem-automatica"),
         tipo: str("mudanca"),
@@ -233,80 +275,85 @@ async function comenta(id, texto) {
   return r.ok;
 }
 
-// --- Aviso no celular ------------------------------------------------------
+// --- Phone notification ----------------------------------------------------
 
 /**
- * Para onde o toque na notificação leva.
+ * Where tapping the notification lands.
  *
- * A regra é a única coisa que o Adson precisa saber de cor: **se o PR existe, o
- * link é o PR; se não existe, é o card.** Um aviso que chega sem PR é um card
- * que não virou PR — relato que não procede, ou sessão que travou —, e o que ele
- * precisa ler nesse caso é justamente o comentário que a triagem acabou de
- * deixar no card. Mandá-lo para o GitHub ali seria mandá-lo para lugar nenhum.
+ * The rule is the only thing Adson needs to know by heart: **if the PR exists,
+ * the link is the PR; if it does not, the link is the card.** A notification
+ * that arrives with no PR is a card that never became one -- a report that does
+ * not hold up, or a session that got stuck -- and what he needs to read in that
+ * case is exactly the comment triage has just left on the card. Sending him to
+ * GitHub there would be sending him nowhere.
  *
- * Quem decide não é o texto que a sessão escreve, é o campo `pr` do card. Não dá
- * para a sessão errar o link elogiando um PR que ela não abriu.
+ * What decides is not the text the session writes, it is the card's `pr` field.
+ * A session cannot get the link wrong by praising a PR it never opened.
  */
-export function linkDoAviso(card) {
-  if (!card.pr) return urlDoCard(card.id);
-  const [repo, numero] = card.pr.split("#");
-  return `https://github.com/${repo}/pull/${numero}`;
+export function notificationLink(card) {
+  if (!card.pr) return cardUrl(card.id);
+  const [repo, number] = card.pr.split("#");
+  return `https://github.com/${repo}/pull/${number}`;
 }
 
 /**
- * O tópico do ntfy, que **não tem padrão no código de propósito**. Este
- * repositório é público, e tópico do ntfy é senha de quem publica: quem souber o
- * nome manda notificação para o celular dele, com `click` para qualquer URL —
- * um pescador perfeito. Então ele mora onde o resto do estado da automação já
- * mora, fora do repositório (`estado.json`), ou na variável de ambiente.
+ * The ntfy topic, which **deliberately has no default in the code**. This
+ * repository is public, and an ntfy topic is a password for whoever publishes
+ * to it: anybody who learns the name can push a notification to his phone, with
+ * `click` pointing at any URL they like -- a perfect lure. So it lives where the
+ * rest of the automation's state already lives, outside the repository
+ * (`estado.json`), or in the environment variable.
  */
-function topico() {
-  const t = process.env["TRIAGEM_NTFY_TOPICO"] || leEstado().ntfyTopico;
-  if (!t) throw new Error(`sem tópico do ntfy — grave 'ntfyTopico' em ${ESTADO} ou defina TRIAGEM_NTFY_TOPICO`);
-  return t;
+function ntfyTopic() {
+  const topic = process.env["TRIAGEM_NTFY_TOPICO"] || readState().ntfyTopic;
+  if (!topic) {
+    throw new Error(
+      `no ntfy topic -- store 'ntfyTopico' in ${STATE_FILE} or set TRIAGEM_NTFY_TOPICO`,
+    );
+  }
+  return topic;
 }
 
 /**
- * Publica em JSON na raiz do ntfy, e não com os cabeçalhos `Title`/`Click` no
- * POST do tópico: cabeçalho HTTP não carrega UTF-8, e título de card daqui vem
- * acentuado ("Localização", "Colisão Astral"). Pelo caminho dos cabeçalhos ele
- * chegaria ao celular truncado ou em mojibake.
+ * Publishes JSON to the ntfy root rather than using `Title`/`Click` headers on
+ * a POST to the topic: an HTTP header does not carry UTF-8, and card titles
+ * from here are accented ("Localização", "Colisão Astral"). Via the header path
+ * they would reach the phone truncated or as mojibake.
  *
- * Com prazo, ao contrário das escritas no Firestore aqui em cima: este é o
- * último passo da sessão, e um POST pendurado deixaria o card resolvido sem
- * ninguém avisado.
+ * With a deadline, unlike the Firestore writes above: this is the last step of
+ * a session, and a hanging POST would leave the card resolved with nobody told.
  */
-async function notifica({ titulo, mensagem, link, tags }) {
+async function notify({ title, message, link, tags }) {
   const r = await fetch("https://ntfy.sh", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic: topico(), title: titulo, message: mensagem, click: link, tags }),
+    body: JSON.stringify({ topic: ntfyTopic(), title, message, click: link, tags }),
     signal: AbortSignal.timeout(10_000),
   });
-  if (!r.ok) return { ok: false, corpo: (await r.text()).slice(0, 300) };
+  if (!r.ok) return { ok: false, body: (await r.text()).slice(0, 300) };
   return { ok: true };
 }
 
 // --- Screening for prompt injection ---------------------------------------
 
 /**
- * The board is public: anybody can file a card. A card's `titulo` and
- * `descricao` are then pasted verbatim into the brief of a session that runs
- * unattended with write access to the board, `git push` and `gh`. So a card is
- * text from a stranger that reaches a tool-using agent, and some of it may be
- * addressed to that agent rather than describing a bug.
+ * The board is public: anybody can file a card. A card's title and description
+ * are then pasted verbatim into the brief of a session that runs unattended
+ * with write access to the board, `git push` and `gh`. So a card is text from a
+ * stranger that reaches a tool-using agent, and some of it may be addressed to
+ * that agent rather than describing a bug.
  *
  * This runs **before** any model reads the card, and that ordering is the whole
  * point: a detector that asks a model "is this an injection?" has already fed
- * it the injection. `maduros` and `pegar` are the only two ways a card becomes
- * a session, so both consult this, independently — the dispatcher can call
- * `pegar <id>` straight past the queue, and has.
+ * it the injection. `triageQueue` and `take` are the only two ways a card
+ * becomes a session, so both consult this, independently -- the dispatcher can
+ * call `take <id>` straight past the queue, and has.
  *
- * It is a speed bump, not a wall. This repository is public, so these patterns
- * are public too, and whoever reads them can write around them. The defences
- * that actually hold are the two behind it: the triage skill treats card text
- * as data and never as instructions, and a screened card waits for a person.
- * What this buys is that the careless attempt never reaches an agent at all.
+ * It is a backstop behind the human, not a wall. This repository is public, so
+ * these patterns are public too, and whoever reads them can write around them.
+ * The defence that actually holds is the one in front of it: a person read this
+ * card in their own language before it reached the queue. What this buys is
+ * that the careless attempt never reaches an agent at all.
  *
  * Biased towards flagging, because the two mistakes do not cost the same. A
  * false positive costs Adson a glance at one card. A false negative hands a
@@ -373,8 +420,9 @@ const SCREEN_RULES = [
 ];
 
 /**
- * Screens the three fields that reach an agent: `titulo` and `descricao` go
- * into the brief, and `autor` goes into a pull request body as the credit line.
+ * Screens the three fields that reach an agent: the title and the description
+ * go into the brief, and the author goes into a pull request body as the credit
+ * line.
  *
  * Returns `null` for a card that reads like a bug report, or
  * `{ rule, field, excerpt }` naming the rule, the field it fired on, and
@@ -382,7 +430,7 @@ const SCREEN_RULES = [
  * dismissing a false positive cheap.
  */
 export function screenForInjection(card) {
-  for (const field of ["titulo", "descricao", "autor"]) {
+  for (const field of ["title", "description", "author"]) {
     const raw = String(card?.[field] ?? "");
     if (!raw) continue;
 
@@ -409,29 +457,30 @@ function around(text, index) {
   );
 }
 
-// --- Regras da fila --------------------------------------------------------
+// --- Queue rules -----------------------------------------------------------
 
 /**
  * What the automation may take right now: cards Adson has moved to `backlog`
  * himself. `replay` stays out because a recording is nobody's request -- it is
  * review material, and it is born archived.
  */
-export function maduros(cards, { desde, emVooMax = EM_VOO_MAX } = {}) {
-  const emVoo = cards.filter((c) => !c.arquivado && c.auto && c.status === "em_progresso");
-  const vagas = Math.max(0, emVooMax - emVoo.length);
+export function triageQueue(cards, { since, inFlightMax = IN_FLIGHT_MAX } = {}) {
+  const inFlight = cards.filter((c) => !c.archived && c.auto && c.status === "em_progresso");
+  const slots = Math.max(0, inFlightMax - inFlight.length);
 
   const candidates = cards
-    .filter((c) => !c.arquivado && c.status === "backlog" && c.tipo !== "replay")
-    .filter((c) => c.projeto in REPOS)
-    // `parar` leaves a refused card in `backlog` with `refused: true`. Without
-    // this the queue would hand it to a fresh session every cycle, forever.
+    .filter((c) => !c.archived && c.status === "backlog" && c.type !== "replay")
+    .filter((c) => c.project in REPOS)
+    // `refuse` leaves a turned-down card in `backlog` with `refused: true`.
+    // Without this the queue would hand it to a fresh session every cycle,
+    // forever.
     .filter((c) => !c.refused)
-    // Keyed on `atualizadoEm`, the moment the card was moved into `backlog`.
-    // Keying on `criadoEm` would silently drop every older card Adson approves
+    // Keyed on `updatedAt`, the moment the card was moved into `backlog`.
+    // Keying on `createdAt` would silently drop every older card Adson approves
     // -- the same shape of silent drop that kept the announcer quiet for
     // thirteen days.
-    .filter((c) => !desde || ((c.atualizadoEm ?? c.criadoEm) > desde))
-    .sort((a, b) => String(a.criadoEm).localeCompare(String(b.criadoEm)));
+    .filter((c) => !since || ((c.updatedAt ?? c.createdAt) > since))
+    .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
 
   // A backstop, not the gate. A person read this card before it reached the
   // queue, so what is left for a regex to catch is what a tired reviewer skims
@@ -439,237 +488,286 @@ export function maduros(cards, { desde, emVooMax = EM_VOO_MAX } = {}) {
   // of the queue, with no public comment: naming the rule that caught it would
   // tell whoever wrote it what to avoid next time.
   const blocked = [];
-  const fila = [];
+  const ready = [];
   for (const c of candidates) {
     const screen = screenForInjection(c);
     if (screen) blocked.push({ ...c, screen });
-    else fila.push(c);
+    else ready.push(c);
   }
 
-  return { fila, emVoo, vagas, pegaveis: fila.slice(0, vagas), blocked };
+  return { ready, inFlight, slots, takeable: ready.slice(0, slots), blocked };
 }
 
-// --- Comandos --------------------------------------------------------------
+// --- Commands --------------------------------------------------------------
 
-const comandos = {
-  async bootstrap() {
-    const desde = new Date().toISOString();
-    const estado = { ...leEstado(), desde };
-    gravaEstado(estado);
-    const { fila } = maduros(await cardsAtivos(), { desde: null });
-    console.log(
-      `marca d'água: ${desde}\n` +
-        `${fila.length} card(s) em 'backlog' ficaram para trás — a automação não vai pegá-los.\n` +
-        `estado em ${ESTADO}`,
-    );
-  },
+async function bootstrap() {
+  const since = new Date().toISOString();
+  const { stored } = readState();
+  writeWatermark(since, stored);
+  const { ready } = triageQueue(await activeCards(), { since: null });
+  console.log(
+    `watermark: ${since}\n` +
+      `${ready.length} card(s) in 'backlog' were left behind -- the automation will not take them.\n` +
+      `state in ${STATE_FILE}`,
+  );
+}
 
-  async fila() {
-    const estado = leEstado();
-    if (!estado.desde) throw new Error("sem marca d'água — rode 'bootstrap' primeiro");
-    const r = maduros(await cardsAtivos(), { desde: estado.desde });
-    console.log(
-      JSON.stringify(
-        {
-          desde: estado.desde,
-          emVoo: r.emVoo.map((c) => ({ id: c.id, projeto: c.projeto, pr: c.pr })),
-          vagas: r.vagas,
-          pegaveis: r.pegaveis.map((c) => ({
-            id: c.id,
-            projeto: c.projeto,
-            repo: REPOS[c.projeto],
-            pasta: PASTAS[c.projeto],
-            tipo: c.tipo,
-            autor: c.autor,
-            titulo: c.titulo,
-            descricao: c.descricao,
-            url: urlDoCard(c.id),
-          })),
-          barrados: r.blocked.map((c) => ({
-            id: c.id,
-            projeto: c.projeto,
-            titulo: c.titulo,
-            ...c.screen,
-            url: urlDoCard(c.id),
-          })),
-        },
-        null,
-        2,
-      ),
-    );
-  },
-
-  async pegar(id) {
-    if (!id) throw new Error("uso: pegar <id>");
-    const card = await buscaCard(id);
-    if (card.status !== "backlog") {
-      throw new Error(
-        `card ${id} is in '${card.status}', not 'backlog' -- the automation only takes what you moved there yourself`,
-      );
-    }
-
-    // Checked here as well as in `maduros`, because a dispatcher can call
-    // `pegar <id>` straight past the queue — and has.
-    const screen = screenForInjection(card);
-    if (screen) {
-      throw new Error(
-        `card ${id} refused by the injection screen: ${screen.rule} in \`${screen.field}\` — ` +
-          `"${screen.excerpt}". Read the card and decide by hand; the automation will not take it.`,
-      );
-    }
-
-    const r = await escreve(
-      id,
+async function printQueue() {
+  const { since } = readState();
+  if (!since) throw new Error("no watermark -- run 'bootstrap' first");
+  const r = triageQueue(await activeCards(), { since });
+  console.log(
+    JSON.stringify(
       {
-        status: str("em_progresso"),
-        arquivado: bool(false),
-        auto: bool(true),
-        atualizadoEm: ts(Date.now()),
+        since,
+        inFlight: r.inFlight.map((c) => ({ id: c.id, project: c.project, pr: c.pr })),
+        slots: r.slots,
+        takeable: r.takeable.map((c) => ({
+          id: c.id,
+          project: c.project,
+          repo: REPOS[c.project],
+          folder: FOLDERS[c.project],
+          type: c.type,
+          author: c.author,
+          title: c.title,
+          description: c.description,
+          url: cardUrl(c.id),
+        })),
+        blocked: r.blocked.map((c) => ({
+          id: c.id,
+          project: c.project,
+          title: c.title,
+          ...c.screen,
+          url: cardUrl(c.id),
+        })),
       },
-      { updateTime: card.updateTime },
+      null,
+      2,
+    ),
+  );
+}
+
+async function takeCard(id) {
+  if (!id) throw new Error("usage: take <id>");
+  const card = await fetchCard(id);
+  if (card.status !== "backlog") {
+    throw new Error(
+      `card ${id} is in '${card.status}', not 'backlog' -- the automation only takes what you moved there yourself`,
     );
-    if (!r.ok) throw new Error(`não consegui pegar ${id} (outro pegou antes?): ${r.corpo}`);
-    console.log(JSON.stringify({ ...card, status: "em_progresso", auto: true, repo: REPOS[card.projeto], pasta: PASTAS[card.projeto] }, null, 2));
-  },
+  }
 
-  async pr(id, ref) {
-    if (!id || !ref) throw new Error("uso: pr <id> <dono/repo#N>");
-    if (!/^[\w.-]+\/[\w.-]+#\d+$/.test(ref)) throw new Error(`referência inválida: ${ref} (esperado dono/repo#123)`);
-    const r = await escreve(id, { pr: str(ref), atualizadoEm: ts(Date.now()) });
-    if (!r.ok) throw new Error(`não consegui gravar o PR em ${id}: ${r.corpo}`);
-    console.log(`${id} -> ${ref}`);
-  },
+  // Checked here as well as in `triageQueue`, because a dispatcher can call
+  // `take <id>` straight past the queue -- and has.
+  const screen = screenForInjection(card);
+  if (screen) {
+    throw new Error(
+      `card ${id} refused by the injection screen: ${screen.rule} in \`${screen.field}\` — ` +
+        `"${screen.excerpt}". Read the card and decide by hand; the automation will not take it.`,
+    );
+  }
 
-  async parar(id, ...resto) {
-    const motivo = flag(resto, "--motivo");
-    if (!id || !motivo) throw new Error('uso: parar <id> --motivo "texto"');
-    // Stays in `backlog`, and `refused: true` is what takes it out of the queue.
-    // Not `nao_sera_feito`, because closing a card in the reporter's face is
-    // your decision and not the automation's. Not back to `reportado` either:
-    // your judgement that this is a real bug still stands, and the automation
-    // failing to fix it does not un-make it. The public comment, in the
-    // reporter's language, says why.
-    await comenta(id, motivo);
-    const r = await escreve(id, {
-      status: str("backlog"),
-      refused: bool(true),
+  const r = await write(
+    id,
+    {
+      status: str("em_progresso"),
+      arquivado: bool(false),
+      auto: bool(true),
+      atualizadoEm: ts(Date.now()),
+    },
+    { updateTime: card.updateTime },
+  );
+  if (!r.ok) throw new Error(`could not take ${id} (did somebody take it first?): ${r.body}`);
+  console.log(
+    JSON.stringify(
+      {
+        ...card,
+        status: "em_progresso",
+        auto: true,
+        repo: REPOS[card.project],
+        folder: FOLDERS[card.project],
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+async function recordPullRequest(id, ref) {
+  if (!id || !ref) throw new Error("usage: pr <id> <owner/repo#N>");
+  if (!/^[\w.-]+\/[\w.-]+#\d+$/.test(ref)) {
+    throw new Error(`invalid reference: ${ref} (expected owner/repo#123)`);
+  }
+  const r = await write(id, { pr: str(ref), atualizadoEm: ts(Date.now()) });
+  if (!r.ok) throw new Error(`could not record the PR on ${id}: ${r.body}`);
+  console.log(`${id} -> ${ref}`);
+}
+
+async function refuseCard(id, ...rest) {
+  const reason = flag(rest, "--reason", "--motivo");
+  if (!id || !reason) throw new Error('usage: refuse <id> --reason "text"');
+  // Stays in `backlog`, and `refused: true` is what takes it out of the queue.
+  // Not `nao_sera_feito`, because closing a card in the reporter's face is
+  // your decision and not the automation's. Not back to `reportado` either:
+  // your judgement that this is a real bug still stands, and the automation
+  // failing to fix it does not un-make it. The public comment, in the
+  // reporter's language, says why.
+  await comment(id, reason);
+  const r = await write(id, {
+    status: str("backlog"),
+    refused: bool(true),
+    arquivado: bool(false),
+    atualizadoEm: ts(Date.now()),
+  });
+  if (!r.ok) throw new Error(`could not refuse ${id}: ${r.body}`);
+  console.log(`${id} -> backlog (refused)`);
+}
+
+async function reconcile(...args) {
+  const dryRun = args.includes("--dry-run");
+  const { execFileSync } = await import("node:child_process");
+  const cards = (await activeCards()).filter(
+    (c) => !c.archived && c.status === "em_progresso" && c.pr,
+  );
+  let moved = 0;
+  for (const c of cards) {
+    const [repo, number] = c.pr.split("#");
+    let data;
+    try {
+      data = JSON.parse(
+        execFileSync("gh", ["pr", "view", number, "--repo", repo, "--json", "state,mergedAt,url"], {
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+        }),
+      );
+    } catch (e) {
+      console.error(`${c.id}: could not read ${c.pr} -- ${String(e.message).slice(0, 120)}`);
+      continue;
+    }
+    if (data.state !== "MERGED") continue;
+    if (dryRun) {
+      console.log(`[dry-run] ${c.id} <- ${c.pr} merged at ${data.mergedAt}`);
+      moved++;
+      continue;
+    }
+    // The reporter reads this one, so it stays in Portuguese.
+    await comment(
+      c.id,
+      `Resolvido em ${data.url}, mesclado em ${new Date(data.mergedAt).toLocaleDateString("pt-BR")}.`,
+    );
+    const r = await write(c.id, {
+      status: str("resolvido"),
       arquivado: bool(false),
       atualizadoEm: ts(Date.now()),
     });
-    if (!r.ok) throw new Error(`não consegui parar ${id}: ${r.corpo}`);
-    console.log(`${id} -> backlog (refused)`);
-  },
-
-  async reconciliar(...args) {
-    const seco = args.includes("--dry-run");
-    const { execFileSync } = await import("node:child_process");
-    const cards = (await cardsAtivos()).filter(
-      (c) => !c.arquivado && c.status === "em_progresso" && c.pr,
-    );
-    let movidos = 0;
-    for (const c of cards) {
-      const [repo, numero] = c.pr.split("#");
-      let dados;
-      try {
-        dados = JSON.parse(
-          execFileSync("gh", ["pr", "view", numero, "--repo", repo, "--json", "state,mergedAt,url"], {
-            encoding: "utf8",
-            stdio: ["ignore", "pipe", "pipe"],
-          }),
-        );
-      } catch (e) {
-        console.error(`${c.id}: não consegui ler ${c.pr} — ${String(e.message).slice(0, 120)}`);
-        continue;
-      }
-      if (dados.state !== "MERGED") continue;
-      if (seco) {
-        console.log(`[seco] ${c.id} <- ${c.pr} mesclado em ${dados.mergedAt}`);
-        movidos++;
-        continue;
-      }
-      await comenta(c.id, `Resolvido em ${dados.url}, mesclado em ${new Date(dados.mergedAt).toLocaleDateString("pt-BR")}.`);
-      const r = await escreve(c.id, {
-        status: str("resolvido"),
-        arquivado: bool(false),
-        atualizadoEm: ts(Date.now()),
-      });
-      if (!r.ok) {
-        console.error(`${c.id}: ${r.corpo}`);
-        continue;
-      }
-      console.log(`${c.id} -> resolvido (${c.pr})`);
-      movidos++;
+    if (!r.ok) {
+      console.error(`${c.id}: ${r.body}`);
+      continue;
     }
-    console.log(`reconciliados: ${movidos} de ${cards.length} card(s) com PR`);
-  },
+    console.log(`${c.id} -> resolvido (${c.pr})`);
+    moved++;
+  }
+  console.log(`reconciled: ${moved} of ${cards.length} card(s) with a PR`);
+}
 
-  /**
-   * O aviso de fim de card. A sessão escreve a frase; o link não é dela — sai do
-   * card, por `linkDoAviso`. Uma notificação por card, no fim: progresso não vai
-   * para o celular de ninguém.
-   *
-   * O id é obrigatório, e `--mensagem` no lugar dele é erro em vez de virar
-   * alarme: `avisar "$ID" --mensagem ...` com a variável vazia precisa falhar,
-   * não mandar uma notificação genérica que parece ter dado certo.
-   */
-  async avisar(id, ...resto) {
-    const mensagem = flag(resto, "--mensagem");
-    if (!id || id.startsWith("--") || !mensagem) throw new Error('uso: avisar <id> --mensagem "texto"');
+/**
+ * The end-of-card notification. The session writes the sentence; the link is
+ * not the session's -- it comes off the card, through `notificationLink`. One
+ * notification per card, at the end: progress does not go to anybody's phone.
+ *
+ * The id is required, and `--message` in its place is an error rather than
+ * becoming an alarm: `notify "$ID" --message ...` with an empty variable has to
+ * fail, not send a generic notification that looks like it worked.
+ */
+async function notifyAboutCard(id, ...rest) {
+  const message = flag(rest, "--message", "--mensagem");
+  if (!id || id.startsWith("--") || !message) {
+    throw new Error('usage: notify <id> --message "text"');
+  }
 
-    const card = await buscaCard(id);
-    const link = linkDoAviso(card);
-    const r = await notifica({
-      titulo: card.titulo || card.id,
-      mensagem,
-      link,
-      // O projeto vira etiqueta em vez de entrar no título: na tela do celular o
-      // título é o que se lê primeiro, e ali o que importa é o card.
-      tags: [card.projeto, card.pr ? "rocket" : "speech_balloon"],
-    });
-    if (!r.ok) throw new Error(`não consegui avisar sobre ${id}: ${r.corpo}`);
-    console.log(`avisado: ${id} -> ${link}`);
-  },
+  const card = await fetchCard(id);
+  const link = notificationLink(card);
+  const r = await notify({
+    title: card.title || card.id,
+    message,
+    link,
+    // The project becomes a tag rather than going into the title: on a phone
+    // screen the title is what gets read first, and there what matters is the
+    // card.
+    tags: [card.project, card.pr ? "rocket" : "speech_balloon"],
+  });
+  if (!r.ok) throw new Error(`could not notify about ${id}: ${r.body}`);
+  console.log(`notified: ${id} -> ${link}`);
+}
 
-  /** O alarme do próprio despachante, que não tem card para apontar. */
-  async alarme(...resto) {
-    const mensagem = flag(resto, "--mensagem");
-    if (!mensagem) throw new Error('uso: alarme --mensagem "texto"');
-    const r = await notifica({ titulo: "Triagem automática", mensagem, link: SITE, tags: ["warning"] });
-    if (!r.ok) throw new Error(`não consegui dar o alarme: ${r.corpo}`);
-    console.log(`alarme -> ${SITE}`);
-  },
+/** The dispatcher's own alarm, which has no card to point at. */
+async function raiseAlarm(...rest) {
+  const message = flag(rest, "--message", "--mensagem");
+  if (!message) throw new Error('usage: alarm --message "text"');
+  // "Triagem automática" is what shows on his phone, so it stays in Portuguese.
+  const r = await notify({
+    title: "Triagem automática",
+    message,
+    link: SITE,
+    tags: ["warning"],
+  });
+  if (!r.ok) throw new Error(`could not raise the alarm: ${r.body}`);
+  console.log(`alarm -> ${SITE}`);
+}
 
-  async estado() {
-    const estado = leEstado();
-    const cards = await cardsAtivos();
-    const r = maduros(cards, { desde: estado.desde ?? null });
-    console.log(
-      `marca d'água : ${estado.desde ?? "(sem bootstrap)"}\n` +
-        `em voo       : ${r.emVoo.length}/${EM_VOO_MAX}${r.emVoo.length ? ` — ${r.emVoo.map((c) => `${c.id}${c.pr ? ` (${c.pr})` : ""}`).join(", ")}` : ""}\n` +
-        `fila madura  : ${r.fila.length}\n` +
-        `pegáveis já  : ${r.pegaveis.length}\n` +
-        // Shown here and in `fila`, and deliberately NOT pushed to the phone:
-        // a notification per screened card would hand a stranger a way to ring
-        // Adson's phone at will, by filing cards. The dispatcher reads this
-        // every cycle, which is where a blocked card belongs.
-        `barrados     : ${r.blocked.length}${r.blocked.length ? ` — ${r.blocked.map((c) => `${c.id} (${c.screen.rule})`).join(", ")}` : ""}
-` +
-        `estado em    : ${ESTADO}`,
-    );
-  },
+async function printState() {
+  const { since } = readState();
+  const cards = await activeCards();
+  const r = triageQueue(cards, { since });
+  console.log(
+    `watermark   : ${since ?? "(no bootstrap)"}\n` +
+      `in flight   : ${r.inFlight.length}/${IN_FLIGHT_MAX}${r.inFlight.length ? ` — ${r.inFlight.map((c) => `${c.id}${c.pr ? ` (${c.pr})` : ""}`).join(", ")}` : ""}\n` +
+      `ready       : ${r.ready.length}\n` +
+      `takeable now: ${r.takeable.length}\n` +
+      // Shown here and in `queue`, and deliberately NOT pushed to the phone:
+      // a notification per screened card would hand a stranger a way to ring
+      // Adson's phone at will, by filing cards. The dispatcher reads this
+      // every cycle, which is where a blocked card belongs.
+      `blocked     : ${r.blocked.length}${r.blocked.length ? ` — ${r.blocked.map((c) => `${c.id} (${c.screen.rule})`).join(", ")}` : ""}\n` +
+      `state in    : ${STATE_FILE}`,
+  );
+}
+
+/**
+ * The command table. English names are the real ones; the Portuguese spellings
+ * below them are aliases, kept because the triage skill and anything already in
+ * flight still type those. They can go once no document names them.
+ */
+const commands = {
+  bootstrap,
+  queue: printQueue,
+  take: takeCard,
+  pr: recordPullRequest,
+  refuse: refuseCard,
+  reconcile,
+  notify: notifyAboutCard,
+  alarm: raiseAlarm,
+  state: printState,
+
+  fila: printQueue,
+  pegar: takeCard,
+  parar: refuseCard,
+  reconciliar: reconcile,
+  avisar: notifyAboutCard,
+  alarme: raiseAlarm,
+  estado: printState,
 };
 
-// --- Entrada ---------------------------------------------------------------
+// --- Entry point -----------------------------------------------------------
 
-const [comando, ...args] = process.argv.slice(2);
+const [command, ...args] = process.argv.slice(2);
 
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("triagem.mjs")) {
-  if (!comando || !(comando in comandos)) {
-    console.error(`comandos: ${Object.keys(comandos).join(", ")}`);
+  if (!command || !(command in commands)) {
+    console.error(`commands: ${Object.keys(commands).join(", ")}`);
     process.exit(2);
   }
   try {
-    await comandos[comando](...args);
+    await commands[command](...args);
   } catch (e) {
     console.error(String(e.message ?? e));
     process.exit(1);

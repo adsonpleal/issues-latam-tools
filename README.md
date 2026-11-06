@@ -259,7 +259,7 @@ de agora" e o que já estava em `reportado` fica para trás. Sem isso, ligar a
 automação com a fila cheia despejaria uma sessão por card acumulado. Rode uma vez
 só, à mão: um turno automático nunca grava a marca.
 
-**Teto de sessões simultâneas** (`TRIAGEM_EM_VOO_MAX`, padrão 2). O limite não é
+**Teto de sessões simultâneas** (`TRIAGEM_EM_VOO_MAX`, padrão 5). O limite não é
 do Firestore nem do GitHub — é da máquina, que roda os testes, sobe instância e
 tira captura de cada sessão. Só conta o que a automação pegou: card que você
 moveu à mão para `em_progresso` não ocupa vaga.

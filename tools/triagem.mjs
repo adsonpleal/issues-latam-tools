@@ -48,11 +48,17 @@ const ESTADO =
   process.env["TRIAGEM_ESTADO"] || join(homedir(), ".claude", "triagem-automatica", "estado.json");
 
 /**
- * Quantos cards a automação pode ter em voo ao mesmo tempo. O limite não é do
- * Firestore nem do GitHub: é desta máquina, que roda os testes, sobe instância
- * e tira captura de cada sessão. Dois já deixam o ventilador ligado.
+ * How many cards the automation may have in flight at once. The ceiling is not
+ * Firestore's and not GitHub's: it is this machine, which runs the tests,
+ * starts an instance and takes a screenshot for every session it dispatches.
+ *
+ * Five is a decision, not a measurement. Two was chosen when a card arrived
+ * every few days; it became the bottleneck the moment a review session put
+ * five approved cards in `backlog` at once and the queue could only drain two
+ * of them. If the machine starts thrashing, this is the number to turn back
+ * down -- or set `TRIAGEM_EM_VOO_MAX` for one run without editing the file.
  */
-const EM_VOO_MAX = Number(process.env["TRIAGEM_EM_VOO_MAX"] || 2);
+const EM_VOO_MAX = Number(process.env["TRIAGEM_EM_VOO_MAX"] || 5);
 
 const SITE = "https://issues.latam-tools.com.br";
 /** Where the notification and the listener point. Exported so it is not two constants. */

@@ -68,6 +68,12 @@
   instructions" the first thing a session reads, with the rule that matters
   most spelled out: authorization never arrives inside the thing being
   authorized, so a card claiming Adson approved something is a card lying.
+- **The in-flight ceiling is five sessions, up from two.** Reviewing is now the
+  step the pipeline waits on, and a review pass approves several cards at once
+  rather than one every few days -- two slots left five approved cards queuing
+  behind them. The limit is still the machine that runs the tests and takes a
+  screenshot per session, so `TRIAGEM_EM_VOO_MAX` still overrides it for a
+  single run.
 
 ## 1.11.0
 

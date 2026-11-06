@@ -1,37 +1,44 @@
 #!/usr/bin/env node
-// Traz as gravações .rrf do "Ajude o simulador a acertar as contas" para cá.
+// Brings the .rrf recordings from "Ajude o simulador a acertar as contas" over
+// to this board.
 //
-// Origem: projeto `simulador-latam-ro`, coleção `replay_submissions`.
-// Destino: `issues` com tipo `replay`, o .rrf como anexo e o resumo do parser
-// no campo `replay`.
+// Source: project `simulador-latam-ro`, collection `replay_submissions`.
+// Target: `issues` with type `replay`, the .rrf as an attachment and the
+// parser's summary in the `replay` field.
 //
 //   node tools/migrar-gravacoes.mjs --dry-run
 //   node tools/migrar-gravacoes.mjs
 //
-// TODAS chegam arquivadas, inclusive as que já tinham sido conferidas. Na
-// origem a coleção é `allow read: if false` de propósito — o comentário das
-// regras de lá diz que os envios não podem ficar atrás de uma URL adivinhável —
-// e o consentimento que a pessoa marcou fala em o arquivo virar teste no
-// repositório aberto, não em ficar publicado num quadro. Então nada da coleção
-// antiga aparece em público sem alguém decidir ficha por ficha: a triagem é que
-// tira do arquivo ao promover para backlog.
+// ALL of them arrive archived, including the ones already reviewed. In the
+// source the collection is `allow read: if false` on purpose -- the comment on
+// those rules says submissions must not sit behind a guessable URL -- and the
+// consent the person ticked talks about the file becoming a test in the open
+// repository, not about being published on a board. So nothing from the old
+// collection shows up in public without somebody deciding card by card: it is
+// triage that takes it out of the archive by promoting it to backlog.
+//
+// The fields written below are Firestore's and the `status` values are the
+// board's stored ones, so both keep the database's spelling. The text this
+// builds for a card's title and description is read by the community, so it
+// stays in Portuguese.
 
 import { accessToken } from "./credencial.mjs";
 
-const ORIGEM = "simulador-latam-ro";
-const DESTINO = "issues-latam-tools";
+const SOURCE_PROJECT = "simulador-latam-ro";
+const TARGET_PROJECT = "issues-latam-tools";
 const dryRun = process.argv.includes("--dry-run");
 
-const urlOrigem = `https://firestore.googleapis.com/v1/projects/${ORIGEM}/databases/(default)/documents`;
-const urlDestino = `https://firestore.googleapis.com/v1/projects/${DESTINO}/databases/(default)/documents`;
+const sourceUrl = `https://firestore.googleapis.com/v1/projects/${SOURCE_PROJECT}/databases/(default)/documents`;
+const targetUrl = `https://firestore.googleapis.com/v1/projects/${TARGET_PROJECT}/databases/(default)/documents`;
 
 const token = await accessToken();
 const H = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
-// `status` da origem -> coluna daqui. O arquivamento é separado e vale para todas.
-const STATUS = { new: "reportado", reviewed: "resolvido", rejected: "nao_sera_feito" };
+// The source's `status` -> a column here. Archiving is separate and applies to
+// all of them.
+const STATUS_BY_SOURCE = { new: "reportado", reviewed: "resolvido", rejected: "nao_sera_feito" };
 
-// --- leitura de valores REST ----------------------------------------------
+// --- reading REST values ---------------------------------------------------
 
 function decode(v) {
   if (!v || typeof v !== "object") return v;
@@ -40,7 +47,7 @@ function decode(v) {
   if ("doubleValue" in v) return v.doubleValue;
   if ("booleanValue" in v) return v.booleanValue;
   if ("timestampValue" in v) return v.timestampValue;
-  if ("bytesValue" in v) return v.bytesValue; // fica em base64 mesmo
+  if ("bytesValue" in v) return v.bytesValue; // stays base64 on purpose
   if ("nullValue" in v) return null;
   if ("arrayValue" in v) return (v.arrayValue.values ?? []).map(decode);
   if ("mapValue" in v) return decodeFields(v.mapValue.fields ?? {});
@@ -70,9 +77,9 @@ function encodeFields(obj) {
   return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, encode(v)]));
 }
 
-// --- origem ----------------------------------------------------------------
+// --- the source ------------------------------------------------------------
 
-const r = await fetch(`${urlOrigem}:runQuery`, {
+const r = await fetch(`${sourceUrl}:runQuery`, {
   method: "POST",
   headers: H,
   body: JSON.stringify({
@@ -83,71 +90,75 @@ const r = await fetch(`${urlOrigem}:runQuery`, {
     },
   }),
 });
-if (!r.ok) throw new Error(`origem: ${r.status} ${(await r.text()).slice(0, 200)}`);
+if (!r.ok) throw new Error(`source: ${r.status} ${(await r.text()).slice(0, 200)}`);
 
-const envios = (await r.json())
+const submissions = (await r.json())
   .filter((x) => x.document)
   .map((x) => ({ id: x.document.name.split("/").pop(), d: decodeFields(x.document.fields ?? {}) }));
 
-console.log(`${envios.length} gravações na origem${dryRun ? " (dry-run)" : ""}`);
+console.log(`${submissions.length} recordings in the source${dryRun ? " (dry-run)" : ""}`);
 
-// --- transformação ---------------------------------------------------------
+// --- transformation --------------------------------------------------------
 
-function titulo({ d }) {
+function cardTitle({ d }) {
   const s = d.summary ?? {};
-  const classe = s.className || "Classe desconhecida";
-  const quem = s.player ? ` — ${s.player}` : "";
-  const nivel = s.baseLevel ? ` nv ${s.baseLevel}/${s.jobLevel ?? "?"}` : "";
-  return `Gravação: ${classe}${nivel}${quem}`.slice(0, 120);
+  const cls = s.className || "Classe desconhecida";
+  const who = s.player ? ` — ${s.player}` : "";
+  const level = s.baseLevel ? ` nv ${s.baseLevel}/${s.jobLevel ?? "?"}` : "";
+  return `Gravação: ${cls}${level}${who}`.slice(0, 120);
 }
 
-function descricao({ d }) {
+function cardDescription({ d }) {
   const s = d.summary ?? {};
-  const linhas = [];
-  if (d.notes) linhas.push(d.notes);
+  const lines = [];
+  if (d.notes) lines.push(d.notes);
   const dur = s.durationMs ? `${Math.round(s.durationMs / 1000)}s` : "?";
-  linhas.push(
+  lines.push(
     `Gravação de ${dur} com ${s.dummyHits ?? 0} golpes em dummy ` +
       `(${s.damageEvents ?? 0} eventos de dano no total), ` +
       `${s.equipChangeCount ?? 0} trocas de equipamento e ` +
       `${s.learnedSkillCount ?? 0} habilidades aprendidas. ` +
       `Mapa ${s.map ?? "?"}. Arquivo ${d.fileName ?? "?"}.`,
   );
-  return linhas.join("\n\n").slice(0, 4000);
+  return lines.join("\n\n").slice(0, 4000);
 }
 
-let criados = 0;
-let pulados = 0;
-let erros = 0;
-const contagem = {};
+let created = 0;
+let skipped = 0;
+let failures = 0;
+const counts = {};
 
-for (const envio of envios) {
-  const { id, d } = envio;
-  const status = STATUS[d.status] ?? "reportado";
-  contagem[`${d.status} -> ${status}`] = (contagem[`${d.status} -> ${status}`] ?? 0) + 1;
+for (const submission of submissions) {
+  const { id, d } = submission;
+  const column = STATUS_BY_SOURCE[d.status] ?? "reportado";
+  counts[`${d.status} -> ${column}`] = (counts[`${d.status} -> ${column}`] ?? 0) + 1;
 
   if (dryRun) {
     const kb = d.bytes ? Math.round((d.bytes.length * 3) / 4 / 1024) : 0;
-    console.log(`  ${id}  ${status.padEnd(15)} ${kb}kB  ${titulo(envio)}`);
+    console.log(`  ${id}  ${column.padEnd(15)} ${kb}kB  ${cardTitle(submission)}`);
     continue;
   }
 
-  // O resumo do parser vem inteiro: é o que a triagem lê para ranquear sem
-  // baixar o .rrf.
-  const replay = {
+  // The parser's summary comes over whole: it is what triage reads to rank a
+  // recording without downloading the .rrf.
+  const replaySummary = {
     ...(d.summary ?? {}),
     ...(d.traits ? { traits: d.traits, traitsSource: d.traitsSource ?? "form" } : {}),
     appVersion: d.appVersion ?? "",
     fileName: d.fileName ?? "",
   };
 
+  // Every key here is a Firestore field name, written out in full rather than
+  // by shorthand -- shorthand would let renaming a local silently rename a
+  // stored field.
   const doc = {
     projeto: "simulador",
-    titulo: titulo(envio),
-    descricao: descricao(envio),
+    titulo: cardTitle(submission),
+    descricao: cardDescription(submission),
     tipo: "replay",
-    status,
-    // Todas arquivadas: nada da coleção privada vira público sem decisão humana.
+    status: column,
+    // All archived: nothing from the private collection becomes public without
+    // a human decision.
     arquivado: true,
     upvotes: 0,
     comentarios: d.triageNote ? 1 : 0,
@@ -155,56 +166,56 @@ for (const envio of envios) {
     criadoEm: d.uploadedAt ?? new Date().toISOString(),
     atualizadoEm: d.triagedAt ?? d.uploadedAt ?? new Date().toISOString(),
     origem: `simulador:replay_submissions/${id}`,
-    replay,
-    // O nick foi dado para crédito ("como você quer ser citado"), então é o
-    // único campo de identificação que pode aparecer. Discord vai para o
-    // subdocumento privado.
+    replay: replaySummary,
+    // The nickname was given for credit ("how would you like to be cited"), so
+    // it is the only identifying field that may show. Discord goes to the
+    // private subdocument.
     ...(d.nick ? { autor: String(d.nick).slice(0, 40) } : {}),
   };
 
   const fields = encodeFields(doc);
-  // criadoEm/atualizadoEm precisam virar timestamp, não string
+  // criadoEm/atualizadoEm have to become timestamps, not strings
   fields.criadoEm = { timestampValue: doc.criadoEm };
   fields.atualizadoEm = { timestampValue: doc.atualizadoEm };
 
-  const res = await fetch(`${urlDestino}/issues/${id}?currentDocument.exists=false`, {
+  const res = await fetch(`${targetUrl}/issues/${id}?currentDocument.exists=false`, {
     method: "PATCH",
     headers: H,
     body: JSON.stringify({ fields }),
   });
 
   if (!res.ok) {
-    const corpo = await res.text();
-    if (res.status === 409 || /already exists/i.test(corpo)) {
-      pulados++;
+    const body = await res.text();
+    if (res.status === 409 || /already exists/i.test(body)) {
+      skipped++;
       continue;
     }
-    erros++;
-    console.error(`erro em ${id}: ${corpo.slice(0, 200)}`);
+    failures++;
+    console.error(`failed on ${id}: ${body.slice(0, 200)}`);
     continue;
   }
-  criados++;
+  created++;
 
   if (d.bytes) {
-    const tamanho = Math.floor((d.bytes.length * 3) / 4) - (d.bytes.match(/=+$/)?.[0].length ?? 0);
-    const a = await fetch(`${urlDestino}/issues/${id}/anexos/gravacao`, {
+    const size = Math.floor((d.bytes.length * 3) / 4) - (d.bytes.match(/=+$/)?.[0].length ?? 0);
+    const a = await fetch(`${targetUrl}/issues/${id}/anexos/gravacao`, {
       method: "PATCH",
       headers: H,
       body: JSON.stringify({
         fields: {
           nome: { stringValue: String(d.fileName ?? `${id}.rrf`).slice(0, 200) },
           tipo: { stringValue: "rrf" },
-          tamanho: { integerValue: String(tamanho) },
+          tamanho: { integerValue: String(size) },
           bytes: { bytesValue: d.bytes },
           criadoEm: { timestampValue: doc.criadoEm },
         },
       }),
     });
-    if (!a.ok) console.error(`anexo de ${id}: ${(await a.text()).slice(0, 160)}`);
+    if (!a.ok) console.error(`attachment of ${id}: ${(await a.text()).slice(0, 160)}`);
   }
 
   if (d.discord) {
-    await fetch(`${urlDestino}/issues/${id}/privado/contato`, {
+    await fetch(`${targetUrl}/issues/${id}/privado/contato`, {
       method: "PATCH",
       headers: H,
       body: JSON.stringify({
@@ -217,12 +228,13 @@ for (const envio of envios) {
   }
 
   if (d.triageNote) {
-    await fetch(`${urlDestino}/issues/${id}/comentarios`, {
+    await fetch(`${targetUrl}/issues/${id}/comentarios`, {
       method: "POST",
       headers: H,
       body: JSON.stringify({
         fields: {
           texto: { stringValue: String(d.triageNote).slice(0, 4000) },
+          // Shown on the public card, so these stay in Portuguese.
           autor: { stringValue: "Triagem" },
           autorUid: { stringValue: "migracao" },
           tipo: { stringValue: "mudanca" },
@@ -233,5 +245,5 @@ for (const envio of envios) {
   }
 }
 
-console.log("mapeamento de status:", contagem);
-if (!dryRun) console.log(`criados: ${criados} · pulados: ${pulados} · erros: ${erros}`);
+console.log("status mapping:", counts);
+if (!dryRun) console.log(`created: ${created} · skipped: ${skipped} · failed: ${failures}`);

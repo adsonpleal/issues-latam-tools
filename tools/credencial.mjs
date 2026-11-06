@@ -1,40 +1,40 @@
-// Access token do Google a partir do que já existe na máquina.
+// A Google access token from whatever already exists on this machine.
 //
-// Preferência para uma chave de service account (GOOGLE_APPLICATION_CREDENTIALS);
-// sem ela, usa o refresh token que o `firebase login` deixou no configstore do
-// firebase-tools — assim rodar o seed não exige baixar chave nenhuma.
+// Prefers a service account key (GOOGLE_APPLICATION_CREDENTIALS); without one,
+// uses the refresh token that `firebase login` left in firebase-tools'
+// configstore -- so running the seed does not require downloading any key.
 
 import { createSign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-// Client id/secret públicos do firebase-tools (estão no código aberto dele).
+// firebase-tools' public client id/secret (they are in its open source).
 const CLI_CLIENT_ID =
   "563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com";
 const CLI_CLIENT_SECRET = "j9iVZfS8kkCEFUPaAeJV0sAi";
 
-const ESCOPO = "https://www.googleapis.com/auth/datastore";
+const SCOPE = "https://www.googleapis.com/auth/datastore";
 
 function base64url(buf) {
   return Buffer.from(buf).toString("base64url");
 }
 
-async function tokenPorServiceAccount(caminho) {
-  const sa = JSON.parse(readFileSync(caminho, "utf8"));
-  const agora = Math.floor(Date.now() / 1000);
-  const cabecalho = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const corpo = base64url(
+async function tokenFromServiceAccount(path) {
+  const sa = JSON.parse(readFileSync(path, "utf8"));
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const body = base64url(
     JSON.stringify({
       iss: sa.client_email,
-      scope: ESCOPO,
+      scope: SCOPE,
       aud: "https://oauth2.googleapis.com/token",
-      iat: agora,
-      exp: agora + 3600,
+      iat: now,
+      exp: now + 3600,
     }),
   );
-  const assinatura = createSign("RSA-SHA256")
-    .update(`${cabecalho}.${corpo}`)
+  const signature = createSign("RSA-SHA256")
+    .update(`${header}.${body}`)
     .sign(sa.private_key, "base64url");
 
   const r = await fetch("https://oauth2.googleapis.com/token", {
@@ -42,7 +42,7 @@ async function tokenPorServiceAccount(caminho) {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion: `${cabecalho}.${corpo}.${assinatura}`,
+      assertion: `${header}.${body}.${signature}`,
     }),
   });
   const j = await r.json();
@@ -50,16 +50,16 @@ async function tokenPorServiceAccount(caminho) {
   return j.access_token;
 }
 
-async function tokenPorCLI() {
-  const arquivo = join(homedir(), ".config", "configstore", "firebase-tools.json");
+async function tokenFromCLI() {
+  const file = join(homedir(), ".config", "configstore", "firebase-tools.json");
   let cfg;
   try {
-    cfg = JSON.parse(readFileSync(arquivo, "utf8"));
+    cfg = JSON.parse(readFileSync(file, "utf8"));
   } catch {
-    throw new Error("rode 'firebase login' ou defina GOOGLE_APPLICATION_CREDENTIALS");
+    throw new Error("run 'firebase login' or set GOOGLE_APPLICATION_CREDENTIALS");
   }
   const refresh = cfg?.tokens?.refresh_token;
-  if (!refresh) throw new Error(`sem refresh token em ${arquivo} — rode 'firebase login'`);
+  if (!refresh) throw new Error(`no refresh token in ${file} — run 'firebase login'`);
 
   const r = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -78,5 +78,5 @@ async function tokenPorCLI() {
 
 export async function accessToken() {
   const sa = process.env["GOOGLE_APPLICATION_CREDENTIALS"];
-  return sa ? tokenPorServiceAccount(sa) : tokenPorCLI();
+  return sa ? tokenFromServiceAccount(sa) : tokenFromCLI();
 }

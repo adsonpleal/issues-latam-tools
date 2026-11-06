@@ -1,17 +1,21 @@
 #!/usr/bin/env node
-// Carrega data/seed-issues.json no Firestore. Idempotente: rodar de novo não
-// duplica nem desfaz triagem já feita à mão.
+// Loads data/seed-issues.json into Firestore. Idempotent: running it again
+// neither duplicates anything nor undoes triage already done by hand.
 //
 //   node tools/seed.mjs --dry-run
 //   node tools/seed.mjs
-//   node tools/seed.mjs --force            # sobrescreve o que já existe
-//   node tools/seed.mjs --project outro-id
+//   node tools/seed.mjs --force            # overwrites what is already there
+//   node tools/seed.mjs --project other-id
 //
-// Fala com a API REST do Firestore em vez do firebase-admin: o SDK admin só
-// aceita credencial de service account para Firestore, e a API REST aceita o
-// token que o `firebase login` já deixou na máquina. Um passo a menos de setup.
-// Escrita autenticada assim passa por cima das regras de segurança — é o único
-// caminho que consegue gravar `origem`, por exemplo.
+// Talks to Firestore's REST API instead of firebase-admin: the admin SDK only
+// accepts a service account credential for Firestore, while the REST API
+// accepts the token `firebase login` already left on the machine. One less
+// setup step. An authenticated write like this overrides the security rules --
+// it is the only path that can write `origem`, for one thing.
+//
+// The keys read off each item (`projeto`, `titulo`, `criadoEm`, …) are the seed
+// file's own, and the fields written are Firestore's; both are spelled the way
+// they are stored, not the way this script names things.
 
 import { readFileSync } from "node:fs";
 
@@ -30,87 +34,88 @@ const ISSUE_TYPES = ["bug", "feature"];
 
 const BASE = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
 
-// --- Validação -------------------------------------------------------------
+// --- Validation ------------------------------------------------------------
 
-function valida(item, i) {
-  const erro = (msg) => `item ${i} (${item.id ?? "sem id"}): ${msg}`;
+function validate(item, i) {
+  const fail = (msg) => `item ${i} (${item.id ?? "no id"}): ${msg}`;
 
-  if (!item.id || typeof item.id !== "string") throw new Error(erro("sem id"));
-  if (!PROJECTS.includes(item.projeto)) throw new Error(erro(`projeto inválido: ${item.projeto}`));
-  if (!STATUSES.includes(item.status)) throw new Error(erro(`status inválido: ${item.status}`));
-  if (!ISSUE_TYPES.includes(item.tipo)) throw new Error(erro(`tipo inválido: ${item.tipo}`));
+  if (!item.id || typeof item.id !== "string") throw new Error(fail("no id"));
+  if (!PROJECTS.includes(item.projeto)) throw new Error(fail(`invalid project: ${item.projeto}`));
+  if (!STATUSES.includes(item.status)) throw new Error(fail(`invalid status: ${item.status}`));
+  if (!ISSUE_TYPES.includes(item.tipo)) throw new Error(fail(`invalid type: ${item.tipo}`));
   if (typeof item.titulo !== "string" || item.titulo.length < 3 || item.titulo.length > 120) {
-    throw new Error(erro(`título fora de 3..120 (${item.titulo?.length})`));
+    throw new Error(fail(`title outside 3..120 (${item.titulo?.length})`));
   }
   if (typeof item.descricao !== "string" || item.descricao.length > 4000) {
-    throw new Error(erro("descrição ausente ou acima de 4000"));
+    throw new Error(fail("description missing or over 4000"));
   }
-  // Falha barulhenta de propósito: um único documento sem `arquivado` quebra a
-  // consulta do quadro para TODO MUNDO, porque a regra `allow list` avalia
-  // `resource.data.arquivado` (ver firestore.rules).
-  if (typeof item.arquivado !== "boolean") throw new Error(erro("`arquivado` precisa ser booleano"));
-  if (!Number.isInteger(item.upvotes) || item.upvotes < 0) throw new Error(erro("upvotes inválido"));
-  if (Number.isNaN(Date.parse(item.criadoEm))) throw new Error(erro("criadoEm inválido"));
+  // Loud failure on purpose: a single document without `arquivado` breaks the
+  // board's query for EVERYONE, because the `allow list` rule evaluates
+  // `resource.data.arquivado` (see firestore.rules).
+  if (typeof item.arquivado !== "boolean") throw new Error(fail("`arquivado` must be a boolean"));
+  if (!Number.isInteger(item.upvotes) || item.upvotes < 0) throw new Error(fail("invalid upvotes"));
+  if (Number.isNaN(Date.parse(item.criadoEm))) throw new Error(fail("invalid criadoEm"));
 }
 
-// --- Codificação REST ------------------------------------------------------
+// --- REST encoding ---------------------------------------------------------
 
 const str = (v) => ({ stringValue: v });
 const int = (v) => ({ integerValue: String(v) });
 const bool = (v) => ({ booleanValue: v });
 const ts = (v) => ({ timestampValue: new Date(v).toISOString() });
 
-// --- Carga -----------------------------------------------------------------
+// --- The load --------------------------------------------------------------
 
-const itens = JSON.parse(readFileSync("data/seed-issues.json", "utf8"));
-itens.forEach(valida);
+const items = JSON.parse(readFileSync("data/seed-issues.json", "utf8"));
+items.forEach(validate);
 
 const ids = new Set();
-for (const i of itens) {
-  if (ids.has(i.id)) throw new Error(`id repetido: ${i.id}`);
+for (const i of items) {
+  if (ids.has(i.id)) throw new Error(`duplicate id: ${i.id}`);
   ids.add(i.id);
 }
 
-console.log(`${itens.length} itens validados, projeto ${projectId}${dryRun ? " (dry-run)" : ""}`);
+console.log(`${items.length} items validated, project ${projectId}${dryRun ? " (dry-run)" : ""}`);
 
 if (dryRun) {
-  const porStatus = {};
-  for (const i of itens) {
-    const chave = i.arquivado ? "arquivado" : i.status;
-    porStatus[chave] = (porStatus[chave] ?? 0) + 1;
+  const byStatus = {};
+  for (const i of items) {
+    const key = i.arquivado ? "arquivado" : i.status;
+    byStatus[key] = (byStatus[key] ?? 0) + 1;
   }
-  console.log("distribuição:", porStatus);
-  console.log(`comentários a criar: ${itens.filter((i) => i.nota).length}`);
-  console.log(`contatos privados a criar: ${itens.filter((i) => i.contato).length}`);
+  console.log("distribution:", byStatus);
+  console.log(`comments to create: ${items.filter((i) => i.nota).length}`);
+  console.log(`private contacts to create: ${items.filter((i) => i.contato).length}`);
   process.exit(0);
 }
 
 const token = await accessToken();
-const cabecalhos = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
-async function escreve(caminho, fields, { criarSomente = false } = {}) {
-  // `currentDocument.exists=false` é o `create()` do SDK: se o documento já
-  // existe, o servidor recusa em vez de sobrescrever. É isso que impede o seed
-  // de devolver para `reportado` um card já movido para `em_progresso`.
-  const url = `${BASE}/${caminho}${criarSomente ? "?currentDocument.exists=false" : ""}`;
+async function write(path, fields, { createOnly = false } = {}) {
+  // `currentDocument.exists=false` is the SDK's `create()`: if the document
+  // already exists the server refuses instead of overwriting. That is what
+  // stops the seed sending a card already moved to `em_progresso` back to
+  // `reportado`.
+  const url = `${BASE}/${path}${createOnly ? "?currentDocument.exists=false" : ""}`;
   const r = await fetch(url, {
     method: "PATCH",
-    headers: cabecalhos,
+    headers,
     body: JSON.stringify({ fields }),
   });
   if (!r.ok) {
-    const corpo = await r.text();
-    const jaExiste = r.status === 409 || /already exists|ALREADY_EXISTS/i.test(corpo);
-    return { ok: false, jaExiste, corpo };
+    const body = await r.text();
+    const alreadyExists = r.status === 409 || /already exists|ALREADY_EXISTS/i.test(body);
+    return { ok: false, alreadyExists, body };
   }
   return { ok: true };
 }
 
-let criados = 0;
-let pulados = 0;
-let erros = 0;
+let created = 0;
+let skipped = 0;
+let failures = 0;
 
-for (const item of itens) {
+for (const item of items) {
   const doc = {
     projeto: str(item.projeto),
     titulo: str(item.titulo),
@@ -125,35 +130,37 @@ for (const item of itens) {
     origem: str(item.origem),
   };
 
-  const r = await escreve(`issues/${item.id}`, doc, { criarSomente: !force });
+  const r = await write(`issues/${item.id}`, doc, { createOnly: !force });
   if (!r.ok) {
-    if (r.jaExiste) {
-      pulados++;
+    if (r.alreadyExists) {
+      skipped++;
       continue;
     }
-    erros++;
-    console.error(`erro em ${item.id}: ${r.corpo.slice(0, 200)}`);
+    failures++;
+    console.error(`failed on ${item.id}: ${r.body.slice(0, 200)}`);
     continue;
   }
-  criados++;
+  created++;
 
   if (item.contato) {
-    // Subdocumento que só o admin lê. Quem preencheu a planilha respondeu um
-    // formulário privado e nunca combinou de ter e-mail ou Discord publicados.
-    const c = await escreve(`issues/${item.id}/privado/contato`, {
+    // A subdocument only the admin reads. Whoever filled in the spreadsheet
+    // answered a private form and never agreed to have an e-mail or Discord
+    // handle published.
+    const c = await write(`issues/${item.id}/privado/contato`, {
       contato: str(item.contato),
       criadoEm: ts(item.criadoEm),
     });
-    if (!c.ok) console.error(`contato de ${item.id}: ${c.corpo.slice(0, 120)}`);
+    if (!c.ok) console.error(`contact of ${item.id}: ${c.body.slice(0, 120)}`);
   }
 
   if (item.nota) {
     const n = await fetch(`${BASE}/issues/${item.id}/comentarios`, {
       method: "POST",
-      headers: cabecalhos,
+      headers,
       body: JSON.stringify({
         fields: {
           texto: str(item.nota),
+          // Shown on the public card, so the author's name stays in Portuguese.
           autor: str("Migração"),
           autorUid: str("seed"),
           tipo: str("mudanca"),
@@ -161,9 +168,9 @@ for (const item of itens) {
         },
       }),
     });
-    if (!n.ok) console.error(`nota de ${item.id}: ${(await n.text()).slice(0, 120)}`);
+    if (!n.ok) console.error(`note of ${item.id}: ${(await n.text()).slice(0, 120)}`);
   }
 }
 
-console.log(`criados: ${criados} · pulados: ${pulados} · erros: ${erros}`);
-process.exit(erros > 0 ? 1 : 0);
+console.log(`created: ${created} · skipped: ${skipped} · failed: ${failures}`);
+process.exit(failures > 0 ? 1 : 0);

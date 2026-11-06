@@ -1,91 +1,99 @@
 #!/usr/bin/env node
-// Gera data/seed-issues.json a partir das três origens antigas de issue:
+// Builds data/seed-issues.json from the three old sources of issues:
 //
-//   simulador -> Google Sheets (respostas do Form)
-//   visuais   -> Google Sheets (respostas do Form)
-//   recap     -> coleção `suggestions` no Firestore do projeto ragreplaystats
+//   simulador -> Google Sheets (Form responses)
+//   visuais   -> Google Sheets (Form responses)
+//   recap     -> the `suggestions` collection in the ragreplaystats Firestore
 //
-// Roda uma vez só, na migração. O JSON gerado é revisado à mão (os títulos
-// saem de heurística) e vira a fonte da verdade — depois disso ninguém precisa
-// mais das planilhas, e este script fica de documentação de procedência.
+// Runs exactly once, at the migration. The generated JSON is reviewed by hand
+// (the titles come out of a heuristic) and becomes the source of truth -- after
+// that nobody needs the spreadsheets any more, and this script stands as
+// documentation of where the data came from.
 //
-//   node tools/importar-planilhas.mjs [--saida data/seed-issues.json]
+// The keys it writes are data/seed-issues.json's own and are spelled the way
+// they are stored; `--saida` still works beside `--out` because that is what
+// the README says to type.
+//
+//   node tools/importar-planilhas.mjs [--out data/seed-issues.json]
 
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
-const PLANILHAS = {
+const SHEETS = {
   simulador: "1mWGbu4CpMYPnPfipjNfmD37u7xutvurPd_CeE-O67vw",
   visuais: "1IcN9IjWbZvfSZwiI2ginxx4J5g_AxhCNkh8f7pdaXZ4",
 };
 
 const RECAP = {
-  projeto: "ragreplaystats",
-  chave: "AIzaSyBqceBTU2JscflNsx8L0pNJJpNhJMgqOSE",
+  project: "ragreplaystats",
+  key: "AIzaSyBqceBTU2JscflNsx8L0pNJJpNhJMgqOSE",
 };
 
-const saida = (() => {
-  const i = process.argv.indexOf("--saida");
-  return i > -1 ? process.argv[i + 1] : "data/seed-issues.json";
+const outputPath = (() => {
+  for (const flag of ["--out", "--saida"]) {
+    const i = process.argv.indexOf(flag);
+    if (i > -1) return process.argv[i + 1];
+  }
+  return "data/seed-issues.json";
 })();
 
 // --- CSV -------------------------------------------------------------------
 
-/** Parser de CSV com aspas e quebra de linha dentro do campo. */
-function parseCSV(texto) {
-  const linhas = [];
-  let campos = [];
-  let atual = "";
-  let aspas = false;
+/** A CSV parser that handles quotes and newlines inside a field. */
+function parseCSV(text) {
+  const rows = [];
+  let fields = [];
+  let current = "";
+  let inQuotes = false;
 
-  for (let i = 0; i < texto.length; i++) {
-    const c = texto[i];
-    if (aspas) {
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
       if (c === '"') {
-        if (texto[i + 1] === '"') {
-          atual += '"';
+        if (text[i + 1] === '"') {
+          current += '"';
           i++;
-        } else aspas = false;
-      } else atual += c;
-    } else if (c === '"') aspas = true;
+        } else inQuotes = false;
+      } else current += c;
+    } else if (c === '"') inQuotes = true;
     else if (c === ",") {
-      campos.push(atual);
-      atual = "";
+      fields.push(current);
+      current = "";
     } else if (c === "\n") {
-      campos.push(atual);
-      linhas.push(campos);
-      campos = [];
-      atual = "";
-    } else if (c !== "\r") atual += c;
+      fields.push(current);
+      rows.push(fields);
+      fields = [];
+      current = "";
+    } else if (c !== "\r") current += c;
   }
-  if (atual || campos.length) {
-    campos.push(atual);
-    linhas.push(campos);
+  if (current || fields.length) {
+    fields.push(current);
+    rows.push(fields);
   }
-  return linhas;
+  return rows;
 }
 
-async function baixarPlanilha(id) {
+async function downloadSheet(id) {
   const url = `https://docs.google.com/spreadsheets/d/${id}/export?format=csv`;
   const r = await fetch(url);
-  if (!r.ok) throw new Error(`planilha ${id}: HTTP ${r.status}`);
+  if (!r.ok) throw new Error(`sheet ${id}: HTTP ${r.status}`);
   return parseCSV(await r.text());
 }
 
-// --- Utilidades ------------------------------------------------------------
+// --- Helpers ---------------------------------------------------------------
 
-/** "16/06/2026 08:31:10" no fuso de São Paulo -> ISO em UTC. */
-function dataPlanilha(bruto) {
-  const m = String(bruto).match(
+/** "16/06/2026 08:31:10" in São Paulo time -> ISO in UTC. */
+function sheetDate(value) {
+  const m = String(value).match(
     /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/,
   );
   if (!m) return new Date("2026-06-01T12:00:00Z").toISOString();
-  const [, dia, mes, ano, h, min, s] = m;
-  return new Date(`${ano}-${mes}-${dia}T${h}:${min}:${s}-03:00`).toISOString();
+  const [, day, month, year, h, min, s] = m;
+  return new Date(`${year}-${month}-${day}T${h}:${min}:${s}-03:00`).toISOString();
 }
 
-function slug(texto) {
-  return texto
+function slug(text) {
+  return text
     .toLowerCase()
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
@@ -94,8 +102,8 @@ function slug(texto) {
     .slice(0, 60);
 }
 
-/** Títulos genéricos que a planilha aceitou e que não dizem nada sozinhos. */
-const TITULOS_INUTEIS = new Set([
+/** Generic titles the spreadsheet accepted that say nothing on their own. */
+const USELESS_TITLES = new Set([
   "n/a",
   "na",
   "sugestao",
@@ -108,21 +116,21 @@ const TITULOS_INUTEIS = new Set([
   "a calculadora em si",
 ]);
 
-function primeiraFrase(texto, max = 90) {
-  const limpo = texto.replace(/\s+/g, " ").trim();
-  const corte = limpo.slice(0, max);
-  return corte.length < limpo.length ? `${corte.replace(/[\s,;.]+\S*$/, "")}…` : corte;
+function firstSentence(text, max = 90) {
+  const tidy = text.replace(/\s+/g, " ").trim();
+  const cut = tidy.slice(0, max);
+  return cut.length < tidy.length ? `${cut.replace(/[\s,;.]+\S*$/, "")}…` : cut;
 }
 
-function derivaTitulo(assunto, descricao) {
-  const a = assunto.replace(/\s+/g, " ").trim();
-  if (a && a.length > 3 && !TITULOS_INUTEIS.has(a.toLowerCase())) {
+function deriveTitle(subject, description) {
+  const a = subject.replace(/\s+/g, " ").trim();
+  if (a && a.length > 3 && !USELESS_TITLES.has(a.toLowerCase())) {
     return a.slice(0, 120);
   }
-  return primeiraFrase(descricao || a || "Sem descrição", 110) || "Sem título";
+  return firstSentence(description || a || "Sem descrição", 110) || "Sem título";
 }
 
-const PISTAS_SUGESTAO = [
+const SUGGESTION_HINTS = [
   "sugest",
   "seria legal",
   "seria interessante",
@@ -136,95 +144,96 @@ const PISTAS_SUGESTAO = [
   "exibir o tempo",
 ];
 
-function derivaTipo(texto) {
-  const t = texto.toLowerCase();
-  return PISTAS_SUGESTAO.some((p) => t.includes(p)) ? "feature" : "bug";
+function deriveType(text) {
+  const t = text.toLowerCase();
+  return SUGGESTION_HINTS.some((p) => t.includes(p)) ? "feature" : "bug";
 }
 
-function limpo(v) {
+function clean(v) {
   return String(v ?? "").trim();
 }
 
-// --- Origens ---------------------------------------------------------------
+// --- The sources -----------------------------------------------------------
 
-async function doSimulador() {
-  const linhas = (await baixarPlanilha(PLANILHAS.simulador)).slice(1);
-  const itens = [];
+async function fromSimuladorSheet() {
+  const rows = (await downloadSheet(SHEETS.simulador)).slice(1);
+  const items = [];
 
-  linhas.forEach((linha, i) => {
-    if (!linha.some((c) => limpo(c))) return;
-    const [carimbo, assunto, descricao, contato, status] = linha.map(limpo);
+  rows.forEach((row, i) => {
+    if (!row.some((c) => clean(c))) return;
+    const [stamp, subject, description, contact, rawStatus] = row.map(clean);
 
-    const situacao = status.toLowerCase();
-    let novoStatus = "reportado";
-    let nota = null;
-    if (situacao.startsWith("resolvido parcialmente")) {
-      // A única linha meio-resolvida da planilha. Vira backlog e a observação
-      // original entra como comentário, senão a informação se perde.
-      novoStatus = "backlog";
-      nota = status;
-    } else if (situacao === "resolvido") {
-      novoStatus = "resolvido";
+    const state = rawStatus.toLowerCase();
+    let column = "reportado";
+    let note = null;
+    if (state.startsWith("resolvido parcialmente")) {
+      // The spreadsheet's one half-resolved row. It becomes backlog and the
+      // original remark goes in as a comment, or the information is lost.
+      // `note` keeps the spreadsheet's own wording, not the column we derived.
+      column = "backlog";
+      note = rawStatus;
+    } else if (state === "resolvido") {
+      column = "resolvido";
     }
 
-    itens.push({
+    items.push({
       projeto: "simulador",
-      tipo: derivaTipo(`${assunto} ${descricao}`),
-      titulo: derivaTitulo(assunto, descricao),
-      descricao,
-      status: novoStatus,
-      criadoEm: dataPlanilha(carimbo),
-      contato: contato || null,
-      nota,
-      origem: `sheet:${PLANILHAS.simulador}#linha${i + 2}`,
+      tipo: deriveType(`${subject} ${description}`),
+      titulo: deriveTitle(subject, description),
+      description,
+      status: column,
+      criadoEm: sheetDate(stamp),
+      contact: contact || null,
+      note,
+      origem: `sheet:${SHEETS.simulador}#linha${i + 2}`,
     });
   });
 
-  return itens;
+  return items;
 }
 
-async function doVisuais() {
-  const linhas = (await baixarPlanilha(PLANILHAS.visuais)).slice(1);
-  const itens = [];
+async function fromVisuaisSheet() {
+  const rows = (await downloadSheet(SHEETS.visuais)).slice(1);
+  const items = [];
 
-  linhas.forEach((linha, i) => {
-    if (!linha.some((c) => limpo(c))) return;
-    const carimbo = limpo(linha[0]);
-    const oQue = limpo(linha[1]);
-    const bug = limpo(linha[2]);
-    const esperado = limpo(linha[3]);
-    const build = limpo(linha[4]);
-    const sugestao = limpo(linha[8]);
-    const nick = limpo(linha[9]);
-    const progresso = limpo(linha[10]);
+  rows.forEach((row, i) => {
+    if (!row.some((c) => clean(c))) return;
+    const stamp = clean(row[0]);
+    const what = clean(row[1]);
+    const bug = clean(row[2]);
+    const expected = clean(row[3]);
+    const build = clean(row[4]);
+    const suggestion = clean(row[8]);
+    const nick = clean(row[9]);
+    const progress = clean(row[10]);
 
-    const corpo = bug || sugestao;
-    // A planilha espalha o relato por quatro colunas; o card junta tudo num
-    // texto só, na ordem em que a pessoa preencheu.
-    const partes = [corpo];
-    if (esperado) partes.push(`Esperado: ${esperado}`);
-    if (build) partes.push(`Build: ${build}`);
+    const body = bug || suggestion;
+    // The spreadsheet spreads the report across four columns; the card joins
+    // it into one text, in the order the person filled it in.
+    const parts = [body];
+    if (expected) parts.push(`Esperado: ${expected}`);
+    if (build) parts.push(`Build: ${build}`);
 
-    itens.push({
+    items.push({
       projeto: "visuais",
-      tipo: oQue.toLowerCase().includes("sugest") || sugestao ? "feature" : "bug",
-      titulo: derivaTitulo("", corpo),
-      descricao: partes.filter(Boolean).join("\n\n"),
-      status: progresso.toLowerCase().startsWith("conclu") ? "resolvido" : "reportado",
-      criadoEm: dataPlanilha(carimbo),
-      contato: nick || null,
-      nota: null,
-      origem: `sheet:${PLANILHAS.visuais}#linha${i + 2}`,
+      tipo: what.toLowerCase().includes("sugest") || suggestion ? "feature" : "bug",
+      titulo: deriveTitle("", body),
+      description: parts.filter(Boolean).join("\n\n"),
+      status: progress.toLowerCase().startsWith("conclu") ? "resolvido" : "reportado",
+      criadoEm: sheetDate(stamp),
+      contact: nick || null,
+      note: null,
+      origem: `sheet:${SHEETS.visuais}#linha${i + 2}`,
     });
   });
 
-  return itens;
+  return items;
 }
 
-async function doRecap() {
+async function fromRecapFirestore() {
   const url =
-    `https://firestore.googleapis.com/v1/projects/${RECAP.projeto}` +
-    `/databases/(default)/documents:runQuery?key=${RECAP.chave}`;
+    `https://firestore.googleapis.com/v1/projects/${RECAP.project}` +
+    `/databases/(default)/documents:runQuery?key=${RECAP.key}`;
   const r = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -238,47 +247,50 @@ async function doRecap() {
   });
   if (!r.ok) throw new Error(`recap: HTTP ${r.status}`);
 
-  const linhas = (await r.json()).filter((x) => x.document);
-  return linhas
+  const rows = (await r.json()).filter((x) => x.document);
+  return rows
     .map((x) => {
-      const campos = x.document.fields ?? {};
-      const texto = campos.text?.stringValue ?? "";
+      const fields = x.document.fields ?? {};
+      const text = fields.text?.stringValue ?? "";
       const docId = x.document.name.split("/").pop();
       return {
         projeto: "recap",
-        tipo: derivaTipo(texto),
-        titulo: derivaTitulo("", texto),
-        descricao: texto,
+        tipo: deriveType(text),
+        titulo: deriveTitle("", text),
+        description: text,
         status: "reportado",
-        criadoEm: campos.createdAt?.timestampValue ?? new Date().toISOString(),
-        contato: null,
-        nota: null,
+        criadoEm: fields.createdAt?.timestampValue ?? new Date().toISOString(),
+        contact: null,
+        note: null,
         origem: `recap:suggestions/${docId}`,
-        _votos: Number(campos.upvotes?.integerValue ?? 0),
+        _upvotes: Number(fields.upvotes?.integerValue ?? 0),
       };
     })
-    // "Testando" é linha de teste do próprio dono. Não entra.
-    .filter((i) => i.descricao.trim().toLowerCase() !== "testando");
+    // "Testando" is the owner's own test row. It does not go in.
+    .filter((i) => i.description.trim().toLowerCase() !== "testando");
 }
 
-// --- Revisão à mão ---------------------------------------------------------
+// --- The hand review -------------------------------------------------------
 
-// As planilhas não tinham campo de título: o formulário perguntava "qual item
-// tem o problema?" e algumas pessoas respondiam "n/A" ou colavam o relato
-// inteiro. A heurística acima chuta um título; esta tabela é a leitura humana
-// de cada linha, feita uma vez na migração.
+// The spreadsheets had no title field: the form asked "qual item tem o
+// problema?" and some people answered "n/A" or pasted the whole report. The
+// heuristic above guesses a title; this table is the human reading of each row,
+// done once at the migration.
 //
-// Chaveada pela ORIGEM, não pelo título — assim reescrever o título aqui não
-// muda o id do card (o id sai do título já revisado, e linhas novas entram
-// sempre no fim da planilha, então a numeração das antigas não anda).
+// Keyed by ORIGIN, not by title -- so rewriting a title here does not change
+// the card's id (the id comes from the reviewed title, and new rows always
+// arrive at the end of the spreadsheet, so the old numbering does not move).
 //
-//   titulo    — o que aparece no quadro
-//   tipo      — corrige o chute de bug/sugestão
-//   arquivado — duplicata ou ruído: some do quadro público, mas não se perde
+// The three keys are the ones the assembly below copies onto an item, so they
+// are the stored spellings:
+//
+//   titulo    — what shows on the board
+//   tipo      — corrects the bug/suggestion guess
+//   arquivado — a duplicate or noise: gone from the public board, but not lost
 const SIM = "sheet:1mWGbu4CpMYPnPfipjNfmD37u7xutvurPd_CeE-O67vw";
 const VIS = "sheet:1IcN9IjWbZvfSZwiI2ginxx4J5g_AxhCNkh8f7pdaXZ4";
 
-const REVISAO = {
+const REVIEW = {
   [`${SIM}#linha2`]: { titulo: "Nome da skill não indica a variação (Adoramus sagrado/neutro)" },
   [`${SIM}#linha3`]: { titulo: "Seção com o gap de pós-conjuração e ASPD" },
   [`${SIM}#linha4`]: {
@@ -381,60 +393,64 @@ const REVISAO = {
   },
 };
 
-// --- Montagem --------------------------------------------------------------
+// --- Assembly --------------------------------------------------------------
 
-const brutos = [...(await doSimulador()), ...(await doVisuais()), ...(await doRecap())];
+const raw = [...(await fromSimuladorSheet()), ...(await fromVisuaisSheet()), ...(await fromRecapFirestore())];
 
-let semRevisao = 0;
-for (const item of brutos) {
-  const r = REVISAO[item.origem];
+let unreviewed = 0;
+for (const item of raw) {
+  const r = REVIEW[item.origem];
   if (!r) {
-    // Linha nova, chegada depois da migração: entra com o título da heurística.
-    semRevisao++;
+    // A new row, arrived after the migration: it goes in with the
+    // heuristic's title.
+    unreviewed++;
     continue;
   }
   if (r.titulo) item.titulo = r.titulo;
   if (r.tipo) item.tipo = r.tipo;
   if (r.arquivado) item.arquivado = true;
 }
-if (semRevisao) console.warn(`aviso: ${semRevisao} linha(s) sem revisão manual`);
+if (unreviewed) console.warn(`warning: ${unreviewed} row(s) with no hand review`);
 
-const usados = new Map();
-const itens = brutos.map((i) => {
+const used = new Map();
+const items = raw.map((i) => {
   const base = `${i.projeto}-${slug(i.titulo)}`;
-  const n = (usados.get(base) ?? 0) + 1;
-  usados.set(base, n);
+  const n = (used.get(base) ?? 0) + 1;
+  used.set(base, n);
 
   return {
-    // Id determinístico e legível: reimportar não duplica, e editar o título
-    // depois (na revisão à mão) não muda o id.
+    // A deterministic, readable id: re-importing does not duplicate, and
+    // editing the title later (in the hand review) does not change the id.
     id: n === 1 ? base : `${base}-${n}`,
+    // Every key below is data/seed-issues.json's own, which tools/seed.mjs
+    // reads and writes straight into Firestore -- so they are spelled the way
+    // they are stored, and written out in full rather than by shorthand.
     projeto: i.projeto,
     tipo: i.tipo,
     titulo: i.titulo,
-    descricao: i.descricao,
+    descricao: i.description,
     status: i.status,
     arquivado: i.arquivado === true,
-    upvotes: i._votos ?? 0,
+    upvotes: i._upvotes ?? 0,
     criadoEm: i.criadoEm,
-    // Quem foi resolvido não tem data de resolução em lugar nenhum; usar a de
-    // criação mantém a ordem relativa, que é o que a coluna precisa.
+    // Nothing anywhere records when a resolved item was resolved; using the
+    // creation date keeps the relative order, which is what the column needs.
     atualizadoEm: i.criadoEm,
     origem: i.origem,
-    ...(i.contato ? { contato: i.contato } : {}),
-    ...(i.nota ? { nota: i.nota } : {}),
+    ...(i.contact ? { contato: i.contact } : {}),
+    ...(i.note ? { nota: i.note } : {}),
   };
 });
 
-mkdirSync(dirname(saida), { recursive: true });
-writeFileSync(saida, `${JSON.stringify(itens, null, 2)}\n`, "utf8");
+mkdirSync(dirname(outputPath), { recursive: true });
+writeFileSync(outputPath, `${JSON.stringify(items, null, 2)}\n`, "utf8");
 
-const porProjeto = {};
-const porStatus = {};
-for (const i of itens) {
-  porProjeto[i.projeto] = (porProjeto[i.projeto] ?? 0) + 1;
-  porStatus[i.status] = (porStatus[i.status] ?? 0) + 1;
+const byProject = {};
+const byStatus = {};
+for (const i of items) {
+  byProject[i.projeto] = (byProject[i.projeto] ?? 0) + 1;
+  byStatus[i.status] = (byStatus[i.status] ?? 0) + 1;
 }
-console.log(`${itens.length} itens -> ${saida}`);
-console.log("por projeto:", porProjeto);
-console.log("por status: ", porStatus);
+console.log(`${items.length} items -> ${outputPath}`);
+console.log("by project:", byProject);
+console.log("by status: ", byStatus);

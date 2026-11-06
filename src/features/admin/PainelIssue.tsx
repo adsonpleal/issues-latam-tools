@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { LABEL_TIPO, t } from "../../i18n";
+import { TYPE_LABEL, t } from "../../i18n";
 import { apagarAnexo, subscribeAnexos, type Anexo, type AnexoPronto } from "../../lib/anexos";
 import { subscribeComentarios, type Comentario } from "../../lib/comentarios";
 import type { Issue } from "../../lib/issues";
-import { PROJETOS } from "../../lib/projetos";
+import { PROJECTS } from "../../lib/projetos";
 import { ListaAnexos } from "../ticket/ListaAnexos";
 import { ListaComentarios } from "../ticket/ListaComentarios";
 import {
@@ -70,7 +70,7 @@ export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
       ) : (
         <>
           <p className="painel-meta">
-            {PROJETOS[issue.projeto].nome} · {LABEL_TIPO[issue.tipo]} · ▲ {issue.upvotes}
+            {PROJECTS[issue.projeto].name} · {TYPE_LABEL[issue.tipo]} · ▲ {issue.upvotes}
             {issue.autor && <> · {t.reportadoPor(issue.autor)}</>}
           </p>
           {issue.descricao && <p className="painel-descricao">{issue.descricao}</p>}

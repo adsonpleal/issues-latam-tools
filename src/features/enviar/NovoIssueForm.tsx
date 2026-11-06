@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-import { LABEL_TIPO, t } from "../../i18n";
+import { TYPE_LABEL, t } from "../../i18n";
 import {
   AUTOR_MAX,
   CONTATO_MAX,
@@ -9,8 +9,8 @@ import {
   TITULO_MAX,
   type AnexoPronto,
 } from "../../lib/issues";
-import { PROJETOS, SLUGS_PROJETO, parseProjeto, type Projeto } from "../../lib/projetos";
-import { TIPOS_FORM, type Tipo } from "../../lib/status";
+import { PROJECTS, PROJECT_SLUGS, parseProject, type Project } from "../../lib/projetos";
+import { FORM_ISSUE_TYPES, type IssueType } from "../../lib/status";
 import { CampoAnexos } from "./CampoAnexos";
 import { useEnviarIssue } from "./useEnviarIssue";
 
@@ -20,8 +20,8 @@ export function NovoIssueForm() {
   const { estado, mensagemErro, enviar } = useEnviarIssue();
 
   // O projeto vem pré-selecionado do link "Reportar" do site de origem.
-  const [projeto, setProjeto] = useState<Projeto>(parseProjeto(params.get("projeto")) ?? "simulador");
-  const [tipo, setTipo] = useState<Tipo>("bug");
+  const [projeto, setProjeto] = useState<Project>(parseProject(params.get("projeto")) ?? "simulador");
+  const [tipo, setTipo] = useState<IssueType>("bug");
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [autor, setAutor] = useState("");
@@ -42,12 +42,12 @@ export function NovoIssueForm() {
         <select
           id="projeto"
           value={projeto}
-          onChange={(e) => setProjeto(e.target.value as Projeto)}
+          onChange={(e) => setProjeto(e.target.value as Project)}
           required
         >
-          {SLUGS_PROJETO.map((slug) => (
+          {PROJECT_SLUGS.map((slug) => (
             <option key={slug} value={slug}>
-              {PROJETOS[slug].nome} — {PROJETOS[slug].descricao}
+              {PROJECTS[slug].name} — {PROJECTS[slug].description}
             </option>
           ))}
         </select>
@@ -59,7 +59,7 @@ export function NovoIssueForm() {
             `flex-direction: column` de `.campo`, e é a linha que precisa ser
             horizontal, não a legenda junto com eles. */}
         <div className="radio-linha">
-          {TIPOS_FORM.map((tp) => (
+          {FORM_ISSUE_TYPES.map((tp) => (
             <label key={tp} className="radio">
               <input
                 type="radio"
@@ -68,7 +68,7 @@ export function NovoIssueForm() {
                 checked={tipo === tp}
                 onChange={() => setTipo(tp)}
               />
-              {LABEL_TIPO[tp]}
+              {TYPE_LABEL[tp]}
             </label>
           ))}
         </div>

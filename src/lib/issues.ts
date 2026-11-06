@@ -19,10 +19,10 @@ import {
 
 import { ANEXOS_MAX, enviarAnexo, type AnexoPronto } from "./anexos";
 import { getDb } from "./firebase";
-import type { Projeto } from "./projetos";
-import { isProjeto } from "./projetos";
-import type { Coluna, Status, Tipo } from "./status";
-import { isStatus, isTipo } from "./status";
+import type { Project } from "./projetos";
+import { isProject } from "./projetos";
+import type { Column, Status, IssueType } from "./status";
+import { isStatus, isIssueType } from "./status";
 
 export const LIMITE_QUADRO = 500;
 export const TITULO_MAX = 120;
@@ -32,10 +32,10 @@ export const CONTATO_MAX = 120;
 
 export type Issue = {
   id: string;
-  projeto: Projeto;
+  projeto: Project;
   titulo: string;
   descricao: string;
-  tipo: Tipo;
+  tipo: IssueType;
   status: Status;
   arquivado: boolean;
   upvotes: number;
@@ -83,7 +83,7 @@ function toIssue(snap: QueryDocumentSnapshot<DocumentData>): Issue | null {
   // Documento fora do formato é descartado em vez de derrubar o quadro. Só pode
   // acontecer por edição manual no console, mas aí é um card que some, não uma
   // tela em branco.
-  if (!isProjeto(d["projeto"]) || !isStatus(d["status"]) || !isTipo(d["tipo"])) return null;
+  if (!isProject(d["projeto"]) || !isStatus(d["status"]) || !isIssueType(d["tipo"])) return null;
 
   return {
     id: snap.id,
@@ -159,8 +159,8 @@ export async function getIssue(id: string): Promise<Issue | null> {
 export type { AnexoPronto } from "./anexos";
 
 export type NovoIssue = {
-  projeto: Projeto;
-  tipo: Tipo;
+  projeto: Project;
+  tipo: IssueType;
   titulo: string;
   descricao: string;
   /** Nick público, opcional. */
@@ -228,7 +228,7 @@ export async function upvoteIssue(id: string): Promise<void> {
 }
 
 /** Arquivar preserva o status real, para desarquivar devolver certo. */
-function patchColuna(coluna: Coluna): Record<string, unknown> {
+function patchColuna(coluna: Column): Record<string, unknown> {
   return coluna === "arquivado"
     ? { arquivado: true, atualizadoEm: serverTimestamp() }
     : { arquivado: false, status: coluna, atualizadoEm: serverTimestamp() };
@@ -239,7 +239,7 @@ function patchColuna(coluna: Coluna): Record<string, unknown> {
  * alguma coisa dentro da pilha onde foi arrumada. Quem quiser mover E escolher
  * a posição solta o card em cima de outro, o que cai em `ordenarIssues`.
  */
-export async function moverIssue(id: string, coluna: Coluna): Promise<void> {
+export async function moverIssue(id: string, coluna: Column): Promise<void> {
   await updateDoc(doc(getDb(), "issues", id), {
     ...patchColuna(coluna),
     ordem: deleteField(),
@@ -258,7 +258,7 @@ export type Posicao = { id: string; ordem: number | null };
  */
 export async function ordenarIssues(
   posicoes: Posicao[],
-  movido?: { id: string; coluna: Coluna },
+  movido?: { id: string; coluna: Column },
 ): Promise<void> {
   if (posicoes.length === 0 && !movido) return;
   const db = getDb();

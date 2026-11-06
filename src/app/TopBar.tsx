@@ -1,9 +1,9 @@
 import { Link, useSearchParams } from "react-router-dom";
 
 import { useSessao } from "../features/admin/SessaoContext";
-import { LABEL_TIPO, t } from "../i18n";
-import { PROJETOS, SLUGS_PROJETO, parseProjeto } from "../lib/projetos";
-import { TIPOS, isTipo } from "../lib/status";
+import { TYPE_LABEL, t } from "../i18n";
+import { PROJECTS, PROJECT_SLUGS, parseProject } from "../lib/projetos";
+import { ISSUE_TYPES, isIssueType } from "../lib/status";
 
 /**
  * Os filtros moram na querystring, não em estado local: mudar o filtro já deixa
@@ -17,9 +17,9 @@ import { TIPOS, isTipo } from "../lib/status";
 export function TopBar() {
   const { sessao, admin, sair } = useSessao();
   const [params, setParams] = useSearchParams();
-  const projeto = parseProjeto(params.get("projeto"));
+  const projeto = parseProject(params.get("projeto"));
   const tipoBruto = params.get("tipo");
-  const tipo = isTipo(tipoBruto) ? tipoBruto : null;
+  const tipo = isIssueType(tipoBruto) ? tipoBruto : null;
   const busca = params.get("busca") ?? "";
 
   function atualiza(chave: string, valor: string) {
@@ -46,9 +46,9 @@ export function TopBar() {
             title={t.filtrarProjeto}
           >
             <option value="">{t.todosProjetos}</option>
-            {SLUGS_PROJETO.map((slug) => (
+            {PROJECT_SLUGS.map((slug) => (
               <option key={slug} value={slug}>
-                {PROJETOS[slug].nome}
+                {PROJECTS[slug].name}
               </option>
             ))}
           </select>
@@ -62,9 +62,9 @@ export function TopBar() {
             title={t.filtrarTipo}
           >
             <option value="">{t.todosTipos}</option>
-            {TIPOS.map((tp) => (
+            {ISSUE_TYPES.map((tp) => (
               <option key={tp} value={tp}>
-                {LABEL_TIPO[tp]}
+                {TYPE_LABEL[tp]}
               </option>
             ))}
           </select>

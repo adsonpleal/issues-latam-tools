@@ -1,6 +1,6 @@
 // Strings de UI — só pt-BR (a língua do servidor LATAM).
 import type { EstadoGravacao } from "./lib/gravacoes";
-import type { Coluna, Status, Tipo } from "./lib/status";
+import type { Column, Status, IssueType } from "./lib/status";
 
 export const t = {
   siteNome: "Issues",
@@ -152,7 +152,7 @@ export const t = {
   codigoAberto: "Projeto open source no",
 } as const;
 
-export const LABEL_STATUS: Record<Coluna, string> = {
+export const STATUS_LABEL: Record<Column, string> = {
   reportado: "Reportado",
   backlog: "Backlog",
   em_progresso: "Em progresso",
@@ -161,7 +161,7 @@ export const LABEL_STATUS: Record<Coluna, string> = {
   arquivado: "Arquivado",
 };
 
-export const AJUDA_STATUS: Record<Status, string> = {
+export const STATUS_HELP: Record<Status, string> = {
   reportado: "Chegou agora, ainda não foi analisado.",
   backlog: "Aceito, vai ser feito quando der.",
   em_progresso: "Estou mexendo nisso agora.",
@@ -169,14 +169,14 @@ export const AJUDA_STATUS: Record<Status, string> = {
   nao_sera_feito: "Analisado e descartado.",
 };
 
-export const LABEL_ESTADO: Record<EstadoGravacao, string> = {
+export const RECORDING_STATE_LABEL: Record<EstadoGravacao, string> = {
   fila: "Na fila",
   promovida: "No quadro",
   conferida: "Conferida",
   descartada: "Descartada",
 };
 
-export const LABEL_TIPO: Record<Tipo, string> = {
+export const TYPE_LABEL: Record<IssueType, string> = {
   bug: "Bug",
   feature: "Sugestão",
   replay: "Gravação",

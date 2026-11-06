@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { PROJETOS as PROJETOS_APP } from "../src/lib/projetos";
-import { COLUNAS } from "../src/lib/status";
+import { PROJECTS as PROJECTS_APP } from "../src/lib/projetos";
+import { COLUMNS } from "../src/lib/status";
 import {
   FOLDERS,
   REPOS,
@@ -55,8 +55,8 @@ const card = (id, extra = {}) =>
  */
 describe("derived from the app's constants", () => {
   it("every project on the board has a repository and a folder", () => {
-    expect(Object.keys(REPOS).sort()).toEqual(Object.keys(PROJETOS_APP).sort());
-    expect(Object.keys(FOLDERS).sort()).toEqual(Object.keys(PROJETOS_APP).sort());
+    expect(Object.keys(REPOS).sort()).toEqual(Object.keys(PROJECTS_APP).sort());
+    expect(Object.keys(FOLDERS).sort()).toEqual(Object.keys(PROJECTS_APP).sort());
   });
 
   it("the repositories are owner/name", () => {
@@ -175,7 +175,7 @@ describe("triageQueue", () => {
   const since = "2026-10-30T09:00:00Z";
 
   it("takes only what is in backlog", () => {
-    const cards = COLUNAS.map((status) => card(status, { status }));
+    const cards = COLUMNS.map((status) => card(status, { status }));
     const { ready } = triageQueue(cards, { since });
     expect(ready.map((c) => c.id)).toEqual(["backlog"]);
   });

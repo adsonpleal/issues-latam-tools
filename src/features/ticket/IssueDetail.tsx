@@ -1,15 +1,15 @@
 import { Link } from "react-router-dom";
 
-import { LABEL_STATUS, LABEL_TIPO, t } from "../../i18n";
+import { STATUS_LABEL, TYPE_LABEL, t } from "../../i18n";
 import { formatData } from "../../lib/datas";
 import type { Issue } from "../../lib/issues";
-import { PROJETOS } from "../../lib/projetos";
+import { PROJECTS } from "../../lib/projetos";
 import { useVotos } from "../votos/useVotos";
 import { TextoComLinks } from "./TextoComLinks";
 
 export function IssueDetail({ issue }: { issue: Issue }) {
   const { jaVotou, votar } = useVotos();
-  const projeto = PROJETOS[issue.projeto];
+  const project = PROJECTS[issue.projeto];
   const votou = jaVotou(issue.id);
 
   return (
@@ -17,14 +17,14 @@ export function IssueDetail({ issue }: { issue: Issue }) {
       <div className="issue-detalhe-selos">
         <Link
           className="selo selo-projeto"
-          style={{ borderColor: projeto.cor, color: projeto.cor }}
+          style={{ borderColor: project.color, color: project.color }}
           to={`/?projeto=${issue.projeto}`}
         >
-          {projeto.nome}
+          {project.name}
         </Link>
-        <span className={`selo selo-tipo selo-${issue.tipo}`}>{LABEL_TIPO[issue.tipo]}</span>
+        <span className={`selo selo-tipo selo-${issue.tipo}`}>{TYPE_LABEL[issue.tipo]}</span>
         <span className={`selo selo-status selo-${issue.status}`}>
-          {LABEL_STATUS[issue.status]}
+          {STATUS_LABEL[issue.status]}
         </span>
       </div>
 

@@ -10,13 +10,13 @@ import {
   type Posicao,
 } from "../../lib/issues";
 import type { Sessao } from "../../lib/auth";
-import type { Coluna } from "../../lib/status";
+import type { Column } from "../../lib/status";
 
 export function useAcoesAdmin(sessao: Sessao | null) {
   const [erro, setErro] = useState<string | null>(null);
 
   const mover = useCallback(
-    async (id: string, coluna: Coluna) => {
+    async (id: string, coluna: Column) => {
       setErro(null);
       // Sem estado local: o onSnapshot do quadro já compensa a latência e pinta
       // o card na coluna nova antes da escrita chegar em São Paulo.
@@ -26,7 +26,7 @@ export function useAcoesAdmin(sessao: Sessao | null) {
   );
 
   const ordenar = useCallback(
-    async (posicoes: Posicao[], movido?: { id: string; coluna: Coluna }) => {
+    async (posicoes: Posicao[], movido?: { id: string; coluna: Column }) => {
       if (posicoes.length === 0 && !movido) return;
       setErro(null);
       await ordenarIssues(posicoes, movido).catch((e: Error) => setErro(e.message));

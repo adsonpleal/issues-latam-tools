@@ -1,83 +1,87 @@
 import { describe, expect, it } from "vitest";
 
-import { LABEL_STATUS as LABEL_STATUS_APP, LABEL_TIPO as LABEL_TIPO_APP } from "../src/i18n";
-import { PROJETOS as PROJETOS_APP } from "../src/lib/projetos";
+import { STATUS_LABEL as STATUS_LABEL_APP, TYPE_LABEL as TYPE_LABEL_APP } from "../src/i18n";
+import { PROJECTS as PROJECTS_APP } from "../src/lib/projetos";
 import {
-  LABEL_STATUS,
-  LABEL_TIPO,
-  PROJETOS,
-  chaveOrdem,
-  documentoParaCard,
-  mensagemDeMudanca,
-  montarMensagem,
-  nomeDoTopico,
-  podar,
-  sanitizarDescricao,
-  sanitizarTitulo,
-  saturado,
-  statusFinal,
-  truncar,
-  urlDoPr,
-  valor,
+  PROJECTS,
+  STATUS_LABEL,
+  TYPE_LABEL,
+  buildMessage,
+  changeMessage,
+  fieldValue,
+  freshState,
+  isFinalStatus,
+  isSaturated,
+  orderKey,
+  prune,
+  pullRequestUrl,
+  sanitizeDescription,
+  sanitizeTitle,
+  stateFromDisk,
+  stateToDisk,
+  threadName,
+  toCard,
+  truncate,
 } from "./anunciar-discord.mjs";
 
 /**
- * A ferramenta é .mjs sem build, então não consegue importar o .ts do app e
- * duplica as duas tabelas. Isto é o que transforma uma cor errada no embed em
- * `npm test` vermelho, em vez de alguém reparar meses depois no Discord.
+ * The tool is .mjs with no build step, so it cannot import the app's .ts and
+ * duplicates the two tables instead. This is what turns a wrong colour in the
+ * embed into a red `npm test`, rather than somebody noticing months later in
+ * Discord.
  */
-describe("deriva das constantes", () => {
-  it("as cores e nomes batem com src/lib/projetos.ts", () => {
-    expect(Object.keys(PROJETOS).sort()).toEqual(Object.keys(PROJETOS_APP).sort());
-    for (const [slug, p] of Object.entries(PROJETOS_APP)) {
-      expect(PROJETOS[slug].nome).toBe(p.nome);
-      expect(PROJETOS[slug].cor).toBe(p.cor);
+describe("derived from the app's constants", () => {
+  it("matches the colours and names in src/lib/projetos.ts", () => {
+    expect(Object.keys(PROJECTS).sort()).toEqual(Object.keys(PROJECTS_APP).sort());
+    for (const [slug, p] of Object.entries(PROJECTS_APP)) {
+      expect(PROJECTS[slug].name).toBe(p.name);
+      expect(PROJECTS[slug].color).toBe(p.color);
     }
   });
 
-  it("os rótulos de tipo batem com src/i18n.ts", () => {
-    expect(LABEL_TIPO).toEqual(LABEL_TIPO_APP);
+  it("matches the type labels in src/i18n.ts", () => {
+    expect(TYPE_LABEL).toEqual(TYPE_LABEL_APP);
   });
 
-  it("os rótulos de status batem com src/i18n.ts", () => {
-    expect(LABEL_STATUS).toEqual(LABEL_STATUS_APP);
+  it("matches the status labels in src/i18n.ts", () => {
+    expect(STATUS_LABEL).toEqual(STATUS_LABEL_APP);
   });
 });
 
-describe("valor", () => {
-  it("desembrulha cada tipo da REST", () => {
-    expect(valor({ stringValue: "oi" })).toBe("oi");
-    expect(valor({ booleanValue: false })).toBe(false);
-    expect(valor({ nullValue: null })).toBe(null);
-    expect(valor({ doubleValue: 1.5 })).toBe(1.5);
+describe("fieldValue", () => {
+  it("unwraps each of REST's types", () => {
+    expect(fieldValue({ stringValue: "oi" })).toBe("oi");
+    expect(fieldValue({ booleanValue: false })).toBe(false);
+    expect(fieldValue({ nullValue: null })).toBe(null);
+    expect(fieldValue({ doubleValue: 1.5 })).toBe(1.5);
   });
 
-  it("integerValue chega como string e vira número", () => {
-    expect(valor({ integerValue: "42" })).toBe(42);
+  it("turns integerValue, which arrives as a string, into a number", () => {
+    expect(fieldValue({ integerValue: "42" })).toBe(42);
   });
 
-  it("timestampValue fica string crua, nunca Date", () => {
-    // Passar por Date truncaria os microssegundos e o marco d'água ficaria
-    // ANTES do card de onde veio, reanunciando-o para sempre.
+  it("keeps timestampValue a raw string, never a Date", () => {
+    // Going through Date would truncate the microseconds and leave the
+    // watermark BEFORE the card it came from, re-announcing it forever.
     const ts = "2026-08-16T18:22:31.412345Z";
-    expect(valor({ timestampValue: ts })).toBe(ts);
+    expect(fieldValue({ timestampValue: ts })).toBe(ts);
   });
 
-  it("desce em array e map", () => {
-    expect(valor({ arrayValue: { values: [{ stringValue: "a" }] } })).toEqual(["a"]);
-    expect(valor({ mapValue: { fields: { n: { integerValue: "7" } } } })).toEqual({ n: 7 });
-    expect(valor({ arrayValue: {} })).toEqual([]);
+  it("descends into arrays and maps", () => {
+    expect(fieldValue({ arrayValue: { values: [{ stringValue: "a" }] } })).toEqual(["a"]);
+    expect(fieldValue({ mapValue: { fields: { n: { integerValue: "7" } } } })).toEqual({ n: 7 });
+    expect(fieldValue({ arrayValue: {} })).toEqual([]);
   });
 
-  it("campo ausente ou desconhecido vira null", () => {
-    expect(valor(undefined)).toBe(null);
-    expect(valor({ geoPointValue: {} })).toBe(null);
+  it("turns a missing or unknown field into null", () => {
+    expect(fieldValue(undefined)).toBe(null);
+    expect(fieldValue({ geoPointValue: {} })).toBe(null);
   });
 });
 
-describe("documentoParaCard", () => {
-  it("tira o id do fim do name e traz só campo público", () => {
-    const card = documentoParaCard({
+describe("toCard", () => {
+  it("takes the id off the end of name and brings only public fields", () => {
+    const card = toCard({
       name: "projects/p/databases/(default)/documents/issues/abc123",
       fields: {
         projeto: { stringValue: "calc" },
@@ -88,140 +92,170 @@ describe("documentoParaCard", () => {
       },
     });
     expect(card.id).toBe("abc123");
-    expect(card.projeto).toBe("calc");
-    expect(card.autor).toBe(null);
+    expect(card.project).toBe("calc");
+    expect(card.author).toBe(null);
   });
 
-  it("aguenta documento sem campos", () => {
-    const card = documentoParaCard({ name: "a/b/c/issues/x" });
-    expect(card).toMatchObject({ id: "x", titulo: "", descricao: "", criadoEm: null });
+  it("maps every stored field name onto its English one", () => {
+    // The left-hand names below are Firestore's and are a contract with the
+    // live database; the right-hand ones are this file's. This is the test that
+    // catches a rename on the wrong side of that line.
+    const card = toCard({
+      name: "a/b/c/issues/x",
+      fields: {
+        projeto: { stringValue: "visuais" },
+        tipo: { stringValue: "feature" },
+        titulo: { stringValue: "o título" },
+        descricao: { stringValue: "a descrição" },
+        autor: { stringValue: "RemLATAM" },
+        criadoEm: { timestampValue: "2026-08-16T18:22:31Z" },
+        status: { stringValue: "backlog" },
+        pr: { stringValue: "o/r#1" },
+      },
+    });
+    expect(card).toEqual({
+      id: "x",
+      project: "visuais",
+      type: "feature",
+      title: "o título",
+      description: "a descrição",
+      author: "RemLATAM",
+      createdAt: "2026-08-16T18:22:31Z",
+      status: "backlog",
+      pr: "o/r#1",
+    });
+  });
+
+  it("survives a document with no fields", () => {
+    const card = toCard({ name: "a/b/c/issues/x" });
+    expect(card).toMatchObject({ id: "x", title: "", description: "", createdAt: null });
   });
 });
 
-describe("chaveOrdem", () => {
-  it("segundo cheio é menor que o mesmo segundo com fração", () => {
-    // Cru, "…34Z" > "…34.5Z" no lexicográfico porque 'Z' > '.'. É o bug que
-    // faria o marco andar para trás.
+describe("orderKey", () => {
+  it("sorts a whole second below the same second with a fraction", () => {
+    // Raw, "…34Z" > "…34.5Z" lexicographically because 'Z' > '.'. That is the
+    // bug that would walk the watermark backwards.
     expect("2026-08-16T22:27:34Z" > "2026-08-16T22:27:34.5Z").toBe(true);
-    expect(chaveOrdem("2026-08-16T22:27:34Z") < chaveOrdem("2026-08-16T22:27:34.5Z")).toBe(true);
+    expect(orderKey("2026-08-16T22:27:34Z") < orderKey("2026-08-16T22:27:34.5Z")).toBe(true);
   });
 
-  it("compara precisões diferentes corretamente", () => {
-    expect(chaveOrdem("2026-08-16T22:27:34.569Z") < chaveOrdem("2026-08-16T22:27:34.569001Z")).toBe(
+  it("compares different precisions correctly", () => {
+    expect(orderKey("2026-08-16T22:27:34.569Z") < orderKey("2026-08-16T22:27:34.569001Z")).toBe(
       true,
     );
-    expect(chaveOrdem("2026-08-16T22:27:34.569Z") === chaveOrdem("2026-08-16T22:27:34.569000Z")).toBe(
+    expect(orderKey("2026-08-16T22:27:34.569Z") === orderKey("2026-08-16T22:27:34.569000Z")).toBe(
       true,
     );
   });
 
-  it("string fora do formato não explode", () => {
-    expect(chaveOrdem("qualquer coisa")).toBe("qualquer coisa");
-    expect(chaveOrdem(null)).toBe("");
+  it("does not blow up on a string outside the format", () => {
+    expect(orderKey("qualquer coisa")).toBe("qualquer coisa");
+    expect(orderKey(null)).toBe("");
   });
 });
 
-describe("truncar", () => {
-  it("devolve intacto quando cabe", () => {
-    expect(truncar("curto", 10)).toBe("curto");
-    expect(truncar("exato", 5)).toBe("exato");
+describe("truncate", () => {
+  it("returns the text intact when it fits", () => {
+    expect(truncate("curto", 10)).toBe("curto");
+    expect(truncate("exato", 5)).toBe("exato");
   });
 
-  it("recua até o espaço para não picar a palavra", () => {
-    expect(truncar("um dois tres quatro", 15)).toBe("um dois tres…");
+  it("backs up to the space so it does not chop a word", () => {
+    expect(truncate("um dois tres quatro", 15)).toBe("um dois tres…");
   });
 
-  it("corta seco quando não há espaço por perto", () => {
-    expect(truncar("a".repeat(100), 10)).toBe(`${"a".repeat(10)}…`);
+  it("cuts flat when there is no space nearby", () => {
+    expect(truncate("a".repeat(100), 10)).toBe(`${"a".repeat(10)}…`);
   });
 
-  it("não parte emoji ao meio", () => {
-    const cortado = truncar(`${"a".repeat(10)}🎉bbb`, 11);
-    expect(cortado).toBe("aaaaaaaaaa🎉…");
-    expect(cortado).not.toContain("�");
-    // Um slice ingênuo por UTF-16 deixaria metade do par substituto aqui.
-    expect([...cortado].every((c) => c.codePointAt(0) !== 0xd83c)).toBe(true);
+  it("does not split an emoji in half", () => {
+    const cut = truncate(`${"a".repeat(10)}🎉bbb`, 11);
+    expect(cut).toBe("aaaaaaaaaa🎉…");
+    expect(cut).not.toContain("�");
+    // A naive UTF-16 slice would leave half a surrogate pair here.
+    expect([...cut].every((c) => c.codePointAt(0) !== 0xd83c)).toBe(true);
   });
 
-  it("conta code point, não unidade UTF-16", () => {
-    expect(truncar("🎉🎉🎉", 3)).toBe("🎉🎉🎉");
+  it("counts code points, not UTF-16 units", () => {
+    expect(truncate("🎉🎉🎉", 3)).toBe("🎉🎉🎉");
   });
 });
 
-describe("sanitizarDescricao", () => {
-  it("escapa o que forma markup", () => {
-    expect(sanitizarDescricao("**forte** e _fraco_")).toBe("\\*\\*forte\\*\\* e \\_fraco\\_");
-    expect(sanitizarDescricao("||spoiler||")).toBe("\\|\\|spoiler\\|\\|");
-    expect(sanitizarDescricao("`code`")).toBe("\\`code\\`");
+describe("sanitizeDescription", () => {
+  it("escapes what forms markup", () => {
+    expect(sanitizeDescription("**forte** e _fraco_")).toBe("\\*\\*forte\\*\\* e \\_fraco\\_");
+    expect(sanitizeDescription("||spoiler||")).toBe("\\|\\|spoiler\\|\\|");
+    expect(sanitizeDescription("`code`")).toBe("\\`code\\`");
   });
 
-  it("desmonta link mascarado sem levar o parêntese junto", () => {
-    expect(sanitizarDescricao("[clique](http://ruim)")).toBe("\\[clique\\]([link])");
+  it("takes a masked link apart without swallowing the parenthesis", () => {
+    expect(sanitizeDescription("[clique](http://ruim)")).toBe("\\[clique\\]([link])");
   });
 
-  it("deixa a pontuação que fecha a frase no lugar", () => {
-    expect(sanitizarDescricao("olha https://x.com/a, e https://y.com.")).toBe("olha [link], e [link].");
+  it("leaves the punctuation that closes a sentence in place", () => {
+    expect(sanitizeDescription("olha https://x.com/a, e https://y.com.")).toBe("olha [link], e [link].");
   });
 
-  it("neutraliza cabeçalho no começo da linha", () => {
-    expect(sanitizarDescricao("# titulo falso")).toBe("\\# titulo falso");
+  it("neutralises a heading at the start of a line", () => {
+    expect(sanitizeDescription("# titulo falso")).toBe("\\# titulo falso");
   });
 
-  it("tira URL e convite do Discord", () => {
-    expect(sanitizarDescricao("veja https://phishing.example/x")).toBe("veja [link]");
-    expect(sanitizarDescricao("entra discord.gg/abc agora")).toBe("entra [link] agora");
-    expect(sanitizarDescricao("www.ruim.com")).toBe("[link]");
+  it("strips URLs and Discord invites", () => {
+    expect(sanitizeDescription("veja https://phishing.example/x")).toBe("veja [link]");
+    expect(sanitizeDescription("entra discord.gg/abc agora")).toBe("entra [link] agora");
+    expect(sanitizeDescription("www.ruim.com")).toBe("[link]");
   });
 
-  it("tira invisível, bidi e zero-width", () => {
-    expect(sanitizarDescricao("a​b‮cd")).toBe("abcd");
+  it("strips invisibles, bidi and zero-width", () => {
+    expect(sanitizeDescription("a​b‮cd")).toBe("abcd");
   });
 
-  it("não deixa o usuário injetar a sentinela de link", () => {
-    // Se a sentinela sobrevivesse, daria para forjar um "[link]" no meio do texto.
-    expect(sanitizarDescricao("ab")).toBe("ab");
+  it("does not let the user inject the link sentinel", () => {
+    // If the sentinel survived, a "[link]" could be forged mid-text.
+    expect(sanitizeDescription("ab")).toBe("ab");
   });
 
-  it("escapa menção crua (o allowed_mentions cobre o ping)", () => {
-    expect(sanitizarDescricao("<@1234>")).toBe("\\<@1234\\>");
+  it("escapes a raw mention (allowed_mentions covers the ping)", () => {
+    expect(sanitizeDescription("<@1234>")).toBe("\\<@1234\\>");
   });
 
-  it("colapsa linha em branco e limita a altura", () => {
-    expect(sanitizarDescricao("a\n\n\n\n\nb")).toBe("a\n\nb");
-    expect(sanitizarDescricao(Array.from({ length: 20 }, (_, i) => `l${i}`).join("\n"))).toBe(
+  it("collapses blank lines and caps the height", () => {
+    expect(sanitizeDescription("a\n\n\n\n\nb")).toBe("a\n\nb");
+    expect(sanitizeDescription(Array.from({ length: 20 }, (_, i) => `l${i}`).join("\n"))).toBe(
       Array.from({ length: 8 }, (_, i) => `l${i}`).join("\n"),
     );
   });
 
-  it("aguenta vazio e não-string", () => {
-    expect(sanitizarDescricao("")).toBe("");
-    expect(sanitizarDescricao(null)).toBe("");
+  it("survives empty and non-string input", () => {
+    expect(sanitizeDescription("")).toBe("");
+    expect(sanitizeDescription(null)).toBe("");
   });
 });
 
-describe("sanitizarTitulo", () => {
-  it("não escapa markdown (título de embed não renderiza)", () => {
-    expect(sanitizarTitulo("bug no **item**")).toBe("bug no **item**");
+describe("sanitizeTitle", () => {
+  it("does not escape markdown (an embed title does not render it)", () => {
+    expect(sanitizeTitle("bug no **item**")).toBe("bug no **item**");
   });
 
-  it("junta espaço e tira invisível", () => {
-    expect(sanitizarTitulo("  a\n\nb​  ")).toBe("a b");
+  it("joins whitespace and strips invisibles", () => {
+    expect(sanitizeTitle("  a\n\nb​  ")).toBe("a b");
   });
 });
 
-describe("montarMensagem", () => {
+describe("buildMessage", () => {
   const base = {
     id: "abc123",
-    projeto: "mercado",
-    tipo: "bug",
-    titulo: "Falta a carta",
-    descricao: "Não aparece na lista",
-    autor: null,
-    criadoEm: "2026-08-16T18:22:31.412345Z",
+    project: "mercado",
+    type: "bug",
+    title: "Falta a carta",
+    description: "Não aparece na lista",
+    author: null,
+    createdAt: "2026-08-16T18:22:31.412345Z",
   };
 
-  it("monta o embed com cor do projeto e permalink", () => {
-    const m = montarMensagem(base);
+  it("builds the embed with the project's colour and the permalink", () => {
+    const m = buildMessage(base);
     expect(m.embeds[0]).toMatchObject({
       author: { name: "Mercado · Bug" },
       title: "Falta a carta",
@@ -232,62 +266,62 @@ describe("montarMensagem", () => {
     });
   });
 
-  it("nunca deixa passar menção em massa", () => {
-    expect(montarMensagem({ ...base, titulo: "@everyone socorro" }).allowed_mentions).toEqual({
+  it("never lets a mass mention through", () => {
+    expect(buildMessage({ ...base, title: "@everyone socorro" }).allowed_mentions).toEqual({
       parse: [],
     });
   });
 
-  it("põe o nick no rodapé só quando existe", () => {
-    expect(montarMensagem(base).embeds[0].footer.text).toBe("issues.latam-tools.com.br");
-    expect(montarMensagem({ ...base, autor: "RemLATAM" }).embeds[0].footer.text).toBe(
+  it("puts the nickname in the footer only when there is one", () => {
+    expect(buildMessage(base).embeds[0].footer.text).toBe("issues.latam-tools.com.br");
+    expect(buildMessage({ ...base, author: "RemLATAM" }).embeds[0].footer.text).toBe(
       "Reportado por RemLATAM · issues.latam-tools.com.br",
     );
   });
 
-  it("nick com invisível não vira rodapé forjado", () => {
-    expect(montarMensagem({ ...base, autor: "Rem‮X" }).embeds[0].footer.text).toBe(
+  it("does not let a nickname with invisibles forge a footer", () => {
+    expect(buildMessage({ ...base, author: "Rem‮X" }).embeds[0].footer.text).toBe(
       "Reportado por RemX · issues.latam-tools.com.br",
     );
   });
 
-  it("projeto desconhecido cai no blurple em vez de quebrar", () => {
-    // Mesma filosofia do parseProjeto: slug velho não derruba a página.
-    const m = montarMensagem({ ...base, projeto: "novo", tipo: "bug" });
+  it("falls back to blurple for an unknown project instead of breaking", () => {
+    // Same philosophy as parseProject: an old slug does not take the page down.
+    const m = buildMessage({ ...base, project: "novo", type: "bug" });
     expect(m.embeds[0].color).toBe(0x5865f2);
     expect(m.embeds[0].author.name).toBe("novo · Bug");
   });
 
-  it("omite a descrição quando o card não tem", () => {
-    expect(montarMensagem({ ...base, descricao: "" }).embeds[0]).not.toHaveProperty("description");
+  it("omits the description when the card has none", () => {
+    expect(buildMessage({ ...base, description: "" }).embeds[0]).not.toHaveProperty("description");
   });
 
-  it("título vazio não gera embed sem título", () => {
-    expect(montarMensagem({ ...base, titulo: "" }).embeds[0].title).toBe("(sem título)");
+  it("does not produce a titleless embed from an empty title", () => {
+    expect(buildMessage({ ...base, title: "" }).embeds[0].title).toBe("(sem título)");
   });
 
-  it("id vira componente de URL escapado", () => {
-    expect(montarMensagem({ ...base, id: "a b/c" }).embeds[0].url).toBe(
+  it("escapes the id as a URL component", () => {
+    expect(buildMessage({ ...base, id: "a b/c" }).embeds[0].url).toBe(
       "https://issues.latam-tools.com.br/t/a%20b%2Fc",
     );
   });
 
-  it("nonce é estável por card, para o Discord deduplicar a repetição", () => {
-    expect(montarMensagem(base).nonce).toBe(montarMensagem(base).nonce);
-    expect(montarMensagem(base).nonce.length).toBeLessThanOrEqual(25);
-    expect(montarMensagem({ ...base, id: "outro" }).nonce).not.toBe(montarMensagem(base).nonce);
+  it("keeps the nonce stable per card, so Discord deduplicates a repeat", () => {
+    expect(buildMessage(base).nonce).toBe(buildMessage(base).nonce);
+    expect(buildMessage(base).nonce.length).toBeLessThanOrEqual(25);
+    expect(buildMessage({ ...base, id: "outro" }).nonce).not.toBe(buildMessage(base).nonce);
   });
 
-  it("respeita os limites de tamanho do Discord", () => {
-    const m = montarMensagem({ ...base, titulo: "t".repeat(500), descricao: "d".repeat(5000) });
+  it("respects Discord's size limits", () => {
+    const m = buildMessage({ ...base, title: "t".repeat(500), description: "d".repeat(5000) });
     expect([...m.embeds[0].title].length).toBeLessThanOrEqual(201);
     expect([...m.embeds[0].description].length).toBeLessThanOrEqual(501);
   });
 });
 
-describe("documentoParaCard traz status e pr", () => {
-  it("carrega os dois campos que o acompanhamento usa", () => {
-    const card = documentoParaCard({
+describe("toCard brings status and pr", () => {
+  it("carries the two fields the follow-up uses", () => {
+    const card = toCard({
       name: "a/b/c/issues/x",
       fields: { status: { stringValue: "em_progresso" }, pr: { stringValue: "o/r#7" } },
     });
@@ -295,79 +329,141 @@ describe("documentoParaCard traz status e pr", () => {
     expect(card.pr).toBe("o/r#7");
   });
 
-  it("o card tem exatamente estas chaves, e nenhuma a mais", () => {
-    // Trava a promessa do cabecalho do script: o que sai daqui e o que vai para
-    // o Discord. Uma chave nova entra por este teste, nao por descuido.
-    expect(Object.keys(documentoParaCard({ name: "a/b/c/issues/x" })).sort()).toEqual([
-      "autor",
-      "criadoEm",
-      "descricao",
+  it("gives the card exactly these keys and no more", () => {
+    // Pins the promise in the script's header: what comes out of here is what
+    // goes to Discord. A new key gets in through this test, not by accident.
+    expect(Object.keys(toCard({ name: "a/b/c/issues/x" })).sort()).toEqual([
+      "author",
+      "createdAt",
+      "description",
       "id",
       "pr",
-      "projeto",
+      "project",
       "status",
-      "tipo",
-      "titulo",
+      "title",
+      "type",
     ]);
   });
 });
 
-describe("urlDoPr", () => {
-  it("monta o link a partir de dono/repo#N", () => {
-    expect(urlDoPr("adsonpleal/latam-ro-calc#90")).toBe(
+/**
+ * The state file lives in /var/lib on the server and was written by the
+ * version of this script that is deployed now. Its keys are as much a contract
+ * as Firestore's field names: `readState` rejects a shape it does not
+ * recognise, renames the file and redoes the bootstrap, which silently drops
+ * the announcements in that window. These tests are what stop a rename from
+ * reaching disk.
+ */
+describe("the state file's on-disk shape", () => {
+  const onDisk = {
+    versao: 1,
+    watermark: "2026-08-16T18:22:31.412345Z",
+    anunciados: ["a", "b"],
+    falhasSeguidas: 3,
+    alertaEnviado: true,
+    acompanhados: { card1: { topico: "t1", mensagem: "m1", pr: "o/r#2", status: "backlog" } },
+    ultimaChecagem: 1762000000000,
+  };
+
+  it("reads the stored keys into English ones", () => {
+    expect(stateFromDisk(onDisk)).toEqual({
+      version: 1,
+      watermark: "2026-08-16T18:22:31.412345Z",
+      announced: ["a", "b"],
+      consecutiveFailures: 3,
+      alertSent: true,
+      followed: { card1: { threadId: "t1", messageId: "m1", pr: "o/r#2", status: "backlog" } },
+      lastCheck: 1762000000000,
+    });
+  });
+
+  it("writes back exactly the keys the server already holds", () => {
+    expect(stateToDisk(stateFromDisk(onDisk))).toEqual(onDisk);
+  });
+
+  it("writes those same keys for a state that never came off disk", () => {
+    // The bootstrap path builds a state in memory; it must land on disk in the
+    // shape the deployed reader demands.
+    expect(Object.keys(stateToDisk(freshState("2026-01-01T00:00:00Z"))).sort()).toEqual([
+      "acompanhados",
+      "alertaEnviado",
+      "anunciados",
+      "falhasSeguidas",
+      "ultimaChecagem",
+      "versao",
+      "watermark",
+    ]);
+    expect(stateToDisk(freshState("2026-01-01T00:00:00Z")).versao).toBe(1);
+  });
+
+  it("treats a state file written before follow-ups existed as valid", () => {
+    const old = { versao: 1, watermark: "2026-01-01T00:00:00Z", anunciados: ["a"] };
+    expect(stateFromDisk(old)).toMatchObject({
+      followed: {},
+      lastCheck: 0,
+      consecutiveFailures: 0,
+      alertSent: false,
+    });
+  });
+});
+
+describe("pullRequestUrl", () => {
+  it("builds the link from owner/repo#N", () => {
+    expect(pullRequestUrl("adsonpleal/latam-ro-calc#90")).toBe(
       "https://github.com/adsonpleal/latam-ro-calc/pull/90",
     );
   });
 
-  it("recusa qualquer coisa fora do formato", () => {
-    // O campo e dado, nao codigo: o que nao casa exato nao vira link nenhum,
-    // porque este link e postado sob a identidade do bot.
-    for (const ruim of ["", "sem-numero", "o/r#", "o/r#abc", "http://evil.com", "o/r#1 extra", null, 7]) {
-      expect(urlDoPr(ruim)).toBe(null);
+  it("refuses anything outside the format", () => {
+    // The field is data, not code: what does not match exactly becomes no link
+    // at all, because this link is posted under the bot's identity.
+    for (const bad of ["", "sem-numero", "o/r#", "o/r#abc", "http://evil.com", "o/r#1 extra", null, 7]) {
+      expect(pullRequestUrl(bad)).toBe(null);
     }
   });
 
-  it("nao deixa barra a mais virar outro caminho", () => {
-    expect(urlDoPr("a/b/c#1")).toBe(null);
+  it("does not let an extra slash become another path", () => {
+    expect(pullRequestUrl("a/b/c#1")).toBe(null);
   });
 });
 
-describe("saturado", () => {
-  const agora = Date.parse("2026-11-03T12:00:00Z");
-  const card = (minutosAtras) => ({
-    criadoEm: new Date(agora - minutosAtras * 60000).toISOString(),
+describe("isSaturated", () => {
+  const now = Date.parse("2026-11-03T12:00:00Z");
+  const card = (minutesAgo) => ({
+    createdAt: new Date(now - minutesAgo * 60000).toISOString(),
   });
 
-  it("rajada na janela satura", () => {
-    expect(saturado(Array.from({ length: 10 }, () => card(1)), { agora })).toBe(true);
+  it("saturates on a burst inside the window", () => {
+    expect(isSaturated(Array.from({ length: 10 }, () => card(1)), { now })).toBe(true);
   });
 
-  it("represamento espalhado por dias NAO satura", () => {
-    // Esta e a regressao que deixou o servico 13 dias vermelho: a pagina cheia
-    // disparava o guard, o guard impedia o post, e sem post o marco nao andava.
-    const atrasados = Array.from({ length: 26 }, (_, i) => card((i + 1) * 60 * 12));
-    expect(saturado(atrasados, { agora })).toBe(false);
+  it("does NOT saturate on a backlog spread over days", () => {
+    // This is the regression that left the service 13 days red: a full page
+    // fired the guard, the guard blocked the post, and with no post the
+    // watermark never moved.
+    const behind = Array.from({ length: 26 }, (_, i) => card((i + 1) * 60 * 12));
+    expect(isSaturated(behind, { now })).toBe(false);
   });
 
-  it("card sem data nao conta", () => {
-    expect(saturado([{ criadoEm: null }, { criadoEm: "nao e data" }], { agora })).toBe(false);
+  it("does not count a card with no date", () => {
+    expect(isSaturated([{ createdAt: null }, { createdAt: "nao e data" }], { now })).toBe(false);
   });
 });
 
-describe("mensagemDeMudanca", () => {
-  it("anuncia o PR quando ele aparece", () => {
-    const m = mensagemDeMudanca({ pr: null, status: "em_progresso" }, { pr: "o/r#3", status: "em_progresso" });
+describe("changeMessage", () => {
+  it("announces the pull request when it appears", () => {
+    const m = changeMessage({ pr: null, status: "em_progresso" }, { pr: "o/r#3", status: "em_progresso" });
     expect(m.content).toContain("https://github.com/o/r/pull/3");
     expect(m.allowed_mentions).toEqual({ parse: [] });
   });
 
-  it("anuncia a mudanca de status com o rotulo do site", () => {
-    const m = mensagemDeMudanca({ pr: null, status: "reportado" }, { pr: null, status: "resolvido" });
+  it("announces a status move with the site's own label", () => {
+    const m = changeMessage({ pr: null, status: "reportado" }, { pr: null, status: "resolvido" });
     expect(m.content).toContain("Resolvido");
   });
 
-  it("junta as duas quando mudam juntas", () => {
-    const m = mensagemDeMudanca(
+  it("joins the two when they change together", () => {
+    const m = changeMessage(
       { pr: null, status: "reportado" },
       { pr: "o/r#3", status: "em_progresso" },
     );
@@ -375,42 +471,42 @@ describe("mensagemDeMudanca", () => {
     expect(m.content).toContain("Em progresso");
   });
 
-  it("sem mudanca, nao posta nada", () => {
-    const igual = { pr: "o/r#3", status: "em_progresso" };
-    expect(mensagemDeMudanca(igual, { ...igual })).toBe(null);
+  it("posts nothing when nothing changed", () => {
+    const same = { pr: "o/r#3", status: "em_progresso" };
+    expect(changeMessage(same, { ...same })).toBe(null);
   });
 
-  it("PR malformado nao vira linha", () => {
-    expect(mensagemDeMudanca({ pr: null, status: "x" }, { pr: "lixo", status: "x" })).toBe(null);
+  it("does not turn a malformed PR into a line", () => {
+    expect(changeMessage({ pr: null, status: "x" }, { pr: "lixo", status: "x" })).toBe(null);
   });
 });
 
-describe("podar", () => {
-  it("devolve intacto quando cabe", () => {
+describe("prune", () => {
+  it("returns the list intact when it fits", () => {
     const a = { um: 1, dois: 2 };
-    expect(podar(a, 5)).toEqual(a);
+    expect(prune(a, 5)).toEqual(a);
   });
 
-  it("mantem os mais novos e descarta os mais velhos", () => {
-    expect(Object.keys(podar({ a: 1, b: 2, c: 3 }, 2))).toEqual(["b", "c"]);
+  it("keeps the newest and drops the oldest", () => {
+    expect(Object.keys(prune({ a: 1, b: 2, c: 3 }, 2))).toEqual(["b", "c"]);
   });
 
-  it("aguenta vazio e ausente", () => {
-    expect(podar(undefined, 2)).toEqual({});
+  it("survives empty and missing input", () => {
+    expect(prune(undefined, 2)).toEqual({});
   });
 });
 
-describe("tópico e status final", () => {
-  it("o nome do topico e o titulo saneado e cortado em 100", () => {
-    expect([...nomeDoTopico({ titulo: "t".repeat(300) })].length).toBeLessThanOrEqual(100);
-    expect(nomeDoTopico({ titulo: "" })).toBe("(sem título)");
+describe("thread name and final status", () => {
+  it("names the thread with the sanitised title, cut at 100", () => {
+    expect([...threadName({ title: "t".repeat(300) })].length).toBeLessThanOrEqual(100);
+    expect(threadName({ title: "" })).toBe("(sem título)");
   });
 
-  it("so resolvido e nao_sera_feito encerram o acompanhamento", () => {
-    expect(statusFinal("resolvido")).toBe(true);
-    expect(statusFinal("nao_sera_feito")).toBe(true);
-    for (const aberto of ["reportado", "backlog", "em_progresso", null, undefined]) {
-      expect(statusFinal(aberto)).toBe(false);
+  it("ends the follow-up only on resolvido and nao_sera_feito", () => {
+    expect(isFinalStatus("resolvido")).toBe(true);
+    expect(isFinalStatus("nao_sera_feito")).toBe(true);
+    for (const open of ["reportado", "backlog", "em_progresso", null, undefined]) {
+      expect(isFinalStatus(open)).toBe(false);
     }
   });
 });

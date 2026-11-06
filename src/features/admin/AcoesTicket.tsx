@@ -1,13 +1,13 @@
 import { useState } from "react";
 
-import { LABEL_STATUS, t } from "../../i18n";
+import { STATUS_LABEL, t } from "../../i18n";
 import type { Issue } from "../../lib/issues";
-import { COLUNAS_ADMIN, type Coluna } from "../../lib/status";
+import { ADMIN_COLUMNS, type Column } from "../../lib/status";
 import { FormularioEdicao, useContato, type CamposEditaveis } from "./AcoesIssue";
 
 type Props = {
   issue: Issue;
-  onMover: (coluna: Coluna) => void;
+  onMover: (coluna: Column) => void;
   onEditar: (campos: CamposEditaveis) => void;
 };
 
@@ -48,11 +48,11 @@ export function AcoesTicket({ issue, onMover, onEditar }: Props) {
               <span className="visually-hidden">{t.moverPara}</span>
               <select
                 value={issue.arquivado ? "arquivado" : issue.status}
-                onChange={(e) => onMover(e.target.value as Coluna)}
+                onChange={(e) => onMover(e.target.value as Column)}
               >
-                {COLUNAS_ADMIN.map((c) => (
+                {ADMIN_COLUMNS.map((c) => (
                   <option key={c} value={c}>
-                    {LABEL_STATUS[c]}
+                    {STATUS_LABEL[c]}
                   </option>
                 ))}
               </select>

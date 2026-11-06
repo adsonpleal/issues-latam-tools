@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import { LABEL_ESTADO, t } from "../../i18n";
+import { RECORDING_STATE_LABEL, t } from "../../i18n";
 import { formataTamanho } from "../../lib/anexos";
 import { formatRelative } from "../../lib/datas";
 import { getArquivo, type EstadoGravacao, type Gravacao } from "../../lib/gravacoes";
@@ -105,7 +105,7 @@ function Ficha({
     <li className="gravacao">
       <div className="gravacao-topo">
         <h3 className="gravacao-titulo">{gravacao.titulo}</h3>
-        <span className={`selo selo-${gravacao.estado}`}>{LABEL_ESTADO[gravacao.estado]}</span>
+        <span className={`selo selo-${gravacao.estado}`}>{RECORDING_STATE_LABEL[gravacao.estado]}</span>
       </div>
 
       {gravacao.resumo && Object.keys(gravacao.resumo).length > 0 ? (

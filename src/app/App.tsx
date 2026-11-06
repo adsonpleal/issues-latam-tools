@@ -3,7 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-
 
 import { SessaoProvider } from "../features/admin/SessaoContext";
 import { t } from "../i18n";
-import { isProjeto } from "../lib/projetos";
+import { isProject } from "../lib/projetos";
 import { BoardPage } from "../pages/BoardPage";
 import { IssuePage } from "../pages/IssuePage";
 import { NewIssuePage } from "../pages/NewIssuePage";
@@ -29,7 +29,7 @@ const GravacoesPage = lazy(() =>
  */
 function AtalhoProjeto() {
   const { slug } = useParams();
-  if (isProjeto(slug)) return <Navigate replace to={`/?projeto=${slug}`} />;
+  if (isProject(slug)) return <Navigate replace to={`/?projeto=${slug}`} />;
   return <NotFoundPage />;
 }
 

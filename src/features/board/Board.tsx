@@ -2,10 +2,10 @@ import { useState } from "react";
 
 import { t } from "../../i18n";
 import type { Issue } from "../../lib/issues";
-import type { Coluna as TipoColuna } from "../../lib/status";
+import type { Column as Column } from "../../lib/status";
 import { useVotos } from "../votos/useVotos";
 import type { Agrupado } from "./agrupar";
-import { Coluna } from "./Coluna";
+import { BoardColumn } from "./Coluna";
 import { IssueCard } from "./IssueCard";
 
 type Props = {
@@ -13,12 +13,12 @@ type Props = {
   carregando: boolean;
   erro: string | null;
   /** Passados só com sessão de admin: arrastar, seletor de coluna e painel. */
-  onMover?: (id: string, coluna: TipoColuna) => void;
+  onMover?: (id: string, coluna: Column) => void;
   onAbrir?: (id: string) => void;
   /** Fixa `id` logo antes (ou depois) de `alvoId`, na pilha de `alvoId`. */
   onFixar?: (id: string, alvoId: string, antes: boolean) => void;
   /** Devolve a coluna inteira à ordem automática. */
-  onOrdemAutomatica?: (coluna: TipoColuna) => void;
+  onOrdemAutomatica?: (coluna: Column) => void;
 };
 
 export function Board({
@@ -49,7 +49,7 @@ export function Board({
   return (
     <div className="quadro">
       {colunas.map(({ coluna, issues }) => (
-        <Coluna
+        <BoardColumn
           key={coluna}
           coluna={coluna}
           quantidade={issues.length}
@@ -86,7 +86,7 @@ export function Board({
               onArrastar={setArrastando}
             />
           ))}
-        </Coluna>
+        </BoardColumn>
       ))}
     </div>
   );

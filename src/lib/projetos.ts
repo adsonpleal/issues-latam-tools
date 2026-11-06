@@ -1,50 +1,56 @@
-/** Os cinco projetos do latam-tools.com.br, na ordem em que aparecem nos filtros. */
-export const PROJETOS = {
+/**
+ * The five latam-tools.com.br projects, in the order they appear in the
+ * filters.
+ *
+ * The keys are the `projeto` values stored on a card, so they keep the spelling
+ * the database uses. The labels are read by visitors and stay in Portuguese.
+ */
+export const PROJECTS = {
   mercado: {
-    nome: "Mercado",
-    descricao: "Preços e ofertas do mercado de jogadores",
+    name: "Mercado",
+    description: "Preços e ofertas do mercado de jogadores",
     url: "https://mercado.latam-tools.com.br",
-    cor: "#3fa96c",
+    color: "#3fa96c",
   },
   simulador: {
-    nome: "Simulador",
-    descricao: "Simulador de dano",
+    name: "Simulador",
+    description: "Simulador de dano",
     url: "https://simulador.latam-tools.com.br",
-    cor: "#d1683f",
+    color: "#d1683f",
   },
   recap: {
-    nome: "Recap",
-    descricao: "Leitor de replays",
+    name: "Recap",
+    description: "Leitor de replays",
     url: "https://recap.latam-tools.com.br",
-    cor: "#7a5fd1",
+    color: "#7a5fd1",
   },
   visuais: {
-    nome: "Visuais",
-    descricao: "Simulador de visuais",
+    name: "Visuais",
+    description: "Simulador de visuais",
     url: "https://visuais.latam-tools.com.br",
-    cor: "#3f6cd1",
+    color: "#3f6cd1",
   },
   calc: {
-    nome: "Calculadoras",
-    descricao: "Diadema, EXP, martelo e memorável",
+    name: "Calculadoras",
+    description: "Diadema, EXP, martelo e memorável",
     url: "https://calc.latam-tools.com.br",
-    cor: "#c9a227",
+    color: "#c9a227",
   },
 } as const;
 
-export type Projeto = keyof typeof PROJETOS;
+export type Project = keyof typeof PROJECTS;
 
-export const SLUGS_PROJETO = Object.keys(PROJETOS) as Projeto[];
+export const PROJECT_SLUGS = Object.keys(PROJECTS) as Project[];
 
-export function isProjeto(valor: unknown): valor is Projeto {
-  return typeof valor === "string" && valor in PROJETOS;
+export function isProject(value: unknown): value is Project {
+  return typeof value === "string" && value in PROJECTS;
 }
 
 /**
- * Um `?projeto=` desconhecido cai no quadro inteiro em vez de 404: o link vem de
- * fora, de sites que a gente atualiza em outro momento, e derrubar a página por
- * causa de um slug velho seria pior do que mostrar tudo.
+ * An unknown `?projeto=` falls back to the whole board rather than a 404: the
+ * link comes from outside, from sites we update at some other time, and taking
+ * the page down over a stale slug would be worse than showing everything.
  */
-export function parseProjeto(valor: string | null): Projeto | null {
-  return isProjeto(valor) ? valor : null;
+export function parseProject(value: string | null): Project | null {
+  return isProject(value) ? value : null;
 }

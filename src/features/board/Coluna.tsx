@@ -1,19 +1,19 @@
 import { useRef, useState, type ReactNode } from "react";
 
-import { AJUDA_STATUS, LABEL_STATUS, t } from "../../i18n";
-import { isStatus, type Coluna as TipoColuna } from "../../lib/status";
+import { STATUS_HELP, STATUS_LABEL, t } from "../../i18n";
+import { isStatus, type Column as Column } from "../../lib/status";
 
 type Props = {
-  coluna: TipoColuna;
+  coluna: Column;
   quantidade: number;
   children: ReactNode;
   /** Só com sessão de admin: transforma a coluna em alvo de drop. */
-  onSoltar?: (id: string, coluna: TipoColuna) => void;
+  onSoltar?: (id: string, coluna: Column) => void;
   /** Só quando a pilha está arrumada à mão: devolve a coluna ao automático. */
   onOrdemAutomatica?: () => void;
 };
 
-export function Coluna({ coluna, quantidade, children, onSoltar, onOrdemAutomatica }: Props) {
+export function BoardColumn({ coluna, quantidade, children, onSoltar, onOrdemAutomatica }: Props) {
   // dragenter/dragleave disparam para cada filho: sem contar a profundidade, o
   // destaque pisca sempre que o ponteiro passa por cima de um card.
   const profundidade = useRef(0);
@@ -57,11 +57,11 @@ export function Coluna({ coluna, quantidade, children, onSoltar, onOrdemAutomati
   return (
     <section
       className={`coluna coluna-${coluna}${sobre ? " coluna-alvo" : ""}`}
-      aria-label={LABEL_STATUS[coluna]}
+      aria-label={STATUS_LABEL[coluna]}
       {...alvo}
     >
       <header className="coluna-topo">
-        <h2>{LABEL_STATUS[coluna]}</h2>
+        <h2>{STATUS_LABEL[coluna]}</h2>
         <span className="coluna-contador" aria-hidden="true">
           {quantidade}
         </span>
@@ -76,7 +76,7 @@ export function Coluna({ coluna, quantidade, children, onSoltar, onOrdemAutomati
           </button>
         )}
       </header>
-      {isStatus(coluna) && <p className="coluna-ajuda">{AJUDA_STATUS[coluna]}</p>}
+      {isStatus(coluna) && <p className="coluna-ajuda">{STATUS_HELP[coluna]}</p>}
       <div className="coluna-lista">
         {quantidade === 0 ? <p className="coluna-vazia">{t.colunaVazia}</p> : children}
       </div>

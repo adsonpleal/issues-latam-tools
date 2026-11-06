@@ -1,11 +1,11 @@
 import type { Issue } from "../../lib/issues";
-import type { Projeto } from "../../lib/projetos";
-import type { Coluna, Tipo } from "../../lib/status";
-import { COLUNAS, COLUNAS_ADMIN, ordenaPorAtualizacao } from "../../lib/status";
+import type { Project } from "../../lib/projetos";
+import type { Column, IssueType } from "../../lib/status";
+import { COLUMNS, ADMIN_COLUMNS, sortsByUpdatedAt } from "../../lib/status";
 
 export type Filtros = {
-  projeto: Projeto | null;
-  tipo: Tipo | null;
+  projeto: Project | null;
+  tipo: IssueType | null;
   busca: string;
 };
 
@@ -37,11 +37,11 @@ function tempo(d: Date | null): number {
  * A coluna onde o card aparece. `arquivado` não é status: é o booleano que tira
  * o card das cinco colunas e o joga na gaveta.
  */
-export function colunaDe(issue: Issue): Coluna {
+export function colunaDe(issue: Issue): Column {
   return issue.arquivado ? "arquivado" : issue.status;
 }
 
-function comparar(a: Issue, b: Issue, coluna: Coluna): number {
+function comparar(a: Issue, b: Issue, coluna: Column): number {
   // Arrumado à mão manda em tudo. Quem não foi arrumado flui embaixo, pela
   // regra da coluna — é o que faz um card novo cair no fim de uma pilha
   // arrumada em vez de se enfiar no meio dela.
@@ -50,7 +50,7 @@ function comparar(a: Issue, b: Issue, coluna: Coluna): number {
     if (b.ordem === null) return -1;
     if (a.ordem !== b.ordem) return a.ordem - b.ordem;
   }
-  if (ordenaPorAtualizacao(coluna)) {
+  if (sortsByUpdatedAt(coluna)) {
     // Colunas de encerramento: o que saiu mais recentemente vem primeiro.
     return tempo(b.atualizadoEm) - tempo(a.atualizadoEm);
   }
@@ -59,7 +59,7 @@ function comparar(a: Issue, b: Issue, coluna: Coluna): number {
   return tempo(b.criadoEm) - tempo(a.criadoEm);
 }
 
-export type Agrupado = { coluna: Coluna; issues: Issue[] };
+export type Agrupado = { coluna: Column; issues: Issue[] };
 
 /**
  * A pilha de uma coluna, na ordem da tela.
@@ -70,7 +70,7 @@ export type Agrupado = { coluna: Coluna; issues: Issue[] };
  * preserva a posição relativa dos escondidos, "soltar antes do card X" quer
  * dizer a mesma coisa nas duas.
  */
-export function pilha(issues: Issue[], coluna: Coluna): Issue[] {
+export function pilha(issues: Issue[], coluna: Column): Issue[] {
   return issues.filter((i) => colunaDe(i) === coluna).sort((a, b) => comparar(a, b, coluna));
 }
 
@@ -80,8 +80,8 @@ export function pilha(issues: Issue[], coluna: Coluna): Issue[] {
  */
 export function agrupar(issues: Issue[], filtros: Filtros): Agrupado[] {
   const visiveis = filtrar(issues, filtros);
-  return COLUNAS.map((coluna) => ({
-    coluna: coluna as Coluna,
+  return COLUMNS.map((coluna) => ({
+    coluna: coluna as Column,
     issues: pilha(visiveis, coluna),
   }));
 }
@@ -89,5 +89,5 @@ export function agrupar(issues: Issue[], filtros: Filtros): Agrupado[] {
 /** Igual ao `agrupar`, mais a gaveta de arquivados no fim. Só com sessão. */
 export function agruparAdmin(issues: Issue[], filtros: Filtros): Agrupado[] {
   const visiveis = filtrar(issues, filtros);
-  return COLUNAS_ADMIN.map((coluna) => ({ coluna, issues: pilha(visiveis, coluna) }));
+  return ADMIN_COLUMNS.map((coluna) => ({ coluna, issues: pilha(visiveis, coluna) }));
 }

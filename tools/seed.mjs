@@ -24,9 +24,9 @@ const projectId = args.includes("--project")
   ? args[args.indexOf("--project") + 1]
   : "issues-latam-tools";
 
-const PROJETOS = ["visuais", "simulador", "recap", "mercado", "calc"];
+const PROJECTS = ["visuais", "simulador", "recap", "mercado", "calc"];
 const STATUSES = ["reportado", "backlog", "em_progresso", "resolvido", "nao_sera_feito"];
-const TIPOS = ["bug", "feature"];
+const ISSUE_TYPES = ["bug", "feature"];
 
 const BASE = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
 
@@ -36,9 +36,9 @@ function valida(item, i) {
   const erro = (msg) => `item ${i} (${item.id ?? "sem id"}): ${msg}`;
 
   if (!item.id || typeof item.id !== "string") throw new Error(erro("sem id"));
-  if (!PROJETOS.includes(item.projeto)) throw new Error(erro(`projeto inválido: ${item.projeto}`));
+  if (!PROJECTS.includes(item.projeto)) throw new Error(erro(`projeto inválido: ${item.projeto}`));
   if (!STATUSES.includes(item.status)) throw new Error(erro(`status inválido: ${item.status}`));
-  if (!TIPOS.includes(item.tipo)) throw new Error(erro(`tipo inválido: ${item.tipo}`));
+  if (!ISSUE_TYPES.includes(item.tipo)) throw new Error(erro(`tipo inválido: ${item.tipo}`));
   if (typeof item.titulo !== "string" || item.titulo.length < 3 || item.titulo.length > 120) {
     throw new Error(erro(`título fora de 3..120 (${item.titulo?.length})`));
   }

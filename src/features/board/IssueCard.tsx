@@ -1,18 +1,18 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { LABEL_STATUS, LABEL_TIPO, t } from "../../i18n";
+import { STATUS_LABEL, TYPE_LABEL, t } from "../../i18n";
 import { formatRelative } from "../../lib/datas";
 import type { Issue } from "../../lib/issues";
-import { PROJETOS } from "../../lib/projetos";
-import { COLUNAS_ADMIN, type Coluna } from "../../lib/status";
+import { PROJECTS } from "../../lib/projetos";
+import { ADMIN_COLUMNS, type Column } from "../../lib/status";
 
 type Props = {
   issue: Issue;
   jaVotou: boolean;
   onVotar: (id: string) => void;
   /** Presente só com sessão de admin: liga o arrastar e o seletor de coluna. */
-  onMover?: (id: string, coluna: Coluna) => void;
+  onMover?: (id: string, coluna: Column) => void;
   /** Presente só com sessão de admin: abre o painel em vez de navegar. */
   onAbrir?: (id: string) => void;
   /** Soltar um card em cima deste, acima ou abaixo da metade da altura. */
@@ -45,7 +45,7 @@ export function IssueCard({
   arrastando,
   onArrastar,
 }: Props) {
-  const projeto = PROJETOS[issue.projeto];
+  const project = PROJECTS[issue.projeto];
   const admin = Boolean(onMover);
   const [insercao, setInsercao] = useState<"antes" | "depois" | null>(null);
 
@@ -107,10 +107,10 @@ export function IssueCard({
       {...alvo}
     >
       <div className="issue-card-topo">
-        <span className="selo selo-projeto" style={{ borderColor: projeto.cor, color: projeto.cor }}>
-          {projeto.nome}
+        <span className="selo selo-projeto" style={{ borderColor: project.color, color: project.color }}>
+          {project.name}
         </span>
-        <span className={`selo selo-tipo selo-${issue.tipo}`}>{LABEL_TIPO[issue.tipo]}</span>
+        <span className={`selo selo-tipo selo-${issue.tipo}`}>{TYPE_LABEL[issue.tipo]}</span>
       </div>
 
       <h3 className="issue-card-titulo">
@@ -164,11 +164,11 @@ export function IssueCard({
             <span className="visually-hidden">{t.moverPara}</span>
             <select
               value={issue.arquivado ? "arquivado" : issue.status}
-              onChange={(e) => onMover(issue.id, e.target.value as Coluna)}
+              onChange={(e) => onMover(issue.id, e.target.value as Column)}
             >
-              {COLUNAS_ADMIN.map((c) => (
+              {ADMIN_COLUMNS.map((c) => (
                 <option key={c} value={c}>
-                  {LABEL_STATUS[c]}
+                  {STATUS_LABEL[c]}
                 </option>
               ))}
             </select>

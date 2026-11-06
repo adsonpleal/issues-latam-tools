@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 
-import { LABEL_TIPO, t } from "../../i18n";
+import { TYPE_LABEL, t } from "../../i18n";
 import type { AnexoPronto } from "../../lib/anexos";
 import { getContato, type Issue } from "../../lib/issues";
-import { PROJETOS, SLUGS_PROJETO, type Projeto } from "../../lib/projetos";
-import { TIPOS, type Tipo } from "../../lib/status";
+import { PROJECTS, PROJECT_SLUGS, type Project } from "../../lib/projetos";
+import { ISSUE_TYPES, type IssueType } from "../../lib/status";
 import { CampoAnexos } from "../enviar/CampoAnexos";
 
 export type CamposEditaveis = Pick<Issue, "titulo" | "descricao" | "tipo" | "projeto">;
@@ -83,11 +83,11 @@ export function FormularioEdicao({ issue, onSalvar, onCancelar }: PropsEdicao) {
         <span>{t.campoProjeto}</span>
         <select
           value={rascunho.projeto}
-          onChange={(e) => setRascunho({ ...rascunho, projeto: e.target.value as Projeto })}
+          onChange={(e) => setRascunho({ ...rascunho, projeto: e.target.value as Project })}
         >
-          {SLUGS_PROJETO.map((s) => (
+          {PROJECT_SLUGS.map((s) => (
             <option key={s} value={s}>
-              {PROJETOS[s].nome}
+              {PROJECTS[s].name}
             </option>
           ))}
         </select>
@@ -96,11 +96,11 @@ export function FormularioEdicao({ issue, onSalvar, onCancelar }: PropsEdicao) {
         <span>{t.campoTipo}</span>
         <select
           value={rascunho.tipo}
-          onChange={(e) => setRascunho({ ...rascunho, tipo: e.target.value as Tipo })}
+          onChange={(e) => setRascunho({ ...rascunho, tipo: e.target.value as IssueType })}
         >
-          {TIPOS.map((tp) => (
+          {ISSUE_TYPES.map((tp) => (
             <option key={tp} value={tp}>
-              {LABEL_TIPO[tp]}
+              {TYPE_LABEL[tp]}
             </option>
           ))}
         </select>

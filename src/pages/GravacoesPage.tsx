@@ -3,10 +3,10 @@ import { Link } from "react-router-dom";
 
 import { t } from "../i18n";
 import { useSeo } from "../lib/seo";
-import { separarGravacoes } from "../features/admin/gravacoes";
-import { ListaGravacoes } from "../features/admin/ListaGravacoes";
-import { useGravacoes } from "../features/admin/useGravacoes";
-import { useSessao } from "../features/admin/SessaoContext";
+import { splitRecordings } from "../features/admin/gravacoes";
+import { RecordingList } from "../features/admin/ListaGravacoes";
+import { useRecordings } from "../features/admin/useGravacoes";
+import { useSession } from "../features/admin/SessaoContext";
 import { NotFoundPage } from "./NotFoundPage";
 
 /**
@@ -20,20 +20,20 @@ import { NotFoundPage } from "./NotFoundPage";
  * não existe: nem a existência da fila é resposta que se deva a alguém.
  */
 export function GravacoesPage() {
-  const { admin, carregando } = useSessao();
+  const { admin, loading } = useSession();
 
   // Sem o ramo de carregando, o próprio admin veria um lampejo de 404 a cada
   // recarga, enquanto o SDK de auth ainda estivesse subindo.
-  if (carregando) return <p className="aviso">{t.loading}</p>;
+  if (loading) return <p className="aviso">{t.loading}</p>;
   if (!admin) return <NotFoundPage />;
 
-  return <Fila />;
+  return <Queue />;
 }
 
-function Fila() {
+function Queue() {
   useSeo({ title: `${t.recordingsTitle} — ${t.siteName}`, path: "/gravacoes" });
-  const { recordings, carregando, erro, erroAcao, promover, marcar, apagar } = useGravacoes();
-  const { fila, promovidas, decididas } = useMemo(() => separarGravacoes(recordings), [recordings]);
+  const { recordings, loading, error, actionError, promote, mark, remove } = useRecordings();
+  const { queue, promovidas, decididas } = useMemo(() => splitRecordings(recordings), [recordings]);
 
   return (
     <div className="pagina">
@@ -44,16 +44,16 @@ function Fila() {
           ← {t.backToBoard}
         </Link>
       </p>
-      {erroAcao && <p className="aviso aviso-erro">{erroAcao}</p>}
-      <ListaGravacoes
-        fila={fila}
+      {actionError && <p className="aviso aviso-erro">{actionError}</p>}
+      <RecordingList
+        queue={queue}
         promovidas={promovidas}
         decididas={decididas}
-        carregando={carregando}
-        erro={erro}
-        onPromover={(g) => void promover(g)}
-        onMarcar={(id, state) => void marcar(id, state)}
-        onApagar={(id) => void apagar(id)}
+        loading={loading}
+        error={error}
+        onPromover={(g) => void promote(g)}
+        onMark={(id, state) => void mark(id, state)}
+        onDelete={(id) => void remove(id)}
       />
     </div>
   );

@@ -29,7 +29,7 @@ function Pedaco({ text }: { text: string }) {
  * React, nunca por innerHTML. Sem isso, uma descrição com <script> dentro seria
  * exatamente o que parece.
  */
-export function TextoComLinks({ text }: { text: string }) {
+export function TextWithLinks({ text }: { text: string }) {
   return (
     <>
       {text.split("\n").map((linha, iLinha) => (

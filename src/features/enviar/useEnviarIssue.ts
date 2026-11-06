@@ -14,14 +14,14 @@ const ESPERA_MS = 60_000;
  */
 function esperaRestante(): number {
   try {
-    const ultimo = Number(localStorage.getItem(CHAVE_ESPERA) ?? 0);
-    return Math.max(0, ultimo + ESPERA_MS - Date.now());
+    const last = Number(localStorage.getItem(CHAVE_ESPERA) ?? 0);
+    return Math.max(0, last + ESPERA_MS - Date.now());
   } catch {
     return 0;
   }
 }
 
-function marcaEnvio(): void {
+function submitMark(): void {
   try {
     localStorage.setItem(CHAVE_ESPERA, String(Date.now()));
   } catch {
@@ -29,39 +29,39 @@ function marcaEnvio(): void {
   }
 }
 
-export type EstadoEnvio = "parado" | "enviando" | "erro";
+export type SubmitState = "idle" | "sending" | "error";
 
-export function useEnviarIssue() {
-  const [state, setEstado] = useState<EstadoEnvio>("parado");
-  const [mensagemErro, setMensagemErro] = useState<string | null>(null);
+export function useSubmitIssue() {
+  const [state, setState] = useState<SubmitState>("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  async function enviar(data: NewIssue & { isca?: string }): Promise<string | null> {
+  async function submit(data: NewIssue & { isca?: string }): Promise<string | null> {
     // `anexos` já vem pronto do CampoAnexos: reduzido, validado e dentro do teto.
     if (data.isca) return null; // campo-isca preenchido: é robô, some em silêncio
     if (data.title.trim().length < 3) {
-      setEstado("erro");
-      setMensagemErro(t.summaryTooShort);
+      setState("error");
+      setErrorMessage(t.summaryTooShort);
       return null;
     }
     if (esperaRestante() > 0) {
-      setEstado("erro");
-      setMensagemErro(t.slowDown);
+      setState("error");
+      setErrorMessage(t.slowDown);
       return null;
     }
 
-    setEstado("enviando");
-    setMensagemErro(null);
+    setState("sending");
+    setErrorMessage(null);
     try {
       const id = await createIssue(data);
-      marcaEnvio();
-      setEstado("parado");
+      submitMark();
+      setState("idle");
       return id;
     } catch {
-      setEstado("erro");
-      setMensagemErro(t.submitError);
+      setState("error");
+      setErrorMessage(t.submitError);
       return null;
     }
   }
 
-  return { state, mensagemErro, enviar };
+  return { state, errorMessage, submit };
 }

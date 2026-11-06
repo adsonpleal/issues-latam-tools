@@ -9,18 +9,18 @@ import { ADMIN_COLUMNS, type Column } from "../../lib/status";
 
 type Props = {
   issue: Issue;
-  jaVotou: boolean;
-  onVotar: (id: string) => void;
+  hasVoted: boolean;
+  onVote: (id: string) => void;
   /** Presente só com sessão de admin: liga o arrastar e o seletor de coluna. */
-  onMover?: (id: string, column: Column) => void;
+  onMove?: (id: string, column: Column) => void;
   /** Presente só com sessão de admin: abre o painel em vez de navegar. */
-  onAbrir?: (id: string) => void;
+  onOpen?: (id: string) => void;
   /** Soltar um card em cima deste, acima ou abaixo da metade da altura. */
-  onFixar?: (id: string, alvoId: string, antes: boolean) => void;
+  onPin?: (id: string, targetId: string, before: boolean) => void;
   /** Um degrau para cima (-1) ou para baixo (1) na pilha. */
   onDegrau?: (delta: -1 | 1) => void;
   primeiro?: boolean;
-  ultimo?: boolean;
+  last?: boolean;
   /** Id do card em movimento no quadro inteiro, ou null. */
   arrastando?: string | null;
   onArrastar?: (id: string | null) => void;
@@ -34,26 +34,26 @@ function metadeDeCima(e: React.DragEvent<HTMLElement>): boolean {
 
 export function IssueCard({
   issue,
-  jaVotou,
-  onVotar,
-  onMover,
-  onAbrir,
-  onFixar,
+  hasVoted,
+  onVote,
+  onMove,
+  onOpen,
+  onPin,
   onDegrau,
   primeiro,
-  ultimo,
+  last,
   arrastando,
   onArrastar,
 }: Props) {
   const project = PROJECTS[issue.project];
-  const admin = Boolean(onMover);
+  const admin = Boolean(onMove);
   const [insercao, setInsercao] = useState<"antes" | "depois" | null>(null);
 
   // Só vira alvo quando há outro card no ar: sem isso o card acusaria posição
   // de encaixe enquanto ele mesmo está sendo arrastado.
-  const recebe = Boolean(onFixar) && Boolean(arrastando) && arrastando !== issue.id;
+  const recebe = Boolean(onPin) && Boolean(arrastando) && arrastando !== issue.id;
 
-  const alvo = recebe
+  const target = recebe
     ? {
         onDragOver: (e: React.DragEvent<HTMLElement>) => {
           e.preventDefault();
@@ -71,7 +71,7 @@ export function IssueCard({
           e.preventDefault();
           setInsercao(null);
           const id = e.dataTransfer.getData("text/plain");
-          if (id && id !== issue.id) onFixar?.(id, issue.id, metadeDeCima(e));
+          if (id && id !== issue.id) onPin?.(id, issue.id, metadeDeCima(e));
         },
       }
     : {};
@@ -104,7 +104,7 @@ export function IssueCard({
             }
           : undefined
       }
-      {...alvo}
+      {...target}
     >
       <div className="issue-card-topo">
         <span className="selo selo-projeto" style={{ borderColor: project.color, color: project.color }}>
@@ -114,8 +114,8 @@ export function IssueCard({
       </div>
 
       <h3 className="issue-card-titulo">
-        {onAbrir ? (
-          <button type="button" className="link-botao" onClick={() => onAbrir(issue.id)}>
+        {onOpen ? (
+          <button type="button" className="link-botao" onClick={() => onOpen(issue.id)}>
             {issue.title}
           </button>
         ) : (
@@ -126,11 +126,11 @@ export function IssueCard({
       <div className="issue-card-rodape">
         <button
           type="button"
-          className={jaVotou ? "voto voto-feito" : "voto"}
-          onClick={() => onVotar(issue.id)}
-          disabled={jaVotou}
-          title={jaVotou ? t.alreadyVoted : t.voteTitle}
-          aria-label={jaVotou ? t.alreadyVoted : t.voteTitle}
+          className={hasVoted ? "voto voto-feito" : "voto"}
+          onClick={() => onVote(issue.id)}
+          disabled={hasVoted}
+          title={hasVoted ? t.alreadyVoted : t.voteTitle}
+          aria-label={hasVoted ? t.alreadyVoted : t.voteTitle}
         >
           <span aria-hidden="true">▲</span> {issue.upvotes}
         </button>
@@ -154,7 +154,7 @@ export function IssueCard({
         </time>
       </div>
 
-      {onMover && (
+      {onMove && (
         // Arrastar não funciona em toque nenhum — nem Safari do iPhone, nem
         // Chrome do Android. O seletor e as setas são o mecanismo de verdade; o
         // arrastar é só o atalho no desktop. De quebra funcionam no teclado e no
@@ -164,7 +164,7 @@ export function IssueCard({
             <span className="visually-hidden">{t.moveTo}</span>
             <select
               value={issue.archived ? "arquivado" : issue.status}
-              onChange={(e) => onMover(issue.id, e.target.value as Column)}
+              onChange={(e) => onMove(issue.id, e.target.value as Column)}
             >
               {ADMIN_COLUMNS.map((c) => (
                 <option key={c} value={c}>
@@ -188,7 +188,7 @@ export function IssueCard({
               <button
                 type="button"
                 onClick={() => onDegrau(1)}
-                disabled={ultimo}
+                disabled={last}
                 title={t.moveDown}
                 aria-label={t.moveDown}
               >

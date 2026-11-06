@@ -5,7 +5,7 @@ import type { PreparedAttachment } from "../../lib/anexos";
 import { getContact, type Issue } from "../../lib/issues";
 import { PROJECTS, PROJECT_SLUGS, type Project } from "../../lib/projetos";
 import { ISSUE_TYPES, type IssueType } from "../../lib/status";
-import { CampoAnexos } from "../enviar/CampoAnexos";
+import { AttachmentField } from "../enviar/CampoAnexos";
 
 export type EditableFields = Pick<Issue, "title" | "description" | "type" | "project">;
 
@@ -37,11 +37,11 @@ export function useContato(issueId: string): string | null {
 
 type PropsEdicao = {
   issue: Issue;
-  onSalvar: (campos: EditableFields) => void;
+  onSave: (fields: EditableFields) => void;
   onCancelar: () => void;
 };
 
-export function FormularioEdicao({ issue, onSalvar, onCancelar }: PropsEdicao) {
+export function FormularioEdicao({ issue, onSave, onCancelar }: PropsEdicao) {
   const [rascunho, setRascunho] = useState<EditableFields>({
     title: issue.title,
     description: issue.description,
@@ -106,7 +106,7 @@ export function FormularioEdicao({ issue, onSalvar, onCancelar }: PropsEdicao) {
         </select>
       </label>
       <div className="formulario-acoes">
-        <button type="button" className="botao botao-primario" onClick={() => onSalvar(rascunho)}>
+        <button type="button" className="botao botao-primario" onClick={() => onSave(rascunho)}>
           {t.save}
         </button>
         <button type="button" className="botao" onClick={onCancelar}>
@@ -123,10 +123,10 @@ type PropsComentario = {
    * único no documento, e agora existem duas instâncias deste formulário no app.
    */
   id: string;
-  onEnviar: (text: string, images: PreparedAttachment[]) => void;
+  onSubmit: (text: string, images: PreparedAttachment[]) => void;
 };
 
-export function FormularioComentario({ id, onEnviar }: PropsComentario) {
+export function CommentForm({ id, onSubmit }: PropsComentario) {
   const [text, setTexto] = useState("");
   const [images, setImagens] = useState<PreparedAttachment[]>([]);
 
@@ -136,7 +136,7 @@ export function FormularioComentario({ id, onEnviar }: PropsComentario) {
       onSubmit={(e) => {
         e.preventDefault();
         if (!text.trim()) return;
-        onEnviar(text, images);
+        onSubmit(text, images);
         setTexto("");
         setImagens([]);
       }}
@@ -151,7 +151,7 @@ export function FormularioComentario({ id, onEnviar }: PropsComentario) {
           maxLength={4000}
         />
       </label>
-      <CampoAnexos id={id} apenasImagens attachments={images} onChange={setImagens} />
+      <AttachmentField id={id} apenasImagens attachments={images} onChange={setImagens} />
       <button type="submit" className="botao botao-primario">
         {t.comment}
       </button>

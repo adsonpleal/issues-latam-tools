@@ -1,7 +1,7 @@
 import { getFirebaseApp } from "./firebase";
 
 /** O único e-mail com poder de escrita. Espelha `isAdmin()` em firestore.rules. */
-export const EMAIL_ADMIN = "adsonpleal@gmail.com";
+export const ADMIN_EMAIL = "adsonpleal@gmail.com";
 
 /**
  * Marca de "esta máquina já entrou alguma vez", no mesmo namespace dos votos.
@@ -19,18 +19,18 @@ export const EMAIL_ADMIN = "adsonpleal@gmail.com";
  * para fora: `/entrar` liga o observador sem consultá-la, e o Firebase reconhece
  * a sessão que ainda está no IndexedDB.
  */
-const CHAVE_SESSAO = "issues.latamtools.admin";
+const SESSION_KEY = "issues.latamtools.admin";
 
-export type Sessao = {
+export type Session = {
   uid: string;
   name: string;
   email: string;
   admin: boolean;
 };
 
-export function talvezTemSessao(): boolean {
+export function maybeHasSession(): boolean {
   try {
-    return localStorage.getItem(CHAVE_SESSAO) === "1";
+    return localStorage.getItem(SESSION_KEY) === "1";
   } catch {
     // localStorage bloqueado (modo privado antigo, storage cheio): o quadro
     // público segue igual, e entrar continua funcionando por /entrar.
@@ -38,10 +38,10 @@ export function talvezTemSessao(): boolean {
   }
 }
 
-function marcarSessao(tem: boolean): void {
+function markSession(has: boolean): void {
   try {
-    if (tem) localStorage.setItem(CHAVE_SESSAO, "1");
-    else localStorage.removeItem(CHAVE_SESSAO);
+    if (has) localStorage.setItem(SESSION_KEY, "1");
+    else localStorage.removeItem(SESSION_KEY);
   } catch {
     /* sem persistência, segue o jogo */
   }
@@ -56,12 +56,12 @@ async function authModule() {
   return { mod, auth: mod.getAuth(getFirebaseApp()) };
 }
 
-export async function observarSessao(cb: (s: Sessao | null) => void): Promise<() => void> {
+export async function watchSession(cb: (s: Session | null) => void): Promise<() => void> {
   const { mod, auth } = await authModule();
   return mod.onAuthStateChanged(auth, (user) => {
     // A marca acompanha o observador nos dois sentidos — inclusive quando o
     // sair aconteceu em outra aba, que é onde o onAuthStateChanged desemboca.
-    marcarSessao(user !== null);
+    markSession(user !== null);
     if (!user) {
       cb(null);
       return;
@@ -73,7 +73,7 @@ export async function observarSessao(cb: (s: Sessao | null) => void): Promise<()
       // Espelho da UI. Quem manda de verdade são as regras: qualquer conta
       // Google consegue entrar e criar um registro de usuário, e nenhuma delas
       // consegue escrever nada além deste e-mail.
-      admin: user.email === EMAIL_ADMIN && user.emailVerified,
+      admin: user.email === ADMIN_EMAIL && user.emailVerified,
     });
   });
 }
@@ -84,11 +84,11 @@ export async function entrar(): Promise<void> {
   // Popup, não redirect: o fluxo de redirect depende de um cookie cross-site em
   // firebaseapp.com que o ITP do Safari corta.
   await mod.signInWithPopup(auth, provider);
-  marcarSessao(true);
+  markSession(true);
 }
 
-export async function sair(): Promise<void> {
+export async function signOut(): Promise<void> {
   const { mod, auth } = await authModule();
-  marcarSessao(false);
+  markSession(false);
   await mod.signOut(auth);
 }

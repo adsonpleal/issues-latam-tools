@@ -21,32 +21,32 @@ function lerVotos(): Record<string, true> {
   }
 }
 
-function gravarVotos(votos: Record<string, true>): void {
+function gravarVotos(votes: Record<string, true>): void {
   try {
-    localStorage.setItem(CHAVE, JSON.stringify(votos));
+    localStorage.setItem(CHAVE, JSON.stringify(votes));
   } catch {
     /* sem persistência, segue o jogo */
   }
 }
 
-export function useVotos() {
-  const [votos, setVotos] = useState<Record<string, true>>(lerVotos);
+export function useVotes() {
+  const [votes, setVotos] = useState<Record<string, true>>(lerVotos);
 
-  const jaVotou = useCallback((id: string) => votos[id] === true, [votos]);
+  const hasVoted = useCallback((id: string) => votes[id] === true, [votes]);
 
-  const votar = useCallback(
+  const vote = useCallback(
     async (id: string) => {
-      if (votos[id]) return;
+      if (votes[id]) return;
       // Grava antes de mandar: se a escrita falhar, o pior caso é a pessoa achar
       // que votou. O contrário — deixar votar de novo por causa de uma falha de
       // rede — é pior e mais confuso.
-      const novos = { ...votos, [id]: true as const };
-      setVotos(novos);
-      gravarVotos(novos);
+      const nextParams = { ...votes, [id]: true as const };
+      setVotos(nextParams);
+      gravarVotos(nextParams);
       await upvoteIssue(id).catch(() => undefined);
     },
-    [votos],
+    [votes],
   );
 
-  return { jaVotou, votar };
+  return { hasVoted, vote };
 }

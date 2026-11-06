@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Issue } from "../../lib/issues";
-import { agrupar, agruparAdmin, filtrar, FILTROS_VAZIOS, pilha } from "./agrupar";
+import { group, groupForAdmin, filter, NO_FILTERS, stack } from "./agrupar";
 
 function issue(over: Partial<Issue> & { id: string }): Issue {
   return {
@@ -31,37 +31,37 @@ describe("filtrar", () => {
   ];
 
   it("sem filtro devolve tudo", () => {
-    expect(filtrar(base, FILTROS_VAZIOS)).toHaveLength(3);
+    expect(filter(base, NO_FILTERS)).toHaveLength(3);
   });
 
   it("filtra por projeto", () => {
-    const r = filtrar(base, { ...FILTROS_VAZIOS, project: "simulador" });
+    const r = filter(base, { ...NO_FILTERS, project: "simulador" });
     expect(r.map((i) => i.id)).toEqual(["a", "c"]);
   });
 
   it("filtra por tipo", () => {
-    const r = filtrar(base, { ...FILTROS_VAZIOS, type: "feature" });
+    const r = filter(base, { ...NO_FILTERS, type: "feature" });
     expect(r.map((i) => i.id)).toEqual(["b", "c"]);
   });
 
   it("combina projeto e tipo", () => {
-    const r = filtrar(base, { ...FILTROS_VAZIOS, project: "simulador", type: "feature" });
+    const r = filter(base, { ...NO_FILTERS, project: "simulador", type: "feature" });
     expect(r.map((i) => i.id)).toEqual(["c"]);
   });
 
   it("busca ignora acento e caixa", () => {
-    expect(filtrar(base, { ...FILTROS_VAZIOS, busca: "cacadora" }).map((i) => i.id)).toEqual(["a"]);
-    expect(filtrar(base, { ...FILTROS_VAZIOS, busca: "CEIFADOR" }).map((i) => i.id)).toEqual(["b"]);
+    expect(filter(base, { ...NO_FILTERS, search: "cacadora" }).map((i) => i.id)).toEqual(["a"]);
+    expect(filter(base, { ...NO_FILTERS, search: "CEIFADOR" }).map((i) => i.id)).toEqual(["b"]);
   });
 
   it("busca também na descrição", () => {
-    expect(filtrar(base, { ...FILTROS_VAZIOS, busca: "tooltip" }).map((i) => i.id)).toEqual(["c"]);
+    expect(filter(base, { ...NO_FILTERS, search: "tooltip" }).map((i) => i.id)).toEqual(["c"]);
   });
 });
 
 describe("agrupar", () => {
   it("devolve as cinco colunas na ordem, mesmo vazias", () => {
-    const r = agrupar([], FILTROS_VAZIOS);
+    const r = group([], NO_FILTERS);
     expect(r.map((c) => c.column)).toEqual([
       "reportado",
       "backlog",
@@ -73,24 +73,24 @@ describe("agrupar", () => {
   });
 
   it("nunca mostra arquivado — nem quando o status ainda é público", () => {
-    const r = agrupar([issue({ id: "x", status: "resolvido", archived: true })], FILTROS_VAZIOS);
+    const r = group([issue({ id: "x", status: "resolvido", archived: true })], NO_FILTERS);
     expect(r.flatMap((c) => c.issues)).toHaveLength(0);
   });
 
   it("ordena as colunas abertas por votos e desempata pelo mais novo", () => {
-    const r = agrupar(
+    const r = group(
       [
         issue({ id: "poucos", upvotes: 1, createdAt: new Date("2026-05-01") }),
         issue({ id: "muitos", upvotes: 9, createdAt: new Date("2026-01-01") }),
         issue({ id: "novo", upvotes: 1, createdAt: new Date("2026-06-01") }),
       ],
-      FILTROS_VAZIOS,
+      NO_FILTERS,
     );
     expect(r[0]?.issues.map((i) => i.id)).toEqual(["muitos", "novo", "poucos"]);
   });
 
   it("ordena resolvido pela última atualização, não por votos", () => {
-    const r = agrupar(
+    const r = group(
       [
         issue({
           id: "antigo",
@@ -105,32 +105,32 @@ describe("agrupar", () => {
           updatedAt: new Date("2026-08-01"),
         }),
       ],
-      FILTROS_VAZIOS,
+      NO_FILTERS,
     );
     const resolvido = r.find((c) => c.column === "resolvido");
     expect(resolvido?.issues.map((i) => i.id)).toEqual(["recente", "antigo"]);
   });
 
   it("ordem arrumada à mão manda mais que os votos", () => {
-    const r = agrupar(
+    const r = group(
       [
         issue({ id: "campeao", upvotes: 99 }),
         issue({ id: "fixado", upvotes: 0, order: 0 }),
       ],
-      FILTROS_VAZIOS,
+      NO_FILTERS,
     );
     expect(r[0]?.issues.map((i) => i.id)).toEqual(["fixado", "campeao"]);
   });
 
   it("quem não foi arrumado flui embaixo da pilha arrumada, pela regra da coluna", () => {
-    const r = agrupar(
+    const r = group(
       [
         issue({ id: "solto-pouco", upvotes: 1 }),
         issue({ id: "fixado-2", order: 1 }),
         issue({ id: "solto-muito", upvotes: 8 }),
         issue({ id: "fixado-1", order: 0 }),
       ],
-      FILTROS_VAZIOS,
+      NO_FILTERS,
     );
     expect(r[0]?.issues.map((i) => i.id)).toEqual([
       "fixado-1",
@@ -141,12 +141,12 @@ describe("agrupar", () => {
   });
 
   it("a ordem manual também vale nas colunas de encerramento", () => {
-    const r = agrupar(
+    const r = group(
       [
         issue({ id: "recente", status: "resolvido", updatedAt: new Date("2026-08-01") }),
         issue({ id: "fixado", status: "resolvido", updatedAt: new Date("2026-01-01"), order: 0 }),
       ],
-      FILTROS_VAZIOS,
+      NO_FILTERS,
     );
     expect(r.find((c) => c.column === "resolvido")?.issues.map((i) => i.id)).toEqual([
       "fixado",
@@ -155,12 +155,12 @@ describe("agrupar", () => {
   });
 
   it("aplica o filtro de projeto dentro das colunas", () => {
-    const r = agrupar(
+    const r = group(
       [
         issue({ id: "a", project: "recap" }),
         issue({ id: "b", project: "calc", status: "backlog" }),
       ],
-      { ...FILTROS_VAZIOS, project: "recap" },
+      { ...NO_FILTERS, project: "recap" },
     );
     expect(r.flatMap((c) => c.issues).map((i) => i.id)).toEqual(["a"]);
   });
@@ -168,7 +168,7 @@ describe("agrupar", () => {
 
 describe("pilha", () => {
   it("devolve a coluna inteira, ignorando qualquer filtro", () => {
-    const r = pilha(
+    const r = stack(
       [
         issue({ id: "a", status: "backlog", upvotes: 1, project: "recap" }),
         issue({ id: "b", status: "backlog", upvotes: 5, project: "calc" }),
@@ -180,23 +180,23 @@ describe("pilha", () => {
   });
 
   it("a gaveta de arquivados é uma pilha como as outras", () => {
-    const r = pilha([issue({ id: "x", status: "resolvido", archived: true })], "arquivado");
+    const r = stack([issue({ id: "x", status: "resolvido", archived: true })], "arquivado");
     expect(r.map((i) => i.id)).toEqual(["x"]);
   });
 });
 
 describe("agruparAdmin", () => {
   it("acrescenta a coluna de arquivados no fim", () => {
-    const r = agruparAdmin([issue({ id: "x", archived: true })], FILTROS_VAZIOS);
+    const r = groupForAdmin([issue({ id: "x", archived: true })], NO_FILTERS);
     expect(r).toHaveLength(6);
     expect(r[5]?.column).toBe("arquivado");
     expect(r[5]?.issues.map((i) => i.id)).toEqual(["x"]);
   });
 
   it("card arquivado sai da coluna de status original", () => {
-    const r = agruparAdmin(
+    const r = groupForAdmin(
       [issue({ id: "x", status: "em_progresso", archived: true })],
-      FILTROS_VAZIOS,
+      NO_FILTERS,
     );
     expect(r.find((c) => c.column === "em_progresso")?.issues).toHaveLength(0);
   });

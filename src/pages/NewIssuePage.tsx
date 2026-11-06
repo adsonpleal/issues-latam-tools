@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 
 import { t } from "../i18n";
 import { useSeo } from "../lib/seo";
-import { NovoIssueForm } from "../features/enviar/NovoIssueForm";
+import { NewIssueForm } from "../features/enviar/NovoIssueForm";
 
 export function NewIssuePage() {
   useSeo({
@@ -20,7 +20,7 @@ export function NewIssuePage() {
       </p>
       <h1>{t.formTitle}</h1>
       <p className="subtitulo">{t.formSubtitle}</p>
-      <NovoIssueForm />
+      <NewIssueForm />
     </div>
   );
 }

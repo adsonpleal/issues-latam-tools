@@ -11,27 +11,27 @@ import {
 } from "../../lib/issues";
 import { PROJECTS, PROJECT_SLUGS, parseProject, type Project } from "../../lib/projetos";
 import { FORM_ISSUE_TYPES, type IssueType } from "../../lib/status";
-import { CampoAnexos } from "./CampoAnexos";
-import { useEnviarIssue } from "./useEnviarIssue";
+import { AttachmentField } from "./CampoAnexos";
+import { useSubmitIssue } from "./useEnviarIssue";
 
-export function NovoIssueForm() {
+export function NewIssueForm() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { state, mensagemErro, enviar } = useEnviarIssue();
+  const { state, errorMessage, submit } = useSubmitIssue();
 
   // O projeto vem pré-selecionado do link "Reportar" do site de origem.
-  const [project, setProjeto] = useState<Project>(parseProject(params.get("projeto")) ?? "simulador");
-  const [type, setTipo] = useState<IssueType>("bug");
-  const [title, setTitulo] = useState("");
-  const [description, setDescricao] = useState("");
-  const [author, setAutor] = useState("");
+  const [project, setProject] = useState<Project>(parseProject(params.get("projeto")) ?? "simulador");
+  const [type, setType] = useState<IssueType>("bug");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [author, setAuthor] = useState("");
   const [contact, setContato] = useState("");
-  const [attachments, setAnexos] = useState<PreparedAttachment[]>([]);
+  const [attachments, setAttachments] = useState<PreparedAttachment[]>([]);
   const [isca, setIsca] = useState("");
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    const id = await enviar({ project, type, title, description, author, contact, attachments, isca });
+    const id = await submit({ project, type, title, description, author, contact, attachments, isca });
     if (id) navigate(`/t/${id}?novo=1`);
   }
 
@@ -42,7 +42,7 @@ export function NovoIssueForm() {
         <select
           id="projeto"
           value={project}
-          onChange={(e) => setProjeto(e.target.value as Project)}
+          onChange={(e) => setProject(e.target.value as Project)}
           required
         >
           {PROJECT_SLUGS.map((slug) => (
@@ -66,7 +66,7 @@ export function NovoIssueForm() {
                 name="tipo"
                 value={tp}
                 checked={type === tp}
-                onChange={() => setTipo(tp)}
+                onChange={() => setType(tp)}
               />
               {TYPE_LABEL[tp]}
             </label>
@@ -79,7 +79,7 @@ export function NovoIssueForm() {
         <input
           id="titulo"
           value={title}
-          onChange={(e) => setTitulo(e.target.value)}
+          onChange={(e) => setTitle(e.target.value)}
           placeholder={t.fieldSummaryPlaceholder}
           maxLength={TITLE_MAX}
           required
@@ -92,21 +92,21 @@ export function NovoIssueForm() {
         <textarea
           id="descricao"
           value={description}
-          onChange={(e) => setDescricao(e.target.value)}
+          onChange={(e) => setDescription(e.target.value)}
           placeholder={t.fieldDetailsPlaceholder}
           maxLength={DESCRIPTION_MAX}
           rows={7}
         />
       </div>
 
-      <CampoAnexos attachments={attachments} onChange={setAnexos} />
+      <AttachmentField attachments={attachments} onChange={setAttachments} />
 
       <div className="campo">
         <label htmlFor="autor">{t.fieldNick}</label>
         <input
           id="autor"
           value={author}
-          onChange={(e) => setAutor(e.target.value)}
+          onChange={(e) => setAuthor(e.target.value)}
           maxLength={NICK_MAX}
           aria-describedby="ajuda-autor"
         />
@@ -143,11 +143,11 @@ export function NovoIssueForm() {
         />
       </div>
 
-      {mensagemErro && <p className="aviso aviso-erro">{mensagemErro}</p>}
+      {errorMessage && <p className="aviso aviso-erro">{errorMessage}</p>}
 
       <div className="formulario-acoes">
-        <button type="submit" className="botao botao-primario" disabled={state === "enviando"}>
-          {state === "enviando" ? t.submitting : t.submit}
+        <button type="submit" className="botao botao-primario" disabled={state === "sending"}>
+          {state === "sending" ? t.submitting : t.submit}
         </button>
       </div>
     </form>

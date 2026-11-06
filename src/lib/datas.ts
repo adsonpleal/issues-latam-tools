@@ -10,9 +10,9 @@ const HORA = 60 * MINUTO;
 const DIA = 24 * HORA;
 
 /** "há 3 dias", "há 2 meses". Acima de um ano vira data absoluta. */
-export function formatRelative(data: Date | null): string {
-  if (!data) return "";
-  const delta = data.getTime() - Date.now();
+export function formatRelative(date: Date | null): string {
+  if (!date) return "";
+  const delta = date.getTime() - Date.now();
   const abs = Math.abs(delta);
 
   if (abs < MINUTO) return "agora";
@@ -20,9 +20,9 @@ export function formatRelative(data: Date | null): string {
   if (abs < DIA) return RTF.format(Math.round(delta / HORA), "hour");
   if (abs < 30 * DIA) return RTF.format(Math.round(delta / DIA), "day");
   if (abs < 365 * DIA) return RTF.format(Math.round(delta / (30 * DIA)), "month");
-  return DATA_COMPLETA.format(data);
+  return DATA_COMPLETA.format(date);
 }
 
-export function formatData(data: Date | null): string {
-  return data ? DATA_COMPLETA.format(data) : "";
+export function formatDate(date: Date | null): string {
+  return date ? DATA_COMPLETA.format(date) : "";
 }

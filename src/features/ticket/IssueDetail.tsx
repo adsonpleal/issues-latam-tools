@@ -1,16 +1,16 @@
 import { Link } from "react-router-dom";
 
 import { STATUS_LABEL, TYPE_LABEL, t } from "../../i18n";
-import { formatData } from "../../lib/datas";
+import { formatDate } from "../../lib/datas";
 import type { Issue } from "../../lib/issues";
 import { PROJECTS } from "../../lib/projetos";
-import { useVotos } from "../votos/useVotos";
-import { TextoComLinks } from "./TextoComLinks";
+import { useVotes } from "../votos/useVotos";
+import { TextWithLinks } from "./TextoComLinks";
 
 export function IssueDetail({ issue }: { issue: Issue }) {
-  const { jaVotou, votar } = useVotos();
+  const { hasVoted, vote } = useVotes();
   const project = PROJECTS[issue.project];
-  const votou = jaVotou(issue.id);
+  const votou = hasVoted(issue.id);
 
   return (
     <article className="issue-detalhe">
@@ -31,20 +31,20 @@ export function IssueDetail({ issue }: { issue: Issue }) {
       <h1>{issue.title}</h1>
 
       <p className="issue-detalhe-meta">
-        {formatData(issue.createdAt)}
+        {formatDate(issue.createdAt)}
         {issue.author && <> · {t.reportedBy(issue.author)}</>}
       </p>
 
       {issue.description && (
         <div className="issue-detalhe-descricao">
-          <TextoComLinks text={issue.description} />
+          <TextWithLinks text={issue.description} />
         </div>
       )}
 
       <button
         type="button"
         className={votou ? "voto voto-feito" : "voto"}
-        onClick={() => void votar(issue.id)}
+        onClick={() => void vote(issue.id)}
         disabled={votou}
         title={votou ? t.alreadyVoted : t.voteTitle}
       >

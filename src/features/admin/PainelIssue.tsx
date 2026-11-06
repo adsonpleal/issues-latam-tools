@@ -5,21 +5,21 @@ import { deleteAttachment, subscribeAttachments, type Attachment, type PreparedA
 import { subscribeComments, type IssueComment } from "../../lib/comentarios";
 import type { Issue } from "../../lib/issues";
 import { PROJECTS } from "../../lib/projetos";
-import { ListaAnexos } from "../ticket/ListaAnexos";
-import { ListaComentarios } from "../ticket/ListaComentarios";
+import { AttachmentList } from "../ticket/ListaAnexos";
+import { CommentList } from "../ticket/ListaComentarios";
 import {
-  FormularioComentario,
+  CommentForm,
   FormularioEdicao,
   useContato,
   type EditableFields,
 } from "./AcoesIssue";
-import { ResumoGravacao } from "./ResumoGravacao";
+import { RecordingSummary } from "./ResumoGravacao";
 
 type Props = {
   issue: Issue;
-  onFechar: () => void;
-  onComentar: (text: string, images: PreparedAttachment[]) => void;
-  onEditar: (campos: EditableFields) => void;
+  onClose: () => void;
+  onComment: (text: string, images: PreparedAttachment[]) => void;
+  onEdit: (fields: EditableFields) => void;
 };
 
 /**
@@ -27,24 +27,24 @@ type Props = {
  * ler a ficha e arrastar a coluna na mesma tela. A mesma ficha, inteira e com os
  * mesmos poderes, também abre em `/t/:id`; as peças de edição são as mesmas.
  */
-export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
-  const [comments, setComentarios] = useState<IssueComment[]>([]);
-  const [attachments, setAnexos] = useState<Attachment[]>([]);
+export function IssuePanel({ issue, onClose, onComment, onEdit }: Props) {
+  const [comments, setComments] = useState<IssueComment[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [editando, setEditando] = useState(false);
   const contact = useContato(issue.id);
 
   useEffect(() => setEditando(false), [issue.id]);
 
   useEffect(
-    () => subscribeComments(issue.id, setComentarios, () => setComentarios([])),
+    () => subscribeComments(issue.id, setComments, () => setComments([])),
     [issue.id],
   );
 
-  useEffect(() => subscribeAttachments(issue.id, setAnexos, () => setAnexos([])), [issue.id]);
+  useEffect(() => subscribeAttachments(issue.id, setAttachments, () => setAttachments([])), [issue.id]);
 
   // Mesma subcoleção, dois lugares na tela: sem `comentarioId` é anexo do card,
   // com `comentarioId` é print colado numa atualização.
-  const [anexosDoCard, imagensDeComentario] = useMemo(
+  const [cardAttachments, commentImages] = useMemo(
     () => [attachments.filter((a) => !a.commentId), attachments.filter((a) => a.commentId)],
     [attachments],
   );
@@ -53,7 +53,7 @@ export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
     <aside className="painel" aria-label={issue.title}>
       <div className="painel-topo">
         <h2>{editando ? t.edit : issue.title}</h2>
-        <button type="button" className="botao botao-pequeno" onClick={onFechar}>
+        <button type="button" className="botao botao-pequeno" onClick={onClose}>
           ✕
         </button>
       </div>
@@ -61,8 +61,8 @@ export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
       {editando ? (
         <FormularioEdicao
           issue={issue}
-          onSalvar={(campos) => {
-            onEditar(campos);
+          onSave={(fields) => {
+            onEdit(fields);
             setEditando(false);
           }}
           onCancelar={() => setEditando(false)}
@@ -74,7 +74,7 @@ export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
             {issue.author && <> · {t.reportedBy(issue.author)}</>}
           </p>
           {issue.description && <p className="painel-descricao">{issue.description}</p>}
-          {issue.replay && <ResumoGravacao replay={issue.replay} />}
+          {issue.replay && <RecordingSummary replay={issue.replay} />}
           <p className="linha-contato">
             <strong>{t.contactLabel}:</strong> {contact ?? t.noContact}
           </p>
@@ -84,16 +84,16 @@ export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
         </>
       )}
 
-      <ListaAnexos attachments={anexosDoCard} onApagar={(attachmentId) => void deleteAttachment(issue.id, attachmentId)} />
+      <AttachmentList attachments={cardAttachments} onDelete={(attachmentId) => void deleteAttachment(issue.id, attachmentId)} />
 
       <h3 className="secao">{t.commentCount(comments.length)}</h3>
-      <ListaComentarios
+      <CommentList
         comments={comments}
-        images={imagensDeComentario}
+        images={commentImages}
         onApagarImagem={(attachmentId) => void deleteAttachment(issue.id, attachmentId)}
       />
 
-      <FormularioComentario id="imagens-comentario-painel" onEnviar={onComentar} />
+      <CommentForm id="imagens-comentario-painel" onSubmit={onComment} />
     </aside>
   );
 }

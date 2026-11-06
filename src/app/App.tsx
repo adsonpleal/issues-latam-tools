@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 
-import { SessaoProvider } from "../features/admin/SessaoContext";
+import { SessionProvider } from "../features/admin/SessaoContext";
 import { t } from "../i18n";
 import { isProject } from "../lib/projetos";
 import { BoardPage } from "../pages/BoardPage";
@@ -42,7 +42,7 @@ function AtalhoProjeto() {
 export function App() {
   return (
     <BrowserRouter>
-      <SessaoProvider>
+      <SessionProvider>
         <TopBar />
         <main className="conteudo">
           <Suspense fallback={<p className="aviso">{t.loading}</p>}>
@@ -61,7 +61,7 @@ export function App() {
           </Suspense>
         </main>
         <SiteFooter />
-      </SessaoProvider>
+      </SessionProvider>
     </BrowserRouter>
   );
 }

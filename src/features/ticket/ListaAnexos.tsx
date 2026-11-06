@@ -6,10 +6,10 @@ import { formatSize, attachmentUrl, type Attachment } from "../../lib/anexos";
 type Props = {
   attachments: Attachment[];
   /** Só com sessão de admin: qualquer pessoa anexa, então precisa dar para tirar. */
-  onApagar?: (attachmentId: string) => void;
+  onDelete?: (attachmentId: string) => void;
 };
 
-export function ListaAnexos({ attachments, onApagar }: Props) {
+export function AttachmentList({ attachments, onDelete }: Props) {
   const urls = useMemo(() => attachments.map(attachmentUrl), [attachments]);
   useEffect(() => () => urls.forEach(URL.revokeObjectURL), [urls]);
 
@@ -49,11 +49,11 @@ export function ListaAnexos({ attachments, onApagar }: Props) {
             <a className="botao botao-pequeno" href={urls[i]} download={a.name}>
               {t.download}
             </a>
-            {onApagar && (
+            {onDelete && (
               <button
                 type="button"
                 className="botao botao-pequeno"
-                onClick={() => onApagar(a.id)}
+                onClick={() => onDelete(a.id)}
               >
                 {t.remove}
               </button>

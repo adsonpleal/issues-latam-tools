@@ -3,33 +3,33 @@ import type { Project } from "../../lib/projetos";
 import type { Column, IssueType } from "../../lib/status";
 import { COLUMNS, ADMIN_COLUMNS, sortsByUpdatedAt } from "../../lib/status";
 
-export type Filtros = {
+export type Filters = {
   project: Project | null;
   type: IssueType | null;
-  busca: string;
+  search: string;
 };
 
-export const FILTROS_VAZIOS: Filtros = { project: null, type: null, busca: "" };
+export const NO_FILTERS: Filters = { project: null, type: null, search: "" };
 
 /** Sem acento e em minúsculas, para "gravitacional" achar "Gravitacional". */
-function normaliza(s: string): string {
+function normalise(s: string): string {
   return s
     .toLocaleLowerCase("pt-BR")
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "");
 }
 
-export function filtrar(issues: Issue[], filtros: Filtros): Issue[] {
-  const termo = normaliza(filtros.busca.trim());
+export function filter(issues: Issue[], filters: Filters): Issue[] {
+  const termo = normalise(filters.search.trim());
   return issues.filter((i) => {
-    if (filtros.project && i.project !== filtros.project) return false;
-    if (filtros.type && i.type !== filtros.type) return false;
-    if (termo && !normaliza(`${i.title} ${i.description}`).includes(termo)) return false;
+    if (filters.project && i.project !== filters.project) return false;
+    if (filters.type && i.type !== filters.type) return false;
+    if (termo && !normalise(`${i.title} ${i.description}`).includes(termo)) return false;
     return true;
   });
 }
 
-function tempo(d: Date | null): number {
+function timeOf(d: Date | null): number {
   return d ? d.getTime() : 0;
 }
 
@@ -37,11 +37,11 @@ function tempo(d: Date | null): number {
  * A coluna onde o card aparece. `arquivado` não é status: é o booleano que tira
  * o card das cinco colunas e o joga na gaveta.
  */
-export function colunaDe(issue: Issue): Column {
+export function columnOf(issue: Issue): Column {
   return issue.archived ? "arquivado" : issue.status;
 }
 
-function comparar(a: Issue, b: Issue, column: Column): number {
+function compare(a: Issue, b: Issue, column: Column): number {
   // Arrumado à mão manda em tudo. Quem não foi arrumado flui embaixo, pela
   // regra da coluna — é o que faz um card novo cair no fim de uma pilha
   // arrumada em vez de se enfiar no meio dela.
@@ -52,14 +52,14 @@ function comparar(a: Issue, b: Issue, column: Column): number {
   }
   if (sortsByUpdatedAt(column)) {
     // Colunas de encerramento: o que saiu mais recentemente vem primeiro.
-    return tempo(b.updatedAt) - tempo(a.updatedAt);
+    return timeOf(b.updatedAt) - timeOf(a.updatedAt);
   }
   // Resto do quadro: mais votado primeiro, empate desempatado pelo mais novo.
   if (b.upvotes !== a.upvotes) return b.upvotes - a.upvotes;
-  return tempo(b.createdAt) - tempo(a.createdAt);
+  return timeOf(b.createdAt) - timeOf(a.createdAt);
 }
 
-export type Agrupado = { column: Column; issues: Issue[] };
+export type ColumnGroup = { column: Column; issues: Issue[] };
 
 /**
  * A pilha de uma coluna, na ordem da tela.
@@ -70,24 +70,24 @@ export type Agrupado = { column: Column; issues: Issue[] };
  * preserva a posição relativa dos escondidos, "soltar antes do card X" quer
  * dizer a mesma coisa nas duas.
  */
-export function pilha(issues: Issue[], column: Column): Issue[] {
-  return issues.filter((i) => colunaDe(i) === column).sort((a, b) => comparar(a, b, column));
+export function stack(issues: Issue[], column: Column): Issue[] {
+  return issues.filter((i) => columnOf(i) === column).sort((a, b) => compare(a, b, column));
 }
 
 /**
  * Filtra, agrupa por status e ordena. Função pura de propósito — é a única parte
  * do quadro que dá para testar sem Firestore, e é onde mora toda a lógica.
  */
-export function agrupar(issues: Issue[], filtros: Filtros): Agrupado[] {
-  const visiveis = filtrar(issues, filtros);
+export function group(issues: Issue[], filters: Filters): ColumnGroup[] {
+  const visiveis = filter(issues, filters);
   return COLUMNS.map((column) => ({
     column: column as Column,
-    issues: pilha(visiveis, column),
+    issues: stack(visiveis, column),
   }));
 }
 
 /** Igual ao `agrupar`, mais a gaveta de arquivados no fim. Só com sessão. */
-export function agruparAdmin(issues: Issue[], filtros: Filtros): Agrupado[] {
-  const visiveis = filtrar(issues, filtros);
-  return ADMIN_COLUMNS.map((column) => ({ column, issues: pilha(visiveis, column) }));
+export function groupForAdmin(issues: Issue[], filters: Filters): ColumnGroup[] {
+  const visiveis = filter(issues, filters);
+  return ADMIN_COLUMNS.map((column) => ({ column, issues: stack(visiveis, column) }));
 }

@@ -9,7 +9,7 @@ import {
   formatSize,
 } from "../../lib/anexos";
 import type { PreparedAttachment } from "../../lib/anexos";
-import { reduzirImagem } from "../../lib/imagem";
+import { shrinkImage } from "../../lib/imagem";
 
 type Props = {
   attachments: PreparedAttachment[];
@@ -20,9 +20,9 @@ type Props = {
   apenasImagens?: boolean;
 };
 
-export function CampoAnexos({ attachments, onChange, id = "anexos", apenasImagens = false }: Props) {
+export function AttachmentField({ attachments, onChange, id = "anexos", apenasImagens = false }: Props) {
   const [preparando, setPreparando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
 
   // As miniaturas viram object URL; sem revogar, cada troca de arquivo deixa um
@@ -46,13 +46,13 @@ export function CampoAnexos({ attachments, onChange, id = "anexos", apenasImagen
     if (input.current) input.current.value = "";
     if (escolhidos.length === 0) return;
 
-    setErro(null);
+    setError(null);
     setPreparando(true);
-    const novos: PreparedAttachment[] = [];
+    const nextParams: PreparedAttachment[] = [];
     const problemas: string[] = [];
 
     for (const file of escolhidos) {
-      if (attachments.length + novos.length >= ATTACHMENTS_MAX) {
+      if (attachments.length + nextParams.length >= ATTACHMENTS_MAX) {
         problemas.push(t.attachmentTooMany);
         break;
       }
@@ -65,15 +65,15 @@ export function CampoAnexos({ attachments, onChange, id = "anexos", apenasImagen
       }
       try {
         if (type === "imagem") {
-          const { data, name } = await reduzirImagem(file);
-          novos.push({ name, type, data });
+          const { data, name } = await shrinkImage(file);
+          nextParams.push({ name, type, data });
         } else {
           // .rrf vai como está — encolher um replay não é opção.
           if (file.size > ATTACHMENT_MAX_BYTES) {
             problemas.push(t.attachmentTooBig(file.name, formatSize(ATTACHMENT_MAX_BYTES)));
             continue;
           }
-          novos.push({
+          nextParams.push({
             name: file.name,
             type,
             data: new Uint8Array(await file.arrayBuffer()),
@@ -85,11 +85,11 @@ export function CampoAnexos({ attachments, onChange, id = "anexos", apenasImagen
     }
 
     setPreparando(false);
-    if (problemas.length) setErro(problemas.join(" "));
-    if (novos.length) onChange([...attachments, ...novos]);
+    if (problemas.length) setError(problemas.join(" "));
+    if (nextParams.length) onChange([...attachments, ...nextParams]);
   }
 
-  function remover(i: number) {
+  function remove(i: number) {
     onChange(attachments.filter((_, n) => n !== i));
   }
 
@@ -111,7 +111,7 @@ export function CampoAnexos({ attachments, onChange, id = "anexos", apenasImagen
       </p>
 
       {preparando && <p className="campo-ajuda">{t.attachmentPreparing}</p>}
-      {erro && <p className="aviso aviso-erro">{erro}</p>}
+      {error && <p className="aviso aviso-erro">{error}</p>}
 
       {attachments.length > 0 && (
         <ul className="anexos-escolhidos">
@@ -126,7 +126,7 @@ export function CampoAnexos({ attachments, onChange, id = "anexos", apenasImagen
               )}
               <span className="anexo-nome">{a.name}</span>
               <span className="campo-ajuda">{formatSize(a.data.byteLength)}</span>
-              <button type="button" className="botao botao-pequeno" onClick={() => remover(i)}>
+              <button type="button" className="botao botao-pequeno" onClick={() => remove(i)}>
                 {t.remove}
               </button>
             </li>

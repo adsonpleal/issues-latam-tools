@@ -1,6 +1,6 @@
 import { Link, useSearchParams } from "react-router-dom";
 
-import { useSessao } from "../features/admin/SessaoContext";
+import { useSession } from "../features/admin/SessaoContext";
 import { TYPE_LABEL, t } from "../i18n";
 import { PROJECTS, PROJECT_SLUGS, parseProject } from "../lib/projetos";
 import { ISSUE_TYPES, isIssueType } from "../lib/status";
@@ -15,18 +15,18 @@ import { ISSUE_TYPES, isIssueType } from "../lib/status";
  * época em que existia uma rota para pendurá-lo.
  */
 export function TopBar() {
-  const { sessao, admin, sair } = useSessao();
+  const { session, admin, signOut } = useSession();
   const [params, setParams] = useSearchParams();
   const project = parseProject(params.get("projeto"));
-  const tipoBruto = params.get("tipo");
-  const type = isIssueType(tipoBruto) ? tipoBruto : null;
-  const busca = params.get("busca") ?? "";
+  const rawType = params.get("tipo");
+  const type = isIssueType(rawType) ? rawType : null;
+  const search = params.get("busca") ?? "";
 
-  function atualiza(chave: string, valor: string) {
-    const novos = new URLSearchParams(params);
-    if (valor) novos.set(chave, valor);
-    else novos.delete(chave);
-    setParams(novos, { replace: true });
+  function atualiza(chave: string, value: string) {
+    const nextParams = new URLSearchParams(params);
+    if (value) nextParams.set(chave, value);
+    else nextParams.delete(chave);
+    setParams(nextParams, { replace: true });
   }
 
   return (
@@ -74,7 +74,7 @@ export function TopBar() {
           <span className="visually-hidden">{t.search}</span>
           <input
             type="search"
-            value={busca}
+            value={search}
             placeholder={t.searchPlaceholder}
             onChange={(e) => atualiza("busca", e.target.value)}
           />
@@ -84,9 +84,9 @@ export function TopBar() {
       <div className="topbar-acoes">
         {admin && (
           <span className="admin-sessao">
-            <span>{sessao?.name}</span>
+            <span>{session?.name}</span>
             <Link to="/gravacoes">{t.recordingsLink}</Link>
-            <button type="button" className="botao botao-pequeno" onClick={() => void sair()}>
+            <button type="button" className="botao botao-pequeno" onClick={() => void signOut()}>
               {t.signOut}
             </button>
           </span>

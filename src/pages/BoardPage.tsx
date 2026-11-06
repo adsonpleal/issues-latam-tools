@@ -5,21 +5,21 @@ import { t } from "../i18n";
 import { PROJECTS, parseProject } from "../lib/projetos";
 import { useSeo } from "../lib/seo";
 import { isIssueType, type Column } from "../lib/status";
-import { useSessao } from "../features/admin/SessaoContext";
-import { useAcoesAdmin } from "../features/admin/useAcoesAdmin";
-import { agrupar, agruparAdmin, colunaDe, pilha } from "../features/board/agrupar";
+import { useSession } from "../features/admin/SessaoContext";
+import { useAdminActions } from "../features/admin/useAcoesAdmin";
+import { group, groupForAdmin, columnOf, stack } from "../features/board/agrupar";
 import { Board } from "../features/board/Board";
-import { reordenarPilha, soltarPilha } from "../features/board/ordem";
+import { reorderStack, releaseStack } from "../features/board/ordem";
 import { useBoard } from "../features/board/useBoard";
 
-const PainelIssue = lazy(() =>
-  import("../features/admin/PainelIssue").then((m) => ({ default: m.PainelIssue })),
+const IssuePanel = lazy(() =>
+  import("../features/admin/PainelIssue").then((m) => ({ default: m.IssuePanel })),
 );
 
 export function BoardPage() {
   const [params] = useSearchParams();
   const project = parseProject(params.get("projeto"));
-  const { carregando: carregandoSessao } = useSessao();
+  const { loading: loadingSession } = useSession();
 
   useSeo({
     title: project
@@ -46,80 +46,80 @@ export function BoardPage() {
           Para o admin, evita assinar o Firestore duas vezes (a consulta muda com
           o `admin`) e evita o quadro já pintado piscar de volta para
           "Carregando…" quando o SDK de auth responde. */}
-      {carregandoSessao ? <p className="aviso">{t.loading}</p> : <Quadro />}
+      {loadingSession ? <p className="aviso">{t.loading}</p> : <BoardBody />}
     </>
   );
 }
 
-function Quadro() {
+function BoardBody() {
   const [params, setParams] = useSearchParams();
   const project = parseProject(params.get("projeto"));
-  const tipoBruto = params.get("tipo");
-  const type = isIssueType(tipoBruto) ? tipoBruto : null;
-  const busca = params.get("busca") ?? "";
+  const rawType = params.get("tipo");
+  const type = isIssueType(rawType) ? rawType : null;
+  const search = params.get("busca") ?? "";
 
-  const { sessao, admin } = useSessao();
+  const { session, admin } = useSession();
   // Com admin, a consulta perde o where de arquivado — a regra permite listar
   // tudo para este e-mail, então a gaveta de arquivados aparece.
-  const { issues, carregando, erro } = useBoard({ admin });
-  const { mover, ordenar, comentar, editar, erro: erroAcao } = useAcoesAdmin(sessao);
+  const { issues, loading, error } = useBoard({ admin });
+  const { move, sort, comment, edit, error: actionError } = useAdminActions(session);
 
   // O painel aberto mora na querystring, junto dos filtros: assim a URL da barra
   // de endereço já é o link do card, e voltar no navegador fecha o painel.
-  const aberto = params.get("card");
-  function abrir(id: string | null) {
-    const novos = new URLSearchParams(params);
-    if (id) novos.set("card", id);
-    else novos.delete("card");
-    setParams(novos);
+  const openId = params.get("card");
+  function open(id: string | null) {
+    const nextParams = new URLSearchParams(params);
+    if (id) nextParams.set("card", id);
+    else nextParams.delete("card");
+    setParams(nextParams);
   }
 
-  const colunas = useMemo(
-    () => (admin ? agruparAdmin : agrupar)(issues, { project, type, busca }),
-    [admin, issues, project, type, busca],
+  const columns = useMemo(
+    () => (admin ? groupForAdmin : group)(issues, { project, type, search }),
+    [admin, issues, project, type, search],
   );
   // Procurado na lista inteira, não nas colunas: um link direto precisa abrir o
   // card mesmo quando o filtro em vigor o esconderia do quadro.
-  const issueAberta = admin ? (issues.find((i) => i.id === aberto) ?? null) : null;
+  const openIssue = admin ? (issues.find((i) => i.id === openId) ?? null) : null;
 
   // Soltar em cima de um card fixa a posição. A conta roda sempre na pilha
   // COMPLETA da coluna de destino — o que está na tela pode ser um pedaço dela,
   // e renumerar só o pedaço embaralharia o que o filtro esconde.
-  function fixar(id: string, alvoId: string, antes: boolean) {
-    const arrastado = issues.find((i) => i.id === id);
-    const alvo = issues.find((i) => i.id === alvoId);
-    if (!arrastado || !alvo) return;
-    const destino = colunaDe(alvo);
-    const posicoes = reordenarPilha(pilha(issues, destino), arrastado, alvoId, antes);
+  function pin(id: string, targetId: string, before: boolean) {
+    const dragged = issues.find((i) => i.id === id);
+    const target = issues.find((i) => i.id === targetId);
+    if (!dragged || !target) return;
+    const destination = columnOf(target);
+    const positions = reorderStack(stack(issues, destination), dragged, targetId, before);
     // Veio de outra coluna: status e posição saem na mesma escrita, senão o card
     // aparece um instante na coluna nova e no lugar errado.
-    const mudouDeColuna = colunaDe(arrastado) !== destino;
-    void ordenar(posicoes, mudouDeColuna ? { id, column: destino } : undefined);
+    const changedColumn = columnOf(dragged) !== destination;
+    void sort(positions, changedColumn ? { id, column: destination } : undefined);
   }
 
-  function ordemAutomatica(column: Column) {
-    void ordenar(soltarPilha(pilha(issues, column)));
+  function autoOrder(column: Column) {
+    void sort(releaseStack(stack(issues, column)));
   }
 
   return (
     <>
-      {erroAcao && <p className="aviso aviso-erro">{erroAcao}</p>}
+      {actionError && <p className="aviso aviso-erro">{actionError}</p>}
       <Board
-        colunas={colunas}
-        carregando={carregando}
-        erro={erro}
-        onMover={admin ? (id, column) => void mover(id, column) : undefined}
-        onAbrir={admin ? abrir : undefined}
-        onFixar={admin ? fixar : undefined}
-        onOrdemAutomatica={admin ? ordemAutomatica : undefined}
+        columns={columns}
+        loading={loading}
+        error={error}
+        onMove={admin ? (id, column) => void move(id, column) : undefined}
+        onOpen={admin ? open : undefined}
+        onPin={admin ? pin : undefined}
+        onAutoOrder={admin ? autoOrder : undefined}
       />
-      {issueAberta && (
+      {openIssue && (
         <Suspense fallback={<p className="aviso">{t.loading}</p>}>
-          <PainelIssue
-            issue={issueAberta}
-            onFechar={() => abrir(null)}
-            onComentar={(text, images) => void comentar(issueAberta.id, text, images)}
-            onEditar={(campos) => void editar(issueAberta.id, campos)}
+          <IssuePanel
+            issue={openIssue}
+            onClose={() => open(null)}
+            onComment={(text, images) => void comment(openIssue.id, text, images)}
+            onEdit={(fields) => void edit(openIssue.id, fields)}
           />
         </Suspense>
       )}

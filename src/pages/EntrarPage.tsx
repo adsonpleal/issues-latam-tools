@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 
 import { t } from "../i18n";
 import { useSeo } from "../lib/seo";
-import { useSessao } from "../features/admin/SessaoContext";
+import { useSession } from "../features/admin/SessaoContext";
 
 /**
  * A única porta. Não é linkada de lugar nenhum — e não precisa ser: só existe um
@@ -21,11 +21,11 @@ import { useSessao } from "../features/admin/SessaoContext";
  */
 export function EntrarPage() {
   useSeo({ title: `${t.signIn} — ${t.siteName}` });
-  const { sessao, admin, carregando, ativar, entrar, sair } = useSessao();
+  const { session, admin, loading, ativar, entrar, signOut } = useSession();
   // O que o popup respondeu de errado. Sem isto, falhar em entrar é um clique
   // que não faz nada — e popup bloqueado, que é a falha mais comum, some sem
   // deixar rastro na tela.
-  const [erro, setErro] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(ativar, [ativar]);
 
@@ -34,32 +34,32 @@ export function EntrarPage() {
   return (
     <div className="pagina pagina-estreita">
       <div className="admin-portao">
-        {carregando && <p className="aviso">{t.loading}</p>}
+        {loading && <p className="aviso">{t.loading}</p>}
 
-        {!carregando && !sessao && (
+        {!loading && !session && (
           <>
             <p>{t.adminSignInHelp}</p>
             <button
               type="button"
               className="botao botao-primario"
               onClick={() => {
-                setErro(null);
+                setError(null);
                 entrar().catch((e: { code?: string; message?: string }) =>
-                  setErro(e.code ?? e.message ?? "desconhecido"),
+                  setError(e.code ?? e.message ?? "desconhecido"),
                 );
               }}
             >
               {t.signIn}
             </button>
-            {erro && <p className="aviso aviso-erro">{t.signInError(erro)}</p>}
+            {error && <p className="aviso aviso-erro">{t.signInError(error)}</p>}
           </>
         )}
 
-        {!carregando && sessao && (
+        {!loading && session && (
           <>
             <p className="aviso aviso-erro">{t.noPermission}</p>
             <p className="campo-ajuda">{t.noPermissionHelp}</p>
-            <button type="button" className="botao" onClick={() => void sair()}>
+            <button type="button" className="botao" onClick={() => void signOut()}>
               {t.signOut}
             </button>
           </>

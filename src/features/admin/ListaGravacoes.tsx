@@ -5,59 +5,59 @@ import { RECORDING_STATE_LABEL, t } from "../../i18n";
 import { formatSize } from "../../lib/anexos";
 import { formatRelative } from "../../lib/datas";
 import { getRecordingFile, type RecordingState, type Recording } from "../../lib/gravacoes";
-import { ResumoGravacao } from "./ResumoGravacao";
+import { RecordingSummary } from "./ResumoGravacao";
 
-type Acoes = {
+type Actions = {
   onPromover: (g: Recording) => void;
-  onMarcar: (id: string, state: RecordingState) => void;
-  onApagar: (id: string) => void;
+  onMark: (id: string, state: RecordingState) => void;
+  onDelete: (id: string) => void;
 };
 
-type Props = Acoes & {
-  fila: Recording[];
+type Props = Actions & {
+  queue: Recording[];
   promovidas: Recording[];
   decididas: Recording[];
-  carregando: boolean;
-  erro: string | null;
+  loading: boolean;
+  error: string | null;
 };
 
-export function ListaGravacoes({
-  fila,
+export function RecordingList({
+  queue,
   promovidas,
   decididas,
-  carregando,
-  erro,
-  ...acoes
+  loading,
+  error,
+  ...actions
 }: Props) {
-  if (erro) return <p className="aviso aviso-erro">{t.recordingsError}</p>;
-  if (carregando) return <p className="aviso">{t.loading}</p>;
-  if (fila.length + promovidas.length + decididas.length === 0) {
+  if (error) return <p className="aviso aviso-erro">{t.recordingsError}</p>;
+  if (loading) return <p className="aviso">{t.loading}</p>;
+  if (queue.length + promovidas.length + decididas.length === 0) {
     return <p className="aviso">{t.recordingsEmpty}</p>;
   }
 
   return (
     <>
-      <Secao title={t.recordingsQueue} ajuda={t.recordingsQueueHelp} recordings={fila} vazio={t.queueEmpty}>
-        {(g) => <Ficha key={g.id} recording={g} {...acoes} />}
+      <Secao title={t.recordingsQueue} help={t.recordingsQueueHelp} recordings={queue} empty={t.queueEmpty}>
+        {(g) => <Ficha key={g.id} recording={g} {...actions} />}
       </Secao>
 
       {promovidas.length > 0 && (
         <Secao
           title={t.recordingsPromoted}
-          ajuda={t.recordingsPromotedHelp}
+          help={t.recordingsPromotedHelp}
           recordings={promovidas}
         >
-          {(g) => <Ficha key={g.id} recording={g} {...acoes} />}
+          {(g) => <Ficha key={g.id} recording={g} {...actions} />}
         </Secao>
       )}
 
       {decididas.length > 0 && (
         <Secao
           title={t.recordingsClosed}
-          ajuda={t.recordingsClosedHelp}
+          help={t.recordingsClosedHelp}
           recordings={decididas}
         >
-          {(g) => <Ficha key={g.id} recording={g} {...acoes} />}
+          {(g) => <Ficha key={g.id} recording={g} {...actions} />}
         </Secao>
       )}
     </>
@@ -66,15 +66,15 @@ export function ListaGravacoes({
 
 function Secao({
   title,
-  ajuda,
+  help,
   recordings,
-  vazio,
+  empty,
   children,
 }: {
   title: string;
-  ajuda: string;
+  help: string;
   recordings: Recording[];
-  vazio?: string;
+  empty?: string;
   children: (g: Recording) => ReactNode;
 }) {
   return (
@@ -82,9 +82,9 @@ function Secao({
       <h2 className="secao">
         {title} <span className="coluna-contador">{recordings.length}</span>
       </h2>
-      <p className="campo-ajuda">{ajuda}</p>
+      <p className="campo-ajuda">{help}</p>
       {recordings.length === 0 ? (
-        <p className="aviso">{vazio}</p>
+        <p className="aviso">{empty}</p>
       ) : (
         <ul className="gravacoes-lista">{recordings.map(children)}</ul>
       )}
@@ -95,10 +95,10 @@ function Secao({
 function Ficha({
   recording,
   onPromover,
-  onMarcar,
-  onApagar,
-}: Acoes & { recording: Recording }) {
-  const naFila = recording.state === "fila";
+  onMark,
+  onDelete,
+}: Actions & { recording: Recording }) {
+  const inQueue = recording.state === "fila";
   const promovida = recording.state === "promovida";
 
   return (
@@ -109,7 +109,7 @@ function Ficha({
       </div>
 
       {recording.summary && Object.keys(recording.summary).length > 0 ? (
-        <ResumoGravacao replay={recording.summary} className="gravacao-resumo" />
+        <RecordingSummary replay={recording.summary} className="gravacao-resumo" />
       ) : (
         <p className="campo-ajuda">{t.recordingNoSummary}</p>
       )}
@@ -148,13 +148,13 @@ function Ficha({
       <div className="gravacao-acoes">
         <BotaoBaixar recording={recording} />
 
-        {naFila ? (
+        {inQueue ? (
           <>
             <button
               type="button"
               className="botao botao-pequeno"
               title={t.markReviewedTitle}
-              onClick={() => onMarcar(recording.id, "conferida")}
+              onClick={() => onMark(recording.id, "conferida")}
             >
               {t.markReviewed}
             </button>
@@ -162,7 +162,7 @@ function Ficha({
               type="button"
               className="botao botao-pequeno"
               title={t.discardTitle}
-              onClick={() => onMarcar(recording.id, "descartada")}
+              onClick={() => onMark(recording.id, "descartada")}
             >
               {t.discard}
             </button>
@@ -183,7 +183,7 @@ function Ficha({
               <button
                 type="button"
                 className="botao botao-pequeno"
-                onClick={() => onMarcar(recording.id, "fila")}
+                onClick={() => onMark(recording.id, "fila")}
               >
                 {t.returnToQueue}
               </button>
@@ -195,7 +195,7 @@ function Ficha({
                   // Apagar é para upload que não devia ter entrado, e não tem
                   // volta — por isso é o único clique do site que pergunta.
                   if (window.confirm(t.deleteRecordingConfirm(recording.title))) {
-                    onApagar(recording.id);
+                    onDelete(recording.id);
                   }
                 }}
               >
@@ -214,13 +214,13 @@ function Ficha({
  * inteira com os arquivos dentro seriam megabytes por abertura de página.
  */
 function BotaoBaixar({ recording }: { recording: Recording }) {
-  const [state, setEstado] = useState<"pronto" | "baixando" | "erro">("pronto");
+  const [state, setState] = useState<"ready" | "downloading" | "error">("ready");
 
-  async function baixar() {
-    setEstado("baixando");
+  async function download() {
+    setState("downloading");
     const file = await getRecordingFile(recording.id).catch(() => null);
     if (!file) {
-      setEstado("erro");
+      setState("error");
       return;
     }
     // Uint8Array vindo do Firestore pode ter byteOffset; o slice normaliza.
@@ -233,17 +233,17 @@ function BotaoBaixar({ recording }: { recording: Recording }) {
     a.download = file.name || `${recording.id}.rrf`;
     a.click();
     URL.revokeObjectURL(url);
-    setEstado("pronto");
+    setState("ready");
   }
 
   return (
     <button
       type="button"
       className="botao botao-pequeno"
-      disabled={state === "baixando"}
-      onClick={() => void baixar()}
+      disabled={state === "downloading"}
+      onClick={() => void download()}
     >
-      {state === "baixando" ? t.opening : state === "erro" ? t.downloadError : t.downloadRrf}
+      {state === "downloading" ? t.opening : state === "error" ? t.downloadError : t.downloadRrf}
     </button>
   );
 }

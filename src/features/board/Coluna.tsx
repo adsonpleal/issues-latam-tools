@@ -10,16 +10,16 @@ type Props = {
   /** Só com sessão de admin: transforma a coluna em alvo de drop. */
   onSoltar?: (id: string, column: Column) => void;
   /** Só quando a pilha está arrumada à mão: devolve a coluna ao automático. */
-  onOrdemAutomatica?: () => void;
+  onAutoOrder?: () => void;
 };
 
-export function BoardColumn({ column, quantidade, children, onSoltar, onOrdemAutomatica }: Props) {
+export function BoardColumn({ column, quantidade, children, onSoltar, onAutoOrder }: Props) {
   // dragenter/dragleave disparam para cada filho: sem contar a profundidade, o
   // destaque pisca sempre que o ponteiro passa por cima de um card.
   const profundidade = useRef(0);
   const [sobre, setSobre] = useState(false);
 
-  const alvo = onSoltar
+  const target = onSoltar
     ? {
         // preventDefault no dragover é obrigatório: sem ele o `drop` simplesmente
         // nunca dispara.
@@ -58,18 +58,18 @@ export function BoardColumn({ column, quantidade, children, onSoltar, onOrdemAut
     <section
       className={`coluna coluna-${column}${sobre ? " coluna-alvo" : ""}`}
       aria-label={STATUS_LABEL[column]}
-      {...alvo}
+      {...target}
     >
       <header className="coluna-topo">
         <h2>{STATUS_LABEL[column]}</h2>
         <span className="coluna-contador" aria-hidden="true">
           {quantidade}
         </span>
-        {onOrdemAutomatica && (
+        {onAutoOrder && (
           <button
             type="button"
             className="coluna-auto"
-            onClick={onOrdemAutomatica}
+            onClick={onAutoOrder}
             title={t.autoOrderTitle}
           >
             {t.autoOrder}

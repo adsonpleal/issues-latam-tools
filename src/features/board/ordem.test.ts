@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Issue } from "../../lib/issues";
-import { reordenarPilha, soltarPilha } from "./ordem";
+import { reorderStack, releaseStack } from "./ordem";
 
 function issue(id: string, order: number | null = null): Issue {
   return {
@@ -24,19 +24,19 @@ function issue(id: string, order: number | null = null): Issue {
 }
 
 /** A pilha como ela fica depois das escritas, para conferir o resultado visual. */
-function aplicar(pilha: Issue[], escritas: { id: string; order: number | null }[]): string[] {
+function aplicar(stack: Issue[], escritas: { id: string; order: number | null }[]): string[] {
   const mapa = new Map(escritas.map((e) => [e.id, e.order]));
-  return pilha
+  return stack
     .map((i) => ({ id: i.id, order: mapa.has(i.id) ? (mapa.get(i.id) ?? null) : i.order }))
     .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity))
     .map((i) => i.id);
 }
 
 describe("reordenarPilha", () => {
-  const pilha = [issue("a"), issue("b"), issue("c")];
+  const stack = [issue("a"), issue("b"), issue("c")];
 
   it("numera a pilha inteira no primeiro arrasto", () => {
-    const escritas = reordenarPilha(pilha, pilha[2]!, "a", true);
+    const escritas = reorderStack(stack, stack[2]!, "a", true);
     expect(escritas).toEqual([
       { id: "c", order: 0 },
       { id: "a", order: 1 },
@@ -45,13 +45,13 @@ describe("reordenarPilha", () => {
   });
 
   it("soltar depois do alvo põe o card logo abaixo dele", () => {
-    const escritas = reordenarPilha(pilha, pilha[0]!, "b", false);
-    expect(aplicar(pilha, escritas)).toEqual(["b", "a", "c"]);
+    const escritas = reorderStack(stack, stack[0]!, "b", false);
+    expect(aplicar(stack, escritas)).toEqual(["b", "a", "c"]);
   });
 
   it("grava só o que mudou de posição", () => {
     const arrumada = [issue("a", 0), issue("b", 1), issue("c", 2)];
-    const escritas = reordenarPilha(arrumada, arrumada[1]!, "c", false);
+    const escritas = reorderStack(arrumada, arrumada[1]!, "c", false);
     expect(escritas).toEqual([
       { id: "c", order: 1 },
       { id: "b", order: 2 },
@@ -59,16 +59,16 @@ describe("reordenarPilha", () => {
   });
 
   it("soltar em cima de si mesmo não escreve nada", () => {
-    expect(reordenarPilha(pilha, pilha[1]!, "b", true)).toEqual([]);
+    expect(reorderStack(stack, stack[1]!, "b", true)).toEqual([]);
   });
 
   it("alvo fora da pilha não escreve nada", () => {
-    expect(reordenarPilha(pilha, pilha[0]!, "sumiu", true)).toEqual([]);
+    expect(reorderStack(stack, stack[0]!, "sumiu", true)).toEqual([]);
   });
 
   it("card vindo de outra coluna entra na pilha de destino", () => {
     const deOutraColuna = issue("z", 7);
-    const escritas = reordenarPilha(pilha, deOutraColuna, "b", true);
+    const escritas = reorderStack(stack, deOutraColuna, "b", true);
     expect(escritas).toEqual([
       { id: "a", order: 0 },
       { id: "z", order: 1 },
@@ -81,14 +81,14 @@ describe("reordenarPilha", () => {
     // "b" está escondido por um filtro; arrastar "c" para cima de "a" não pode
     // levá-lo junto nem trocá-lo de lugar com quem ele nunca viu.
     const completa = [issue("a", 0), issue("b", 1), issue("c", 2)];
-    const escritas = reordenarPilha(completa, completa[2]!, "a", true);
+    const escritas = reorderStack(completa, completa[2]!, "a", true);
     expect(aplicar(completa, escritas)).toEqual(["c", "a", "b"]);
   });
 });
 
 describe("soltarPilha", () => {
   it("apaga o número de quem tem um, e só", () => {
-    expect(soltarPilha([issue("a", 0), issue("b"), issue("c", 1)])).toEqual([
+    expect(releaseStack([issue("a", 0), issue("b"), issue("c", 1)])).toEqual([
       { id: "a", order: null },
       { id: "c", order: null },
     ]);

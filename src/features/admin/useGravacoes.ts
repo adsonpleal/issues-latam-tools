@@ -9,10 +9,10 @@ import {
   type Recording,
 } from "../../lib/gravacoes";
 
-export type EstadoFila = {
+export type QueueState = {
   recordings: Recording[];
-  carregando: boolean;
-  erro: string | null;
+  loading: boolean;
+  error: string | null;
 };
 
 /**
@@ -22,46 +22,46 @@ export type EstadoFila = {
  * então para qualquer outra pessoa isto não devolve nada — nem uma lista vazia,
  * um erro de permissão.
  */
-export function useGravacoes() {
+export function useRecordings() {
   const [recordings, setGravacoes] = useState<Recording[]>([]);
-  const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState<string | null>(null);
-  const [erroAcao, setErroAcao] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
-    setCarregando(true);
-    setErro(null);
+    setLoading(true);
+    setError(null);
     return subscribeRecordings(
       (lista) => {
         setGravacoes(lista);
-        setCarregando(false);
+        setLoading(false);
       },
       (e) => {
-        setErro(e.message);
-        setCarregando(false);
+        setError(e.message);
+        setLoading(false);
       },
     );
   }, []);
 
   // Sem estado otimista: o onSnapshot repinta a linha na pilha nova assim que a
   // escrita é aceita, e é o mesmo mecanismo que move card no quadro.
-  const promover = useCallback(async (g: Recording) => {
-    setErroAcao(null);
+  const promote = useCallback(async (g: Recording) => {
+    setActionError(null);
     return promoteRecording(g).catch((e: Error) => {
-      setErroAcao(e.message);
+      setActionError(e.message);
       return null;
     });
   }, []);
 
-  const marcar = useCallback(async (id: string, state: RecordingState) => {
-    setErroAcao(null);
-    await markRecording(id, state).catch((e: Error) => setErroAcao(e.message));
+  const mark = useCallback(async (id: string, state: RecordingState) => {
+    setActionError(null);
+    await markRecording(id, state).catch((e: Error) => setActionError(e.message));
   }, []);
 
-  const apagar = useCallback(async (id: string) => {
-    setErroAcao(null);
-    await deleteRecording(id).catch((e: Error) => setErroAcao(e.message));
+  const remove = useCallback(async (id: string) => {
+    setActionError(null);
+    await deleteRecording(id).catch((e: Error) => setActionError(e.message));
   }, []);
 
-  return { recordings, carregando, erro, erroAcao, promover, marcar, apagar };
+  return { recordings, loading, error, actionError, promote, mark, remove };
 }

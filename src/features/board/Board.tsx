@@ -3,60 +3,60 @@ import { useState } from "react";
 import { t } from "../../i18n";
 import type { Issue } from "../../lib/issues";
 import type { Column as Column } from "../../lib/status";
-import { useVotos } from "../votos/useVotos";
-import type { Agrupado } from "./agrupar";
+import { useVotes } from "../votos/useVotos";
+import type { ColumnGroup } from "./agrupar";
 import { BoardColumn } from "./Coluna";
 import { IssueCard } from "./IssueCard";
 
 type Props = {
-  colunas: Agrupado[];
-  carregando: boolean;
-  erro: string | null;
+  columns: ColumnGroup[];
+  loading: boolean;
+  error: string | null;
   /** Passados só com sessão de admin: arrastar, seletor de coluna e painel. */
-  onMover?: (id: string, column: Column) => void;
-  onAbrir?: (id: string) => void;
+  onMove?: (id: string, column: Column) => void;
+  onOpen?: (id: string) => void;
   /** Fixa `id` logo antes (ou depois) de `alvoId`, na pilha de `alvoId`. */
-  onFixar?: (id: string, alvoId: string, antes: boolean) => void;
+  onPin?: (id: string, targetId: string, before: boolean) => void;
   /** Devolve a coluna inteira à ordem automática. */
-  onOrdemAutomatica?: (column: Column) => void;
+  onAutoOrder?: (column: Column) => void;
 };
 
 export function Board({
-  colunas,
-  carregando,
-  erro,
-  onMover,
-  onAbrir,
-  onFixar,
-  onOrdemAutomatica,
+  columns,
+  loading,
+  error,
+  onMove,
+  onOpen,
+  onPin,
+  onAutoOrder,
 }: Props) {
-  const { jaVotou, votar } = useVotos();
+  const { hasVoted, vote } = useVotes();
   // Qual card está no ar. Quem recebe o drop precisa saber disso para não se
   // oferecer de alvo para si mesmo — o dataTransfer não conta durante o
   // dragover, só no drop.
   const [arrastando, setArrastando] = useState<string | null>(null);
 
-  if (erro) return <p className="aviso aviso-erro">{t.loadError}</p>;
-  if (carregando) return <p className="aviso">{t.loading}</p>;
+  if (error) return <p className="aviso aviso-erro">{t.loadError}</p>;
+  if (loading) return <p className="aviso">{t.loading}</p>;
 
-  const total = colunas.reduce((n, c) => n + c.issues.length, 0);
+  const total = columns.reduce((n, c) => n + c.issues.length, 0);
   if (total === 0) return <p className="aviso">{t.emptyBoard}</p>;
 
   const votarSync = (id: string) => {
-    void votar(id);
+    void vote(id);
   };
 
   return (
     <div className="quadro">
-      {colunas.map(({ column, issues }) => (
+      {columns.map(({ column, issues }) => (
         <BoardColumn
           key={column}
           column={column}
           quantidade={issues.length}
-          onSoltar={onMover}
-          onOrdemAutomatica={
-            onOrdemAutomatica && issues.some((i) => i.order !== null)
-              ? () => onOrdemAutomatica(column)
+          onSoltar={onMove}
+          onAutoOrder={
+            onAutoOrder && issues.some((i) => i.order !== null)
+              ? () => onAutoOrder(column)
               : undefined
           }
         >
@@ -64,24 +64,24 @@ export function Board({
             <IssueCard
               key={issue.id}
               issue={issue}
-              jaVotou={jaVotou(issue.id)}
-              onVotar={votarSync}
-              onMover={onMover}
-              onAbrir={onAbrir}
-              onFixar={onFixar}
+              hasVoted={hasVoted(issue.id)}
+              onVote={votarSync}
+              onMove={onMove}
+              onOpen={onOpen}
+              onPin={onPin}
               // As setas são o mesmo gesto do arrastar, dito com o vizinho da
               // tela: assim elas continuam certas com filtro ligado, em vez de
               // pular por cima de um card que o filtro escondeu.
               onDegrau={
-                onFixar
+                onPin
                   ? (delta) => {
                       const vizinho = issues[i + delta];
-                      if (vizinho) onFixar(issue.id, vizinho.id, delta < 0);
+                      if (vizinho) onPin(issue.id, vizinho.id, delta < 0);
                     }
                   : undefined
               }
               primeiro={i === 0}
-              ultimo={i === issues.length - 1}
+              last={i === issues.length - 1}
               arrastando={arrastando}
               onArrastar={setArrastando}
             />

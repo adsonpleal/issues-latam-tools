@@ -14,9 +14,9 @@ import type { Issue, Position } from "../../lib/issues";
  */
 
 /** Numera a pilha de 0 para baixo, devolvendo só o que de fato mudou. */
-function numerar(pilha: Issue[]): Position[] {
+function numberStack(stack: Issue[]): Position[] {
   const escritas: Position[] = [];
-  pilha.forEach((issue, i) => {
+  stack.forEach((issue, i) => {
     if (issue.order !== i) escritas.push({ id: issue.id, order: i });
   });
   return escritas;
@@ -29,21 +29,21 @@ function numerar(pilha: Issue[]): Position[] {
  * `arrastado` vem à parte porque ele pode estar vindo de outra coluna, e aí não
  * está na pilha de destino.
  */
-export function reordenarPilha(
-  pilha: Issue[],
-  arrastado: Issue,
-  alvoId: string,
-  antes: boolean,
+export function reorderStack(
+  stack: Issue[],
+  dragged: Issue,
+  targetId: string,
+  before: boolean,
 ): Position[] {
-  if (arrastado.id === alvoId) return [];
-  const resto = pilha.filter((i) => i.id !== arrastado.id);
-  const destino = resto.findIndex((i) => i.id === alvoId);
-  if (destino < 0) return [];
-  resto.splice(antes ? destino : destino + 1, 0, arrastado);
-  return numerar(resto);
+  if (dragged.id === targetId) return [];
+  const resto = stack.filter((i) => i.id !== dragged.id);
+  const destination = resto.findIndex((i) => i.id === targetId);
+  if (destination < 0) return [];
+  resto.splice(before ? destination : destination + 1, 0, dragged);
+  return numberStack(resto);
 }
 
 /** Devolve a pilha ao fluxo automático: apaga o número de quem tem um. */
-export function soltarPilha(pilha: Issue[]): Position[] {
-  return pilha.filter((i) => i.order !== null).map((i) => ({ id: i.id, order: null }));
+export function releaseStack(stack: Issue[]): Position[] {
+  return stack.filter((i) => i.order !== null).map((i) => ({ id: i.id, order: null }));
 }

@@ -3,8 +3,8 @@ import { useEffect, useMemo } from "react";
 import { t } from "../../i18n";
 import { attachmentUrl, type Attachment } from "../../lib/anexos";
 import type { IssueComment } from "../../lib/comentarios";
-import { formatData } from "../../lib/datas";
-import { TextoComLinks } from "./TextoComLinks";
+import { formatDate } from "../../lib/datas";
+import { TextWithLinks } from "./TextoComLinks";
 
 type Props = {
   comments: IssueComment[];
@@ -14,7 +14,7 @@ type Props = {
   onApagarImagem?: (attachmentId: string) => void;
 };
 
-export function ListaComentarios({ comments, images = [], onApagarImagem }: Props) {
+export function CommentList({ comments, images = [], onApagarImagem }: Props) {
   // Um object URL por imagem, revogado junto — sem isto cada snapshot do
   // Firestore deixaria um blob preso na memória da aba.
   const urls = useMemo(() => new Map(images.map((a) => [a.id, attachmentUrl(a)])), [images]);
@@ -37,10 +37,10 @@ export function ListaComentarios({ comments, images = [], onApagarImagem }: Prop
         <li key={c.id} className={`comentario comentario-${c.type}`}>
           <div className="comentario-topo">
             <strong>{c.author}</strong>
-            <time dateTime={c.createdAt?.toISOString()}>{formatData(c.createdAt)}</time>
+            <time dateTime={c.createdAt?.toISOString()}>{formatDate(c.createdAt)}</time>
           </div>
           <div className="comentario-texto">
-            <TextoComLinks text={c.text} />
+            <TextWithLinks text={c.text} />
           </div>
           {(porComentario.get(c.id)?.length ?? 0) > 0 && (
             <ul className="comentario-imagens">

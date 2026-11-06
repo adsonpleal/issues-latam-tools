@@ -2,9 +2,9 @@ import { useEffect } from "react";
 
 export const SITE_URL = "https://issues.latam-tools.com.br";
 
-function setMeta(seletor: string, attr: "content" | "href", valor: string) {
-  const el = document.head.querySelector(seletor);
-  if (el) el.setAttribute(attr, valor);
+function setMeta(selector: string, attr: "content" | "href", value: string) {
+  const el = document.head.querySelector(selector);
+  if (el) el.setAttribute(attr, value);
 }
 
 /** Ajusta título/description/canonical por rota. SPA, então é tudo no cliente. */

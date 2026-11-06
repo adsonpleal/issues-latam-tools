@@ -4,8 +4,8 @@ import { subscribeIssues, type Issue } from "../../lib/issues";
 
 export type EstadoQuadro = {
   issues: Issue[];
-  carregando: boolean;
-  erro: string | null;
+  loading: boolean;
+  error: string | null;
 };
 
 /**
@@ -17,25 +17,25 @@ export type EstadoQuadro = {
 export function useBoard(opts: { admin?: boolean } = {}): EstadoQuadro {
   const admin = opts.admin ?? false;
   const [issues, setIssues] = useState<Issue[]>([]);
-  const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setCarregando(true);
-    setErro(null);
-    const cancelar = subscribeIssues(
+    setLoading(true);
+    setError(null);
+    const cancel = subscribeIssues(
       (lista) => {
         setIssues(lista);
-        setCarregando(false);
+        setLoading(false);
       },
       (e) => {
-        setErro(e.message);
-        setCarregando(false);
+        setError(e.message);
+        setLoading(false);
       },
       { admin },
     );
-    return cancelar;
+    return cancel;
   }, [admin]);
 
-  return { issues, carregando, erro };
+  return { issues, loading, error };
 }

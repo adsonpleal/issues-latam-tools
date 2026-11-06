@@ -10,7 +10,7 @@ const LADO_MAX_INICIAL = 1600;
  * Vai apertando em passes: primeiro baixa a qualidade, depois encolhe o lado
  * maior. Sai em WebP, que rende bem melhor que JPEG nesse tipo de captura.
  */
-export async function reduzirImagem(
+export async function shrinkImage(
   file: File,
 ): Promise<{ data: Uint8Array; name: string }> {
   const bitmap = await createImageBitmap(file);
@@ -37,7 +37,7 @@ export async function reduzirImagem(
       if (!blob) throw new Error("falha ao converter a imagem");
 
       if (blob.size <= ATTACHMENT_MAX_BYTES) {
-        return { data: new Uint8Array(await blob.arrayBuffer()), name: nomeWebp(file.name) };
+        return { data: new Uint8Array(await blob.arrayBuffer()), name: webpName(file.name) };
       }
 
       // Duas rodadas mexendo só na qualidade; depois começa a encolher.
@@ -51,7 +51,7 @@ export async function reduzirImagem(
   }
 }
 
-function nomeWebp(name: string): string {
+function webpName(name: string): string {
   const base = name.replace(/\.[^.]+$/, "") || "imagem";
   return `${base.slice(0, 180)}.webp`;
 }

@@ -176,6 +176,7 @@ export const STATUS_HELP: Record<Status, string> = {
 };
 
 export const RECORDING_STATE_LABEL: Record<RecordingState, string> = {
+  // Keyed by the stored `estado` values on a recording.
   fila: "Na fila",
   promovida: "No quadro",
   conferida: "Conferida",

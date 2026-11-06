@@ -7,8 +7,8 @@ import { FormularioEdicao, useContato, type EditableFields } from "./AcoesIssue"
 
 type Props = {
   issue: Issue;
-  onMover: (column: Column) => void;
-  onEditar: (campos: EditableFields) => void;
+  onMove: (column: Column) => void;
+  onEdit: (fields: EditableFields) => void;
 };
 
 /**
@@ -20,7 +20,7 @@ type Props = {
  * página do card virou o único lugar onde um card arquivado é alcançável pelo
  * link direto.
  */
-export function AcoesTicket({ issue, onMover, onEditar }: Props) {
+export function TicketActions({ issue, onMove, onEdit }: Props) {
   const [editando, setEditando] = useState(false);
   const contact = useContato(issue.id);
 
@@ -29,8 +29,8 @@ export function AcoesTicket({ issue, onMover, onEditar }: Props) {
       {editando ? (
         <FormularioEdicao
           issue={issue}
-          onSalvar={(campos) => {
-            onEditar(campos);
+          onSave={(fields) => {
+            onEdit(fields);
             setEditando(false);
           }}
           onCancelar={() => setEditando(false)}
@@ -48,7 +48,7 @@ export function AcoesTicket({ issue, onMover, onEditar }: Props) {
               <span className="visually-hidden">{t.moveTo}</span>
               <select
                 value={issue.archived ? "arquivado" : issue.status}
-                onChange={(e) => onMover(e.target.value as Column)}
+                onChange={(e) => onMove(e.target.value as Column)}
               >
                 {ADMIN_COLUMNS.map((c) => (
                   <option key={c} value={c}>

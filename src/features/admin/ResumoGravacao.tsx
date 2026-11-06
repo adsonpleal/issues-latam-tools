@@ -1,5 +1,5 @@
 import type { ReplaySummary } from "../../lib/issues";
-import { linhasDoResumo } from "./gravacoes";
+import { summaryRows } from "./gravacoes";
 
 type Props = {
   replay: ReplaySummary;
@@ -8,16 +8,16 @@ type Props = {
 };
 
 /** O resumo do parser, para a triagem ranquear sem baixar o .rrf. */
-export function ResumoGravacao({ replay, className = "painel-replay" }: Props) {
+export function RecordingSummary({ replay, className = "painel-replay" }: Props) {
   return (
     <dl className={className}>
-      {linhasDoResumo(replay).map((linha) => (
+      {summaryRows(replay).map((linha) => (
         <div key={linha.chave}>
           <dt>
             {linha.rotulo}
-            {linha.ajuda && <span className="campo-ajuda"> ({linha.ajuda})</span>}
+            {linha.help && <span className="campo-ajuda"> ({linha.help})</span>}
           </dt>
-          <dd>{linha.valor}</dd>
+          <dd>{linha.value}</dd>
         </div>
       ))}
     </dl>

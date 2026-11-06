@@ -10,29 +10,31 @@ import {
   updateDoc,
 } from "firebase/firestore";
 
-import { ANEXOS_MAX, enviarAnexo, type AnexoPronto } from "./anexos";
+import { ATTACHMENTS_MAX, uploadAttachment, type PreparedAttachment } from "./anexos";
 import { getDb } from "./firebase";
 
-export const COMENTARIO_MAX = 4000;
+export const COMMENT_MAX = 4000;
 
-export type TipoComentario = "comentario" | "mudanca";
+/** The values are stored on the document, so they keep their spelling. */
+export type CommentType = "comentario" | "mudanca";
 
-export type Comentario = {
+export type IssueComment = {
   id: string;
-  texto: string;
-  autor: string;
-  criadoEm: Date | null;
-  tipo: TipoComentario;
+  text: string;
+  author: string;
+  createdAt: Date | null;
+  type: CommentType;
 };
 
 /**
- * Subcoleção, não array no card. O motivo que pesa mais não é tamanho: é que
- * manter os comentários fora do documento deixa `upvotes` como a ÚNICA coisa que
- * o público escreve no card, e é isso que torna a regra de upvote demonstrável.
+ * A subcollection, not an array on the card. The reason that weighs most is not
+ * size: keeping the comments out of the document leaves `upvotes` as the ONLY
+ * thing the public writes to a card, and that is what makes the upvote rule
+ * demonstrable.
  */
-export function subscribeComentarios(
+export function subscribeComments(
   issueId: string,
-  onComentarios: (c: Comentario[]) => void,
+  onComments: (c: IssueComment[]) => void,
   onError: (e: Error) => void,
 ): () => void {
   const q = query(
@@ -42,15 +44,15 @@ export function subscribeComentarios(
   return onSnapshot(
     q,
     (snap) =>
-      onComentarios(
+      onComments(
         snap.docs.map((d) => {
           const v = d.data();
           return {
             id: d.id,
-            texto: String(v["texto"] ?? ""),
-            autor: String(v["autor"] ?? ""),
-            criadoEm: v["criadoEm"]?.toDate?.() ?? null,
-            tipo: v["tipo"] === "mudanca" ? "mudanca" : "comentario",
+            text: String(v["texto"] ?? ""),
+            author: String(v["autor"] ?? ""),
+            createdAt: v["criadoEm"]?.toDate?.() ?? null,
+            type: v["tipo"] === "mudanca" ? "mudanca" : "comentario",
           };
         }),
       ),
@@ -58,42 +60,44 @@ export function subscribeComentarios(
   );
 }
 
-export async function addComentario(
+export async function addComment(
   issueId: string,
-  texto: string,
-  autor: string,
-  autorUid: string,
-  tipo: TipoComentario = "comentario",
-  imagens: AnexoPronto[] = [],
+  text: string,
+  author: string,
+  authorUid: string,
+  type: CommentType = "comentario",
+  images: PreparedAttachment[] = [],
 ): Promise<void> {
   const db = getDb();
+  // Firestore's field names, each written out in full.
   const ref = await addDoc(collection(db, "issues", issueId, "comentarios"), {
-    texto: texto.trim().slice(0, COMENTARIO_MAX),
-    autor,
-    autorUid,
-    tipo,
+    texto: text.trim().slice(0, COMMENT_MAX),
+    autor: author,
+    autorUid: authorUid,
+    tipo: type,
     criadoEm: serverTimestamp(),
   });
 
-  // Comentário primeiro, imagens depois — mesma ordem de `createIssue` e pelo
-  // mesmo motivo: o texto é a parte que importa, e imagem que falha some sem
-  // levar a atualização junto. Vão para a subcoleção de anexos amarradas ao id
-  // do comentário; o selo de anexos do card NÃO conta estas, ele fala do que
-  // veio no relato.
-  for (const imagem of imagens.slice(0, ANEXOS_MAX)) {
-    await enviarAnexo(
+  // The comment first, images after -- same order as `createIssue` and for the
+  // same reason: the text is the part that matters, and an image that fails
+  // disappears without taking the update with it. They go to the attachments
+  // subcollection tied to the comment's id; the card's attachment badge does
+  // NOT count these, it speaks for what came with the report.
+  for (const image of images.slice(0, ATTACHMENTS_MAX)) {
+    await uploadAttachment(
       issueId,
       crypto.randomUUID(),
-      imagem.nome,
-      imagem.tipo,
-      imagem.dados,
+      image.name,
+      image.type,
+      image.data,
       ref.id,
     ).catch(() => undefined);
   }
 
-  // Contador desnormalizado para o selo do card: o quadro nunca lê a subcoleção.
-  // Se esta segunda escrita falhar o comentário continua lá, só o selo fica atrás
-  // — preferível a uma transação que poderia recusar o comentário inteiro.
+  // A denormalised counter for the card's badge: the board never reads the
+  // subcollection. If this second write fails the comment is still there and
+  // only the badge lags -- preferable to a transaction that could refuse the
+  // whole comment.
   await updateDoc(doc(db, "issues", issueId), {
     comentarios: increment(1),
     atualizadoEm: serverTimestamp(),

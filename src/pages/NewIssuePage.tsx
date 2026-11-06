@@ -6,8 +6,8 @@ import { NovoIssueForm } from "../features/enviar/NovoIssueForm";
 
 export function NewIssuePage() {
   useSeo({
-    title: `${t.novoTitulo} — ${t.siteNome} ${t.siteSub}`,
-    description: t.novoSub,
+    title: `${t.formTitle} — ${t.siteName} ${t.siteSubtitle}`,
+    description: t.formSubtitle,
     path: "/novo",
   });
 
@@ -15,11 +15,11 @@ export function NewIssuePage() {
     <div className="pagina pagina-estreita">
       <p>
         <Link to="/" className="link-voltar">
-          ← {t.voltar}
+          ← {t.backToBoard}
         </Link>
       </p>
-      <h1>{t.novoTitulo}</h1>
-      <p className="subtitulo">{t.novoSub}</p>
+      <h1>{t.formTitle}</h1>
+      <p className="subtitulo">{t.formSubtitle}</p>
       <NovoIssueForm />
     </div>
   );

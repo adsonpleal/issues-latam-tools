@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 
 import { TYPE_LABEL, t } from "../../i18n";
-import type { AnexoPronto } from "../../lib/anexos";
-import { getContato, type Issue } from "../../lib/issues";
+import type { PreparedAttachment } from "../../lib/anexos";
+import { getContact, type Issue } from "../../lib/issues";
 import { PROJECTS, PROJECT_SLUGS, type Project } from "../../lib/projetos";
 import { ISSUE_TYPES, type IssueType } from "../../lib/status";
 import { CampoAnexos } from "../enviar/CampoAnexos";
 
-export type CamposEditaveis = Pick<Issue, "titulo" | "descricao" | "tipo" | "projeto">;
+export type EditableFields = Pick<Issue, "title" | "description" | "type" | "project">;
 
 /**
  * As peças de edição que o painel do quadro e a página do card usam iguais.
@@ -23,67 +23,67 @@ export type CamposEditaveis = Pick<Issue, "titulo" | "descricao" | "tipo" | "pro
  * quando a pessoa preencheu.
  */
 export function useContato(issueId: string): string | null {
-  const [contato, setContato] = useState<string | null>(null);
+  const [contact, setContato] = useState<string | null>(null);
 
   useEffect(() => {
     setContato(null);
-    void getContato(issueId)
+    void getContact(issueId)
       .then(setContato)
       .catch(() => setContato(null));
   }, [issueId]);
 
-  return contato;
+  return contact;
 }
 
 type PropsEdicao = {
   issue: Issue;
-  onSalvar: (campos: CamposEditaveis) => void;
+  onSalvar: (campos: EditableFields) => void;
   onCancelar: () => void;
 };
 
 export function FormularioEdicao({ issue, onSalvar, onCancelar }: PropsEdicao) {
-  const [rascunho, setRascunho] = useState<CamposEditaveis>({
-    titulo: issue.titulo,
-    descricao: issue.descricao,
-    tipo: issue.tipo,
-    projeto: issue.projeto,
+  const [rascunho, setRascunho] = useState<EditableFields>({
+    title: issue.title,
+    description: issue.description,
+    type: issue.type,
+    project: issue.project,
   });
 
   // O quadro é onSnapshot: se o card mudar embaixo do formulário — outra aba, ou
   // a própria escrita voltando do servidor — o rascunho volta para o que vale.
   useEffect(() => {
     setRascunho({
-      titulo: issue.titulo,
-      descricao: issue.descricao,
-      tipo: issue.tipo,
-      projeto: issue.projeto,
+      title: issue.title,
+      description: issue.description,
+      type: issue.type,
+      project: issue.project,
     });
-  }, [issue.id, issue.titulo, issue.descricao, issue.tipo, issue.projeto]);
+  }, [issue.id, issue.title, issue.description, issue.type, issue.project]);
 
   return (
     <div className="form-edicao">
       <label className="campo">
-        <span>{t.campoTituloLabel}</span>
+        <span>{t.fieldSummary}</span>
         <input
-          value={rascunho.titulo}
-          onChange={(e) => setRascunho({ ...rascunho, titulo: e.target.value })}
+          value={rascunho.title}
+          onChange={(e) => setRascunho({ ...rascunho, title: e.target.value })}
           maxLength={120}
         />
       </label>
       <label className="campo">
-        <span>{t.campoDescricao}</span>
+        <span>{t.fieldDetails}</span>
         <textarea
           rows={8}
-          value={rascunho.descricao}
-          onChange={(e) => setRascunho({ ...rascunho, descricao: e.target.value })}
+          value={rascunho.description}
+          onChange={(e) => setRascunho({ ...rascunho, description: e.target.value })}
           maxLength={4000}
         />
       </label>
       <label className="campo">
-        <span>{t.campoProjeto}</span>
+        <span>{t.fieldProject}</span>
         <select
-          value={rascunho.projeto}
-          onChange={(e) => setRascunho({ ...rascunho, projeto: e.target.value as Project })}
+          value={rascunho.project}
+          onChange={(e) => setRascunho({ ...rascunho, project: e.target.value as Project })}
         >
           {PROJECT_SLUGS.map((s) => (
             <option key={s} value={s}>
@@ -93,10 +93,10 @@ export function FormularioEdicao({ issue, onSalvar, onCancelar }: PropsEdicao) {
         </select>
       </label>
       <label className="campo">
-        <span>{t.campoTipo}</span>
+        <span>{t.fieldType}</span>
         <select
-          value={rascunho.tipo}
-          onChange={(e) => setRascunho({ ...rascunho, tipo: e.target.value as IssueType })}
+          value={rascunho.type}
+          onChange={(e) => setRascunho({ ...rascunho, type: e.target.value as IssueType })}
         >
           {ISSUE_TYPES.map((tp) => (
             <option key={tp} value={tp}>
@@ -107,10 +107,10 @@ export function FormularioEdicao({ issue, onSalvar, onCancelar }: PropsEdicao) {
       </label>
       <div className="formulario-acoes">
         <button type="button" className="botao botao-primario" onClick={() => onSalvar(rascunho)}>
-          {t.salvar}
+          {t.save}
         </button>
         <button type="button" className="botao" onClick={onCancelar}>
-          {t.cancelar}
+          {t.cancel}
         </button>
       </div>
     </div>
@@ -123,37 +123,37 @@ type PropsComentario = {
    * único no documento, e agora existem duas instâncias deste formulário no app.
    */
   id: string;
-  onEnviar: (texto: string, imagens: AnexoPronto[]) => void;
+  onEnviar: (text: string, images: PreparedAttachment[]) => void;
 };
 
 export function FormularioComentario({ id, onEnviar }: PropsComentario) {
-  const [texto, setTexto] = useState("");
-  const [imagens, setImagens] = useState<AnexoPronto[]>([]);
+  const [text, setTexto] = useState("");
+  const [images, setImagens] = useState<PreparedAttachment[]>([]);
 
   return (
     <form
       className="form-comentar"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!texto.trim()) return;
-        onEnviar(texto, imagens);
+        if (!text.trim()) return;
+        onEnviar(text, images);
         setTexto("");
         setImagens([]);
       }}
     >
       <label className="campo">
-        <span className="visually-hidden">{t.comentar}</span>
+        <span className="visually-hidden">{t.comment}</span>
         <textarea
           rows={3}
-          value={texto}
+          value={text}
           onChange={(e) => setTexto(e.target.value)}
-          placeholder={t.comentarPlaceholder}
+          placeholder={t.commentPlaceholder}
           maxLength={4000}
         />
       </label>
-      <CampoAnexos id={id} apenasImagens anexos={imagens} onChange={setImagens} />
+      <CampoAnexos id={id} apenasImagens attachments={images} onChange={setImagens} />
       <button type="submit" className="botao botao-primario">
-        {t.comentar}
+        {t.comment}
       </button>
     </form>
   );

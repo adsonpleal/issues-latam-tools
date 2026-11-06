@@ -17,9 +17,9 @@ import { ISSUE_TYPES, isIssueType } from "../lib/status";
 export function TopBar() {
   const { sessao, admin, sair } = useSessao();
   const [params, setParams] = useSearchParams();
-  const projeto = parseProject(params.get("projeto"));
+  const project = parseProject(params.get("projeto"));
   const tipoBruto = params.get("tipo");
-  const tipo = isIssueType(tipoBruto) ? tipoBruto : null;
+  const type = isIssueType(tipoBruto) ? tipoBruto : null;
   const busca = params.get("busca") ?? "";
 
   function atualiza(chave: string, valor: string) {
@@ -33,19 +33,19 @@ export function TopBar() {
     <header className="topbar">
       <div className="topbar-marca">
         <Link to="/" className="topbar-titulo">
-          {t.siteNome} <span className="topbar-sub">{t.siteSub}</span>
+          {t.siteName} <span className="topbar-sub">{t.siteSubtitle}</span>
         </Link>
       </div>
 
       <div className="topbar-filtros">
         <label className="campo-inline">
-          <span className="visually-hidden">{t.filtrarProjeto}</span>
+          <span className="visually-hidden">{t.filterByProject}</span>
           <select
-            value={projeto ?? ""}
+            value={project ?? ""}
             onChange={(e) => atualiza("projeto", e.target.value)}
-            title={t.filtrarProjeto}
+            title={t.filterByProject}
           >
-            <option value="">{t.todosProjetos}</option>
+            <option value="">{t.allProjects}</option>
             {PROJECT_SLUGS.map((slug) => (
               <option key={slug} value={slug}>
                 {PROJECTS[slug].name}
@@ -55,13 +55,13 @@ export function TopBar() {
         </label>
 
         <label className="campo-inline">
-          <span className="visually-hidden">{t.filtrarTipo}</span>
+          <span className="visually-hidden">{t.filterByType}</span>
           <select
-            value={tipo ?? ""}
+            value={type ?? ""}
             onChange={(e) => atualiza("tipo", e.target.value)}
-            title={t.filtrarTipo}
+            title={t.filterByType}
           >
-            <option value="">{t.todosTipos}</option>
+            <option value="">{t.allTypes}</option>
             {ISSUE_TYPES.map((tp) => (
               <option key={tp} value={tp}>
                 {TYPE_LABEL[tp]}
@@ -71,11 +71,11 @@ export function TopBar() {
         </label>
 
         <label className="campo-inline">
-          <span className="visually-hidden">{t.buscar}</span>
+          <span className="visually-hidden">{t.search}</span>
           <input
             type="search"
             value={busca}
-            placeholder={t.buscarPlaceholder}
+            placeholder={t.searchPlaceholder}
             onChange={(e) => atualiza("busca", e.target.value)}
           />
         </label>
@@ -84,19 +84,19 @@ export function TopBar() {
       <div className="topbar-acoes">
         {admin && (
           <span className="admin-sessao">
-            <span>{sessao?.nome}</span>
-            <Link to="/gravacoes">{t.gravacoesLink}</Link>
+            <span>{sessao?.name}</span>
+            <Link to="/gravacoes">{t.recordingsLink}</Link>
             <button type="button" className="botao botao-pequeno" onClick={() => void sair()}>
-              {t.sair}
+              {t.signOut}
             </button>
           </span>
         )}
         <Link
           className="botao botao-primario"
-          to={projeto ? `/novo?projeto=${projeto}` : "/novo"}
-          title={t.reportarTitulo}
+          to={project ? `/novo?projeto=${project}` : "/novo"}
+          title={t.reportTitle}
         >
-          {t.reportar}
+          {t.report}
         </Link>
       </div>
     </header>

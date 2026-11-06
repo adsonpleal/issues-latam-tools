@@ -3,12 +3,12 @@ import { useState } from "react";
 import { STATUS_LABEL, t } from "../../i18n";
 import type { Issue } from "../../lib/issues";
 import { ADMIN_COLUMNS, type Column } from "../../lib/status";
-import { FormularioEdicao, useContato, type CamposEditaveis } from "./AcoesIssue";
+import { FormularioEdicao, useContato, type EditableFields } from "./AcoesIssue";
 
 type Props = {
   issue: Issue;
-  onMover: (coluna: Column) => void;
-  onEditar: (campos: CamposEditaveis) => void;
+  onMover: (column: Column) => void;
+  onEditar: (campos: EditableFields) => void;
 };
 
 /**
@@ -22,7 +22,7 @@ type Props = {
  */
 export function AcoesTicket({ issue, onMover, onEditar }: Props) {
   const [editando, setEditando] = useState(false);
-  const contato = useContato(issue.id);
+  const contact = useContato(issue.id);
 
   return (
     <section className="acoes-admin">
@@ -38,16 +38,16 @@ export function AcoesTicket({ issue, onMover, onEditar }: Props) {
       ) : (
         <>
           <p className="linha-contato">
-            <strong>{t.contatoLabel}:</strong> {contato ?? t.semContato}
+            <strong>{t.contactLabel}:</strong> {contact ?? t.noContact}
           </p>
           <div className="acoes-admin-linha">
             <button type="button" className="botao botao-pequeno" onClick={() => setEditando(true)}>
-              {t.editar}
+              {t.edit}
             </button>
             <label className="campo-inline">
-              <span className="visually-hidden">{t.moverPara}</span>
+              <span className="visually-hidden">{t.moveTo}</span>
               <select
-                value={issue.arquivado ? "arquivado" : issue.status}
+                value={issue.archived ? "arquivado" : issue.status}
                 onChange={(e) => onMover(e.target.value as Column)}
               >
                 {ADMIN_COLUMNS.map((c) => (

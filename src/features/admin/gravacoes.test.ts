@@ -1,22 +1,22 @@
 import { describe, expect, it } from "vitest";
 
-import type { Gravacao } from "../../lib/gravacoes";
+import type { Recording } from "../../lib/gravacoes";
 import { formataDuracao, linhasDoResumo, separarGravacoes } from "./gravacoes";
 
-function gravacao(over: Partial<Gravacao> & { id: string }): Gravacao {
+function recording(over: Partial<Recording> & { id: string }): Recording {
   return {
-    titulo: "Gravação: Executor nv 240/50",
-    notas: "",
-    resumo: {},
+    title: "Gravação: Executor nv 240/50",
+    notes: "",
+    summary: {},
     nick: null,
-    contato: null,
-    nome: "sessao.rrf",
-    tamanho: 80_000,
-    criadoEm: new Date("2026-01-01"),
-    estado: "fila",
+    contact: null,
+    fileName: "sessao.rrf",
+    size: 80_000,
+    createdAt: new Date("2026-01-01"),
+    state: "fila",
     issueId: null,
-    decididaEm: null,
-    notaTriagem: null,
+    decidedAt: null,
+    triageNote: null,
     ...over,
   };
 }
@@ -24,10 +24,10 @@ function gravacao(over: Partial<Gravacao> & { id: string }): Gravacao {
 describe("separarGravacoes", () => {
   it("separa as três pilhas pelo estado", () => {
     const r = separarGravacoes([
-      gravacao({ id: "nova" }),
-      gravacao({ id: "publicada", estado: "promovida", issueId: "publicada" }),
-      gravacao({ id: "conferida", estado: "conferida" }),
-      gravacao({ id: "descartada", estado: "descartada" }),
+      recording({ id: "nova" }),
+      recording({ id: "publicada", state: "promovida", issueId: "publicada" }),
+      recording({ id: "conferida", state: "conferida" }),
+      recording({ id: "descartada", state: "descartada" }),
     ]);
     expect(r.fila.map((g) => g.id)).toEqual(["nova"]);
     expect(r.promovidas.map((g) => g.id)).toEqual(["publicada"]);
@@ -37,17 +37,17 @@ describe("separarGravacoes", () => {
 
   it("fila ordena pela chegada e decididas pelo carimbo", () => {
     const r = separarGravacoes([
-      gravacao({ id: "velha", criadoEm: new Date("2026-01-01") }),
-      gravacao({ id: "nova", criadoEm: new Date("2026-06-01") }),
-      gravacao({
+      recording({ id: "velha", createdAt: new Date("2026-01-01") }),
+      recording({ id: "nova", createdAt: new Date("2026-06-01") }),
+      recording({
         id: "fechada-antes",
-        estado: "descartada",
-        decididaEm: new Date("2026-02-01"),
+        state: "descartada",
+        decidedAt: new Date("2026-02-01"),
       }),
-      gravacao({
+      recording({
         id: "fechada-agora",
-        estado: "conferida",
-        decididaEm: new Date("2026-08-01"),
+        state: "conferida",
+        decidedAt: new Date("2026-08-01"),
       }),
     ]);
     expect(r.fila.map((g) => g.id)).toEqual(["nova", "velha"]);

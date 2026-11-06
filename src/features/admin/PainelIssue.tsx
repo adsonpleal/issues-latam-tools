@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { TYPE_LABEL, t } from "../../i18n";
-import { apagarAnexo, subscribeAnexos, type Anexo, type AnexoPronto } from "../../lib/anexos";
-import { subscribeComentarios, type Comentario } from "../../lib/comentarios";
+import { deleteAttachment, subscribeAttachments, type Attachment, type PreparedAttachment } from "../../lib/anexos";
+import { subscribeComments, type IssueComment } from "../../lib/comentarios";
 import type { Issue } from "../../lib/issues";
 import { PROJECTS } from "../../lib/projetos";
 import { ListaAnexos } from "../ticket/ListaAnexos";
@@ -11,15 +11,15 @@ import {
   FormularioComentario,
   FormularioEdicao,
   useContato,
-  type CamposEditaveis,
+  type EditableFields,
 } from "./AcoesIssue";
 import { ResumoGravacao } from "./ResumoGravacao";
 
 type Props = {
   issue: Issue;
   onFechar: () => void;
-  onComentar: (texto: string, imagens: AnexoPronto[]) => void;
-  onEditar: (campos: CamposEditaveis) => void;
+  onComentar: (text: string, images: PreparedAttachment[]) => void;
+  onEditar: (campos: EditableFields) => void;
 };
 
 /**
@@ -28,31 +28,31 @@ type Props = {
  * mesmos poderes, também abre em `/t/:id`; as peças de edição são as mesmas.
  */
 export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
-  const [comentarios, setComentarios] = useState<Comentario[]>([]);
-  const [anexos, setAnexos] = useState<Anexo[]>([]);
+  const [comments, setComentarios] = useState<IssueComment[]>([]);
+  const [attachments, setAnexos] = useState<Attachment[]>([]);
   const [editando, setEditando] = useState(false);
-  const contato = useContato(issue.id);
+  const contact = useContato(issue.id);
 
   useEffect(() => setEditando(false), [issue.id]);
 
   useEffect(
-    () => subscribeComentarios(issue.id, setComentarios, () => setComentarios([])),
+    () => subscribeComments(issue.id, setComentarios, () => setComentarios([])),
     [issue.id],
   );
 
-  useEffect(() => subscribeAnexos(issue.id, setAnexos, () => setAnexos([])), [issue.id]);
+  useEffect(() => subscribeAttachments(issue.id, setAnexos, () => setAnexos([])), [issue.id]);
 
   // Mesma subcoleção, dois lugares na tela: sem `comentarioId` é anexo do card,
   // com `comentarioId` é print colado numa atualização.
   const [anexosDoCard, imagensDeComentario] = useMemo(
-    () => [anexos.filter((a) => !a.comentarioId), anexos.filter((a) => a.comentarioId)],
-    [anexos],
+    () => [attachments.filter((a) => !a.commentId), attachments.filter((a) => a.commentId)],
+    [attachments],
   );
 
   return (
-    <aside className="painel" aria-label={issue.titulo}>
+    <aside className="painel" aria-label={issue.title}>
       <div className="painel-topo">
-        <h2>{editando ? t.editar : issue.titulo}</h2>
+        <h2>{editando ? t.edit : issue.title}</h2>
         <button type="button" className="botao botao-pequeno" onClick={onFechar}>
           ✕
         </button>
@@ -70,27 +70,27 @@ export function PainelIssue({ issue, onFechar, onComentar, onEditar }: Props) {
       ) : (
         <>
           <p className="painel-meta">
-            {PROJECTS[issue.projeto].name} · {TYPE_LABEL[issue.tipo]} · ▲ {issue.upvotes}
-            {issue.autor && <> · {t.reportadoPor(issue.autor)}</>}
+            {PROJECTS[issue.project].name} · {TYPE_LABEL[issue.type]} · ▲ {issue.upvotes}
+            {issue.author && <> · {t.reportedBy(issue.author)}</>}
           </p>
-          {issue.descricao && <p className="painel-descricao">{issue.descricao}</p>}
+          {issue.description && <p className="painel-descricao">{issue.description}</p>}
           {issue.replay && <ResumoGravacao replay={issue.replay} />}
           <p className="linha-contato">
-            <strong>{t.contatoLabel}:</strong> {contato ?? t.semContato}
+            <strong>{t.contactLabel}:</strong> {contact ?? t.noContact}
           </p>
           <button type="button" className="botao botao-pequeno" onClick={() => setEditando(true)}>
-            {t.editar}
+            {t.edit}
           </button>
         </>
       )}
 
-      <ListaAnexos anexos={anexosDoCard} onApagar={(anexoId) => void apagarAnexo(issue.id, anexoId)} />
+      <ListaAnexos attachments={anexosDoCard} onApagar={(attachmentId) => void deleteAttachment(issue.id, attachmentId)} />
 
-      <h3 className="secao">{t.comentariosLabel(comentarios.length)}</h3>
+      <h3 className="secao">{t.commentCount(comments.length)}</h3>
       <ListaComentarios
-        comentarios={comentarios}
-        imagens={imagensDeComentario}
-        onApagarImagem={(anexoId) => void apagarAnexo(issue.id, anexoId)}
+        comments={comments}
+        images={imagensDeComentario}
+        onApagarImagem={(attachmentId) => void deleteAttachment(issue.id, attachmentId)}
       />
 
       <FormularioComentario id="imagens-comentario-painel" onEnviar={onComentar} />

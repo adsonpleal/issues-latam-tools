@@ -12,7 +12,7 @@ type Props = {
   jaVotou: boolean;
   onVotar: (id: string) => void;
   /** Presente só com sessão de admin: liga o arrastar e o seletor de coluna. */
-  onMover?: (id: string, coluna: Column) => void;
+  onMover?: (id: string, column: Column) => void;
   /** Presente só com sessão de admin: abre o painel em vez de navegar. */
   onAbrir?: (id: string) => void;
   /** Soltar um card em cima deste, acima ou abaixo da metade da altura. */
@@ -45,7 +45,7 @@ export function IssueCard({
   arrastando,
   onArrastar,
 }: Props) {
-  const project = PROJECTS[issue.projeto];
+  const project = PROJECTS[issue.project];
   const admin = Boolean(onMover);
   const [insercao, setInsercao] = useState<"antes" | "depois" | null>(null);
 
@@ -110,16 +110,16 @@ export function IssueCard({
         <span className="selo selo-projeto" style={{ borderColor: project.color, color: project.color }}>
           {project.name}
         </span>
-        <span className={`selo selo-tipo selo-${issue.tipo}`}>{TYPE_LABEL[issue.tipo]}</span>
+        <span className={`selo selo-tipo selo-${issue.type}`}>{TYPE_LABEL[issue.type]}</span>
       </div>
 
       <h3 className="issue-card-titulo">
         {onAbrir ? (
           <button type="button" className="link-botao" onClick={() => onAbrir(issue.id)}>
-            {issue.titulo}
+            {issue.title}
           </button>
         ) : (
-          <Link to={`/t/${issue.id}`}>{issue.titulo}</Link>
+          <Link to={`/t/${issue.id}`}>{issue.title}</Link>
         )}
       </h3>
 
@@ -129,28 +129,28 @@ export function IssueCard({
           className={jaVotou ? "voto voto-feito" : "voto"}
           onClick={() => onVotar(issue.id)}
           disabled={jaVotou}
-          title={jaVotou ? t.jaVotou : t.votarTitulo}
-          aria-label={jaVotou ? t.jaVotou : t.votarTitulo}
+          title={jaVotou ? t.alreadyVoted : t.voteTitle}
+          aria-label={jaVotou ? t.alreadyVoted : t.voteTitle}
         >
           <span aria-hidden="true">▲</span> {issue.upvotes}
         </button>
 
-        {issue.comentarios > 0 && (
-          <span className="issue-card-meta" title={t.comentariosLabel(issue.comentarios)}>
-            <span aria-hidden="true">💬</span> {issue.comentarios}
+        {issue.comments > 0 && (
+          <span className="issue-card-meta" title={t.commentCount(issue.comments)}>
+            <span aria-hidden="true">💬</span> {issue.comments}
           </span>
         )}
 
-        {issue.anexos > 0 && (
-          <span className="issue-card-meta" title={t.anexosTitulo}>
-            <span aria-hidden="true">📎</span> {issue.anexos}
+        {issue.attachments > 0 && (
+          <span className="issue-card-meta" title={t.attachmentsTitle}>
+            <span aria-hidden="true">📎</span> {issue.attachments}
           </span>
         )}
 
-        {issue.autor && <span className="issue-card-meta">{t.reportadoPor(issue.autor)}</span>}
+        {issue.author && <span className="issue-card-meta">{t.reportedBy(issue.author)}</span>}
 
-        <time className="issue-card-meta issue-card-data" dateTime={issue.criadoEm?.toISOString()}>
-          {formatRelative(issue.criadoEm)}
+        <time className="issue-card-meta issue-card-data" dateTime={issue.createdAt?.toISOString()}>
+          {formatRelative(issue.createdAt)}
         </time>
       </div>
 
@@ -161,9 +161,9 @@ export function IssueCard({
         // leitor de tela.
         <div className="issue-card-admin">
           <label className="issue-card-mover">
-            <span className="visually-hidden">{t.moverPara}</span>
+            <span className="visually-hidden">{t.moveTo}</span>
             <select
-              value={issue.arquivado ? "arquivado" : issue.status}
+              value={issue.archived ? "arquivado" : issue.status}
               onChange={(e) => onMover(issue.id, e.target.value as Column)}
             >
               {ADMIN_COLUMNS.map((c) => (
@@ -180,8 +180,8 @@ export function IssueCard({
                 type="button"
                 onClick={() => onDegrau(-1)}
                 disabled={primeiro}
-                title={t.subirNaPilha}
-                aria-label={t.subirNaPilha}
+                title={t.moveUp}
+                aria-label={t.moveUp}
               >
                 <span aria-hidden="true">↑</span>
               </button>
@@ -189,8 +189,8 @@ export function IssueCard({
                 type="button"
                 onClick={() => onDegrau(1)}
                 disabled={ultimo}
-                title={t.descerNaPilha}
-                aria-label={t.descerNaPilha}
+                title={t.moveDown}
+                aria-label={t.moveDown}
               >
                 <span aria-hidden="true">↓</span>
               </button>

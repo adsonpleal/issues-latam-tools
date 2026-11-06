@@ -8,11 +8,11 @@ const URL_TESTE = /^https?:\/\//;
 // Pontuação colada no fim ("...?r=abc." no fim da frase) não faz parte da URL.
 const PONTUACAO_FINAL = /[.,;:!?)\]]+$/;
 
-function Pedaco({ texto }: { texto: string }) {
-  if (!URL_TESTE.test(texto)) return <>{texto}</>;
+function Pedaco({ text }: { text: string }) {
+  if (!URL_TESTE.test(text)) return <>{text}</>;
 
-  const sobra = texto.match(PONTUACAO_FINAL)?.[0] ?? "";
-  const url = sobra ? texto.slice(0, -sobra.length) : texto;
+  const sobra = text.match(PONTUACAO_FINAL)?.[0] ?? "";
+  const url = sobra ? text.slice(0, -sobra.length) : text;
 
   return (
     <>
@@ -29,14 +29,14 @@ function Pedaco({ texto }: { texto: string }) {
  * React, nunca por innerHTML. Sem isso, uma descrição com <script> dentro seria
  * exatamente o que parece.
  */
-export function TextoComLinks({ texto }: { texto: string }) {
+export function TextoComLinks({ text }: { text: string }) {
   return (
     <>
-      {texto.split("\n").map((linha, iLinha) => (
+      {text.split("\n").map((linha, iLinha) => (
         <Fragment key={iLinha}>
           {iLinha > 0 && <br />}
           {linha.split(URL_SPLIT).map((pedaco, i) => (
-            <Pedaco key={i} texto={pedaco} />
+            <Pedaco key={i} text={pedaco} />
           ))}
         </Fragment>
       ))}

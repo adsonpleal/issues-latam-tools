@@ -20,7 +20,7 @@ import { useSessao } from "../features/admin/SessaoContext";
  * perda de ativação para bloquear o popup.
  */
 export function EntrarPage() {
-  useSeo({ title: `${t.entrar} — ${t.siteNome}` });
+  useSeo({ title: `${t.signIn} — ${t.siteName}` });
   const { sessao, admin, carregando, ativar, entrar, sair } = useSessao();
   // O que o popup respondeu de errado. Sem isto, falhar em entrar é um clique
   // que não faz nada — e popup bloqueado, que é a falha mais comum, some sem
@@ -34,11 +34,11 @@ export function EntrarPage() {
   return (
     <div className="pagina pagina-estreita">
       <div className="admin-portao">
-        {carregando && <p className="aviso">{t.carregando}</p>}
+        {carregando && <p className="aviso">{t.loading}</p>}
 
         {!carregando && !sessao && (
           <>
-            <p>{t.adminEntrarAjuda}</p>
+            <p>{t.adminSignInHelp}</p>
             <button
               type="button"
               className="botao botao-primario"
@@ -49,18 +49,18 @@ export function EntrarPage() {
                 );
               }}
             >
-              {t.entrar}
+              {t.signIn}
             </button>
-            {erro && <p className="aviso aviso-erro">{t.erroEntrar(erro)}</p>}
+            {erro && <p className="aviso aviso-erro">{t.signInError(erro)}</p>}
           </>
         )}
 
         {!carregando && sessao && (
           <>
-            <p className="aviso aviso-erro">{t.semPermissao}</p>
-            <p className="campo-ajuda">{t.semPermissaoAjuda}</p>
+            <p className="aviso aviso-erro">{t.noPermission}</p>
+            <p className="campo-ajuda">{t.noPermissionHelp}</p>
             <button type="button" className="botao" onClick={() => void sair()}>
-              {t.sair}
+              {t.signOut}
             </button>
           </>
         )}

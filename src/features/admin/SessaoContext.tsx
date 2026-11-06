@@ -96,7 +96,7 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
 }
 
 export function useSessao(): Estado {
-  const estado = useContext(Contexto);
-  if (!estado) throw new Error("useSessao fora do SessaoProvider");
-  return estado;
+  const state = useContext(Contexto);
+  if (!state) throw new Error("useSessao fora do SessaoProvider");
+  return state;
 }

@@ -1,4 +1,4 @@
-import type { Issue, Posicao } from "../../lib/issues";
+import type { Issue, Position } from "../../lib/issues";
 
 /**
  * A conta da ordem manual do quadro, sem Firestore nenhum.
@@ -14,10 +14,10 @@ import type { Issue, Posicao } from "../../lib/issues";
  */
 
 /** Numera a pilha de 0 para baixo, devolvendo só o que de fato mudou. */
-function numerar(pilha: Issue[]): Posicao[] {
-  const escritas: Posicao[] = [];
+function numerar(pilha: Issue[]): Position[] {
+  const escritas: Position[] = [];
   pilha.forEach((issue, i) => {
-    if (issue.ordem !== i) escritas.push({ id: issue.id, ordem: i });
+    if (issue.order !== i) escritas.push({ id: issue.id, order: i });
   });
   return escritas;
 }
@@ -34,7 +34,7 @@ export function reordenarPilha(
   arrastado: Issue,
   alvoId: string,
   antes: boolean,
-): Posicao[] {
+): Position[] {
   if (arrastado.id === alvoId) return [];
   const resto = pilha.filter((i) => i.id !== arrastado.id);
   const destino = resto.findIndex((i) => i.id === alvoId);
@@ -44,6 +44,6 @@ export function reordenarPilha(
 }
 
 /** Devolve a pilha ao fluxo automático: apaga o número de quem tem um. */
-export function soltarPilha(pilha: Issue[]): Posicao[] {
-  return pilha.filter((i) => i.ordem !== null).map((i) => ({ id: i.id, ordem: null }));
+export function soltarPilha(pilha: Issue[]): Position[] {
+  return pilha.filter((i) => i.order !== null).map((i) => ({ id: i.id, order: null }));
 }

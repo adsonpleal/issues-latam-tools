@@ -13,93 +13,100 @@ import {
 import { getDb } from "./firebase";
 
 /**
- * Teto por arquivo. O limite duro do Firestore é 1 MiB por documento; 900 kB
- * deixa folga para os outros campos. Mesmo número que o simulador usa para
- * receber .rrf, e .rrf de verdade fica entre 50 e 100 kB.
+ * The per-file ceiling. Firestore's hard limit is 1 MiB per document; 900 kB
+ * leaves room for the other fields. Same number the simulator uses to accept a
+ * .rrf, and a real .rrf runs between 50 and 100 kB.
  */
-export const ANEXO_MAX_BYTES = 900_000;
-export const ANEXOS_MAX = 5;
+export const ATTACHMENT_MAX_BYTES = 900_000;
+export const ATTACHMENTS_MAX = 5;
 
-export const EXTENSOES_ACEITAS = ".rrf,image/*";
+export const ACCEPTED_EXTENSIONS = ".rrf,image/*";
 
-export type TipoAnexo = "rrf" | "imagem";
+/** The values are stored on the document, so they keep their spelling. */
+export type AttachmentType = "rrf" | "imagem";
 
-export type Anexo = {
+export type Attachment = {
   id: string;
-  nome: string;
-  tipo: TipoAnexo;
-  tamanho: number;
+  name: string;
+  type: AttachmentType;
+  size: number;
   bytes: Uint8Array;
-  criadoEm: Date | null;
+  createdAt: Date | null;
   /**
-   * Quando presente, a imagem foi colada num comentário e aparece dentro dele —
-   * não na lista de anexos do card. Mesma subcoleção de propósito: reaproveita a
-   * regra de leitura (arquivado nega os dois) e não cria mais um onSnapshot por
-   * comentário na página.
+   * When present, the image was pasted into a comment and shows inside it --
+   * not in the card's attachment list. The same subcollection on purpose: it
+   * reuses the read rule (archived denies both) and does not add another
+   * onSnapshot per comment on the page.
    */
-  comentarioId: string | null;
+  commentId: string | null;
 };
 
-/** Arquivo já lido e reduzido pelo navegador, pronto para subir. */
-export type AnexoPronto = {
-  nome: string;
-  tipo: TipoAnexo;
-  dados: Uint8Array;
+/** A file already read and shrunk by the browser, ready to upload. */
+export type PreparedAttachment = {
+  name: string;
+  type: AttachmentType;
+  data: Uint8Array;
 };
 
-export function classificaArquivo(arquivo: File): TipoAnexo | null {
-  if (arquivo.type.startsWith("image/")) return "imagem";
-  if (arquivo.name.toLowerCase().endsWith(".rrf")) return "rrf";
+export function classifyFile(file: File): AttachmentType | null {
+  if (file.type.startsWith("image/")) return "imagem";
+  if (file.name.toLowerCase().endsWith(".rrf")) return "rrf";
   return null;
 }
 
-export function formataTamanho(bytes: number): string {
+export function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** Grava um anexo. O id é do cliente porque o card pode nem existir ainda. */
-export async function enviarAnexo(
+/**
+ * Writes one attachment. The id comes from the client because the card may not
+ * even exist yet.
+ *
+ * The keys written below are Firestore's and are spelled the way they are
+ * stored, each one in full rather than by shorthand.
+ */
+export async function uploadAttachment(
   issueId: string,
-  anexoId: string,
-  nome: string,
-  tipo: TipoAnexo,
-  dados: Uint8Array,
-  comentarioId?: string,
+  attachmentId: string,
+  name: string,
+  type: AttachmentType,
+  data: Uint8Array,
+  commentId?: string,
 ): Promise<void> {
-  await setDoc(doc(getDb(), "issues", issueId, "anexos", anexoId), {
-    nome: nome.slice(0, 200),
-    tipo,
-    tamanho: dados.byteLength,
-    bytes: Bytes.fromUint8Array(dados),
+  await setDoc(doc(getDb(), "issues", issueId, "anexos", attachmentId), {
+    nome: name.slice(0, 200),
+    tipo: type,
+    tamanho: data.byteLength,
+    bytes: Bytes.fromUint8Array(data),
     criadoEm: serverTimestamp(),
-    // Ausente é diferente de vazio: a regra só exige admin quando o campo vem,
-    // então anexo comum continua sendo escrita pública.
-    ...(comentarioId ? { comentarioId } : {}),
+    // Absent is different from empty: the rule only demands admin when the
+    // field is there, so an ordinary attachment stays a public write.
+    ...(commentId ? { comentarioId: commentId } : {}),
   });
 }
 
-export function subscribeAnexos(
+export function subscribeAttachments(
   issueId: string,
-  onAnexos: (a: Anexo[]) => void,
+  onAttachments: (a: Attachment[]) => void,
   onError: (e: Error) => void,
 ): () => void {
   const q = query(collection(getDb(), "issues", issueId, "anexos"), orderBy("criadoEm", "asc"));
   return onSnapshot(
     q,
     (snap) =>
-      onAnexos(
+      onAttachments(
         snap.docs.map((d) => {
           const v = d.data();
           return {
             id: d.id,
-            nome: String(v["nome"] ?? ""),
-            tipo: v["tipo"] === "imagem" ? "imagem" : "rrf",
-            tamanho: Number(v["tamanho"] ?? 0),
+            name: String(v["nome"] ?? ""),
+            type: v["tipo"] === "imagem" ? "imagem" : "rrf",
+            size: Number(v["tamanho"] ?? 0),
             bytes: v["bytes"]?.toUint8Array?.() ?? new Uint8Array(),
-            criadoEm: v["criadoEm"]?.toDate?.() ?? null,
-            comentarioId: v["comentarioId"] ? String(v["comentarioId"]) : null,
+            createdAt: v["criadoEm"]?.toDate?.() ?? null,
+            commentId: v["comentarioId"] ? String(v["comentarioId"]) : null,
           };
         }),
       ),
@@ -107,29 +114,29 @@ export function subscribeAnexos(
   );
 }
 
-/** Só o admin consegue — é a moderação de quem subiu o que não devia. */
-export async function apagarAnexo(issueId: string, anexoId: string): Promise<void> {
-  await deleteDoc(doc(getDb(), "issues", issueId, "anexos", anexoId));
+/** Admin only -- this is the moderation path for somebody uploading what they should not. */
+export async function deleteAttachment(issueId: string, attachmentId: string): Promise<void> {
+  await deleteDoc(doc(getDb(), "issues", issueId, "anexos", attachmentId));
 }
 
-const MIME_POR_TIPO: Record<TipoAnexo, string> = {
+const MIME_BY_TYPE: Record<AttachmentType, string> = {
   imagem: "image/webp",
   rrf: "application/octet-stream",
 };
 
 /**
- * Object URL para exibir ou baixar. Quem chama precisa revogar depois — os
- * componentes fazem isso no cleanup do efeito.
+ * An object URL to display or download. The caller has to revoke it afterwards
+ * -- the components do that in their effect cleanup.
  */
-export function urlDoAnexo(anexo: Anexo): string {
-  const tipo = anexo.tipo === "imagem" ? adivinhaMime(anexo.nome) : MIME_POR_TIPO.rrf;
-  // Uint8Array vindo do Firestore pode ter byteOffset; o slice normaliza.
-  const copia = anexo.bytes.slice();
-  return URL.createObjectURL(new Blob([copia as unknown as BlobPart], { type: tipo }));
+export function attachmentUrl(attachment: Attachment): string {
+  const mime = attachment.type === "imagem" ? guessMime(attachment.name) : MIME_BY_TYPE.rrf;
+  // A Uint8Array from Firestore can carry a byteOffset; the slice normalises it.
+  const copy = attachment.bytes.slice();
+  return URL.createObjectURL(new Blob([copy as unknown as BlobPart], { type: mime }));
 }
 
-function adivinhaMime(nome: string): string {
-  const ext = nome.toLowerCase().split(".").pop() ?? "";
+function guessMime(name: string): string {
+  const ext = name.toLowerCase().split(".").pop() ?? "";
   if (ext === "png") return "image/png";
   if (ext === "gif") return "image/gif";
   if (ext === "webp") return "image/webp";

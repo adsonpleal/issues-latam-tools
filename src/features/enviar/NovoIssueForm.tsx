@@ -3,11 +3,11 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { TYPE_LABEL, t } from "../../i18n";
 import {
-  AUTOR_MAX,
-  CONTATO_MAX,
-  DESCRICAO_MAX,
-  TITULO_MAX,
-  type AnexoPronto,
+  NICK_MAX,
+  CONTACT_MAX,
+  DESCRIPTION_MAX,
+  TITLE_MAX,
+  type PreparedAttachment,
 } from "../../lib/issues";
 import { PROJECTS, PROJECT_SLUGS, parseProject, type Project } from "../../lib/projetos";
 import { FORM_ISSUE_TYPES, type IssueType } from "../../lib/status";
@@ -17,31 +17,31 @@ import { useEnviarIssue } from "./useEnviarIssue";
 export function NovoIssueForm() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { estado, mensagemErro, enviar } = useEnviarIssue();
+  const { state, mensagemErro, enviar } = useEnviarIssue();
 
   // O projeto vem pré-selecionado do link "Reportar" do site de origem.
-  const [projeto, setProjeto] = useState<Project>(parseProject(params.get("projeto")) ?? "simulador");
-  const [tipo, setTipo] = useState<IssueType>("bug");
-  const [titulo, setTitulo] = useState("");
-  const [descricao, setDescricao] = useState("");
-  const [autor, setAutor] = useState("");
-  const [contato, setContato] = useState("");
-  const [anexos, setAnexos] = useState<AnexoPronto[]>([]);
+  const [project, setProjeto] = useState<Project>(parseProject(params.get("projeto")) ?? "simulador");
+  const [type, setTipo] = useState<IssueType>("bug");
+  const [title, setTitulo] = useState("");
+  const [description, setDescricao] = useState("");
+  const [author, setAutor] = useState("");
+  const [contact, setContato] = useState("");
+  const [attachments, setAnexos] = useState<PreparedAttachment[]>([]);
   const [isca, setIsca] = useState("");
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    const id = await enviar({ projeto, tipo, titulo, descricao, autor, contato, anexos, isca });
+    const id = await enviar({ project, type, title, description, author, contact, attachments, isca });
     if (id) navigate(`/t/${id}?novo=1`);
   }
 
   return (
     <form className="formulario" onSubmit={onSubmit}>
       <div className="campo">
-        <label htmlFor="projeto">{t.campoProjeto}</label>
+        <label htmlFor="projeto">{t.fieldProject}</label>
         <select
           id="projeto"
-          value={projeto}
+          value={project}
           onChange={(e) => setProjeto(e.target.value as Project)}
           required
         >
@@ -54,7 +54,7 @@ export function NovoIssueForm() {
       </div>
 
       <fieldset className="campo campo-radio">
-        <legend>{t.campoTipo}</legend>
+        <legend>{t.fieldType}</legend>
         {/* Os rádios ficam numa div própria: o fieldset herda o
             `flex-direction: column` de `.campo`, e é a linha que precisa ser
             horizontal, não a legenda junto com eles. */}
@@ -65,7 +65,7 @@ export function NovoIssueForm() {
                 type="radio"
                 name="tipo"
                 value={tp}
-                checked={tipo === tp}
+                checked={type === tp}
                 onChange={() => setTipo(tp)}
               />
               {TYPE_LABEL[tp]}
@@ -75,57 +75,57 @@ export function NovoIssueForm() {
       </fieldset>
 
       <div className="campo">
-        <label htmlFor="titulo">{t.campoTituloLabel}</label>
+        <label htmlFor="titulo">{t.fieldSummary}</label>
         <input
           id="titulo"
-          value={titulo}
+          value={title}
           onChange={(e) => setTitulo(e.target.value)}
-          placeholder={t.campoTituloPlaceholder}
-          maxLength={TITULO_MAX}
+          placeholder={t.fieldSummaryPlaceholder}
+          maxLength={TITLE_MAX}
           required
           minLength={3}
         />
       </div>
 
       <div className="campo">
-        <label htmlFor="descricao">{t.campoDescricao}</label>
+        <label htmlFor="descricao">{t.fieldDetails}</label>
         <textarea
           id="descricao"
-          value={descricao}
+          value={description}
           onChange={(e) => setDescricao(e.target.value)}
-          placeholder={t.campoDescricaoPlaceholder}
-          maxLength={DESCRICAO_MAX}
+          placeholder={t.fieldDetailsPlaceholder}
+          maxLength={DESCRIPTION_MAX}
           rows={7}
         />
       </div>
 
-      <CampoAnexos anexos={anexos} onChange={setAnexos} />
+      <CampoAnexos attachments={attachments} onChange={setAnexos} />
 
       <div className="campo">
-        <label htmlFor="autor">{t.campoAutor}</label>
+        <label htmlFor="autor">{t.fieldNick}</label>
         <input
           id="autor"
-          value={autor}
+          value={author}
           onChange={(e) => setAutor(e.target.value)}
-          maxLength={AUTOR_MAX}
+          maxLength={NICK_MAX}
           aria-describedby="ajuda-autor"
         />
         <p className="campo-ajuda" id="ajuda-autor">
-          {t.campoAutorAjuda}
+          {t.fieldNickHelp}
         </p>
       </div>
 
       <div className="campo">
-        <label htmlFor="contato">{t.campoContato}</label>
+        <label htmlFor="contato">{t.fieldContact}</label>
         <input
           id="contato"
-          value={contato}
+          value={contact}
           onChange={(e) => setContato(e.target.value)}
-          maxLength={CONTATO_MAX}
+          maxLength={CONTACT_MAX}
           aria-describedby="ajuda-contato"
         />
         <p className="campo-ajuda" id="ajuda-contato">
-          {t.campoContatoAjuda}
+          {t.fieldContactHelp}
         </p>
       </div>
 
@@ -146,8 +146,8 @@ export function NovoIssueForm() {
       {mensagemErro && <p className="aviso aviso-erro">{mensagemErro}</p>}
 
       <div className="formulario-acoes">
-        <button type="submit" className="botao botao-primario" disabled={estado === "enviando"}>
-          {estado === "enviando" ? t.enviando : t.enviar}
+        <button type="submit" className="botao botao-primario" disabled={state === "enviando"}>
+          {state === "enviando" ? t.submitting : t.submit}
         </button>
       </div>
     </form>

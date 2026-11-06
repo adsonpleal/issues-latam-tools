@@ -2,25 +2,25 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { t } from "../../i18n";
 import {
-  ANEXOS_MAX,
-  ANEXO_MAX_BYTES,
-  EXTENSOES_ACEITAS,
-  classificaArquivo,
-  formataTamanho,
+  ATTACHMENTS_MAX,
+  ATTACHMENT_MAX_BYTES,
+  ACCEPTED_EXTENSIONS,
+  classifyFile,
+  formatSize,
 } from "../../lib/anexos";
-import type { AnexoPronto } from "../../lib/anexos";
+import type { PreparedAttachment } from "../../lib/anexos";
 import { reduzirImagem } from "../../lib/imagem";
 
 type Props = {
-  anexos: AnexoPronto[];
-  onChange: (anexos: AnexoPronto[]) => void;
+  attachments: PreparedAttachment[];
+  onChange: (attachments: PreparedAttachment[]) => void;
   /** Precisa ser único na página: o formulário e o painel de comentar coexistem. */
   id?: string;
   /** No comentário só entra print — `.rrf` é coisa do relato, não da resposta. */
   apenasImagens?: boolean;
 };
 
-export function CampoAnexos({ anexos, onChange, id = "anexos", apenasImagens = false }: Props) {
+export function CampoAnexos({ attachments, onChange, id = "anexos", apenasImagens = false }: Props) {
   const [preparando, setPreparando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -29,12 +29,12 @@ export function CampoAnexos({ anexos, onChange, id = "anexos", apenasImagens = f
   // blob preso na memória da aba.
   const previews = useMemo(
     () =>
-      anexos.map((a) =>
-        a.tipo === "imagem"
-          ? URL.createObjectURL(new Blob([a.dados.slice() as unknown as BlobPart]))
+      attachments.map((a) =>
+        a.type === "imagem"
+          ? URL.createObjectURL(new Blob([a.data.slice() as unknown as BlobPart]))
           : null,
       ),
-    [anexos],
+    [attachments],
   );
   useEffect(
     () => () => previews.forEach((u) => u && URL.revokeObjectURL(u)),
@@ -48,75 +48,75 @@ export function CampoAnexos({ anexos, onChange, id = "anexos", apenasImagens = f
 
     setErro(null);
     setPreparando(true);
-    const novos: AnexoPronto[] = [];
+    const novos: PreparedAttachment[] = [];
     const problemas: string[] = [];
 
-    for (const arquivo of escolhidos) {
-      if (anexos.length + novos.length >= ANEXOS_MAX) {
-        problemas.push(t.anexoDemais);
+    for (const file of escolhidos) {
+      if (attachments.length + novos.length >= ATTACHMENTS_MAX) {
+        problemas.push(t.attachmentTooMany);
         break;
       }
-      const tipo = classificaArquivo(arquivo);
-      if (!tipo || (apenasImagens && tipo !== "imagem")) {
+      const type = classifyFile(file);
+      if (!type || (apenasImagens && type !== "imagem")) {
         problemas.push(
-          apenasImagens ? t.anexoSoImagem(arquivo.name) : t.anexoTipoInvalido(arquivo.name),
+          apenasImagens ? t.attachmentImageOnly(file.name) : t.attachmentBadType(file.name),
         );
         continue;
       }
       try {
-        if (tipo === "imagem") {
-          const { dados, nome } = await reduzirImagem(arquivo);
-          novos.push({ nome, tipo, dados });
+        if (type === "imagem") {
+          const { data, name } = await reduzirImagem(file);
+          novos.push({ name, type, data });
         } else {
           // .rrf vai como está — encolher um replay não é opção.
-          if (arquivo.size > ANEXO_MAX_BYTES) {
-            problemas.push(t.anexoGrande(arquivo.name, formataTamanho(ANEXO_MAX_BYTES)));
+          if (file.size > ATTACHMENT_MAX_BYTES) {
+            problemas.push(t.attachmentTooBig(file.name, formatSize(ATTACHMENT_MAX_BYTES)));
             continue;
           }
           novos.push({
-            nome: arquivo.name,
-            tipo,
-            dados: new Uint8Array(await arquivo.arrayBuffer()),
+            name: file.name,
+            type,
+            data: new Uint8Array(await file.arrayBuffer()),
           });
         }
       } catch {
-        problemas.push(t.anexoFalhou(arquivo.name));
+        problemas.push(t.attachmentUnreadable(file.name));
       }
     }
 
     setPreparando(false);
     if (problemas.length) setErro(problemas.join(" "));
-    if (novos.length) onChange([...anexos, ...novos]);
+    if (novos.length) onChange([...attachments, ...novos]);
   }
 
   function remover(i: number) {
-    onChange(anexos.filter((_, n) => n !== i));
+    onChange(attachments.filter((_, n) => n !== i));
   }
 
   return (
     <div className="campo">
-      <label htmlFor={id}>{apenasImagens ? t.campoImagens : t.campoAnexos}</label>
+      <label htmlFor={id}>{apenasImagens ? t.fieldImages : t.fieldAttachments}</label>
       <input
         id={id}
         ref={input}
         type="file"
         multiple
-        accept={apenasImagens ? "image/*" : EXTENSOES_ACEITAS}
+        accept={apenasImagens ? "image/*" : ACCEPTED_EXTENSIONS}
         onChange={(e) => void aoEscolher(e)}
-        disabled={preparando || anexos.length >= ANEXOS_MAX}
+        disabled={preparando || attachments.length >= ATTACHMENTS_MAX}
         aria-describedby={`ajuda-${id}`}
       />
       <p className="campo-ajuda" id={`ajuda-${id}`}>
-        {apenasImagens ? t.campoImagensAjuda : t.campoAnexosAjuda}
+        {apenasImagens ? t.fieldImagesHelp : t.fieldAttachmentsHelp}
       </p>
 
-      {preparando && <p className="campo-ajuda">{t.anexoPreparando}</p>}
+      {preparando && <p className="campo-ajuda">{t.attachmentPreparing}</p>}
       {erro && <p className="aviso aviso-erro">{erro}</p>}
 
-      {anexos.length > 0 && (
+      {attachments.length > 0 && (
         <ul className="anexos-escolhidos">
-          {anexos.map((a, i) => (
-            <li key={`${a.nome}-${i}`}>
+          {attachments.map((a, i) => (
+            <li key={`${a.name}-${i}`}>
               {previews[i] ? (
                 <img src={previews[i]!} alt="" className="anexo-thumb" />
               ) : (
@@ -124,10 +124,10 @@ export function CampoAnexos({ anexos, onChange, id = "anexos", apenasImagens = f
                   📄
                 </span>
               )}
-              <span className="anexo-nome">{a.nome}</span>
-              <span className="campo-ajuda">{formataTamanho(a.dados.byteLength)}</span>
+              <span className="anexo-nome">{a.name}</span>
+              <span className="campo-ajuda">{formatSize(a.data.byteLength)}</span>
               <button type="button" className="botao botao-pequeno" onClick={() => remover(i)}>
-                {t.remover}
+                {t.remove}
               </button>
             </li>
           ))}

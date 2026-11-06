@@ -1,6 +1,6 @@
 import { t } from "../../i18n";
-import type { Gravacao } from "../../lib/gravacoes";
-import type { ResumoReplay } from "../../lib/issues";
+import type { Recording } from "../../lib/gravacoes";
+import type { ReplaySummary } from "../../lib/issues";
 
 /**
  * A fila da triagem, em três pilhas.
@@ -9,26 +9,26 @@ import type { ResumoReplay } from "../../lib/issues";
  * são as duas formas de fechar sem publicar; `promovidas` já viraram card.
  */
 export type FilaGravacoes = {
-  fila: Gravacao[];
-  promovidas: Gravacao[];
-  decididas: Gravacao[];
+  fila: Recording[];
+  promovidas: Recording[];
+  decididas: Recording[];
 };
 
 function tempo(d: Date | null): number {
   return d ? d.getTime() : 0;
 }
 
-export function separarGravacoes(gravacoes: Gravacao[]): FilaGravacoes {
+export function separarGravacoes(recordings: Recording[]): FilaGravacoes {
   // A fila ordena pela chegada; as decididas, pelo carimbo — ali o que interessa
   // é o que acabou de sair, não o que foi gravado primeiro.
-  const porChegada = (a: Gravacao, b: Gravacao) => tempo(b.criadoEm) - tempo(a.criadoEm);
-  const porDecisao = (a: Gravacao, b: Gravacao) => tempo(b.decididaEm) - tempo(a.decididaEm);
+  const porChegada = (a: Recording, b: Recording) => tempo(b.createdAt) - tempo(a.createdAt);
+  const porDecisao = (a: Recording, b: Recording) => tempo(b.decidedAt) - tempo(a.decidedAt);
 
   return {
-    fila: gravacoes.filter((g) => g.estado === "fila").sort(porChegada),
-    promovidas: gravacoes.filter((g) => g.estado === "promovida").sort(porDecisao),
-    decididas: gravacoes
-      .filter((g) => g.estado === "conferida" || g.estado === "descartada")
+    fila: recordings.filter((g) => g.state === "fila").sort(porChegada),
+    promovidas: recordings.filter((g) => g.state === "promovida").sort(porDecisao),
+    decididas: recordings
+      .filter((g) => g.state === "conferida" || g.state === "descartada")
       .sort(porDecisao),
   };
 }
@@ -51,27 +51,27 @@ export type LinhaResumo = { chave: string; rotulo: string; valor: string; ajuda?
  * errada" de "item faltando no banco", e golpes em dummy é o que gera crítico
  * suficiente para fechar a conta.
  */
-export function linhasDoResumo(replay: ResumoReplay): LinhaResumo[] {
+export function linhasDoResumo(replay: ReplaySummary): LinhaResumo[] {
   const linhas: LinhaResumo[] = [
     {
       chave: "personagem",
-      rotulo: t.gravacaoClasse,
+      rotulo: t.recordingCharacter,
       valor: `${replay.className ?? "?"} — ${replay.player ?? "?"} (nv ${replay.baseLevel ?? "?"}/${
         replay.jobLevel ?? "?"
       })`,
     },
     {
       chave: "golpes",
-      rotulo: t.gravacaoGolpes,
+      rotulo: t.recordingHits,
       valor: `${replay.dummyHits ?? 0} em dummy · ${replay.damageEvents ?? 0} no total`,
     },
-    { chave: "trocas", rotulo: t.gravacaoTrocas, valor: String(replay.equipChangeCount ?? 0) },
+    { chave: "trocas", rotulo: t.recordingEquipChanges, valor: String(replay.equipChangeCount ?? 0) },
   ];
 
   if (replay.traits && Object.keys(replay.traits).length > 0) {
     linhas.push({
       chave: "talentos",
-      rotulo: t.gravacaoTalentos,
+      rotulo: t.recordingTraits,
       // Separador visível: o espaço duplo que estava aqui antes colapsava para
       // um só no HTML, e "POW 10 CON 5" lia como um número atrás do outro.
       valor: Object.entries(replay.traits)
@@ -79,27 +79,27 @@ export function linhasDoResumo(replay: ResumoReplay): LinhaResumo[] {
         .join(" · "),
       // De onde vieram muda o peso: lido da gravação é fato, informado no
       // formulário é palavra de quem gravou.
-      ajuda: replay.traitsSource === "replay" ? t.talentosDaGravacao : t.talentosDoFormulario,
+      ajuda: replay.traitsSource === "replay" ? t.traitsFromRecording : t.traitsFromForm,
     });
   }
 
   if (replay.skippedItems && replay.skippedItems.length > 0) {
     linhas.push({
       chave: "itens",
-      rotulo: t.gravacaoItensFora,
+      rotulo: t.recordingUnknownItems,
       valor: replay.skippedItems.join(", "),
     });
   }
 
   const duracao = formataDuracao(replay.durationMs);
-  if (duracao) linhas.push({ chave: "duracao", rotulo: t.gravacaoDuracao, valor: duracao });
+  if (duracao) linhas.push({ chave: "duracao", rotulo: t.recordingDuration, valor: duracao });
 
   // A migração escreveu string vazia quando a origem não tinha o campo, por isso
   // `||` e não `??`.
-  linhas.push({ chave: "versao", rotulo: t.gravacaoVersao, valor: replay.appVersion || "?" });
+  linhas.push({ chave: "versao", rotulo: t.recordingAppVersion, valor: replay.appVersion || "?" });
 
   if (replay.fileName) {
-    linhas.push({ chave: "arquivo", rotulo: t.gravacaoArquivo, valor: replay.fileName });
+    linhas.push({ chave: "arquivo", rotulo: t.recordingFile, valor: replay.fileName });
   }
 
   return linhas;

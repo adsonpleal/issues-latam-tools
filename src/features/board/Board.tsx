@@ -13,12 +13,12 @@ type Props = {
   carregando: boolean;
   erro: string | null;
   /** Passados só com sessão de admin: arrastar, seletor de coluna e painel. */
-  onMover?: (id: string, coluna: Column) => void;
+  onMover?: (id: string, column: Column) => void;
   onAbrir?: (id: string) => void;
   /** Fixa `id` logo antes (ou depois) de `alvoId`, na pilha de `alvoId`. */
   onFixar?: (id: string, alvoId: string, antes: boolean) => void;
   /** Devolve a coluna inteira à ordem automática. */
-  onOrdemAutomatica?: (coluna: Column) => void;
+  onOrdemAutomatica?: (column: Column) => void;
 };
 
 export function Board({
@@ -36,11 +36,11 @@ export function Board({
   // dragover, só no drop.
   const [arrastando, setArrastando] = useState<string | null>(null);
 
-  if (erro) return <p className="aviso aviso-erro">{t.erroCarregar}</p>;
-  if (carregando) return <p className="aviso">{t.carregando}</p>;
+  if (erro) return <p className="aviso aviso-erro">{t.loadError}</p>;
+  if (carregando) return <p className="aviso">{t.loading}</p>;
 
   const total = colunas.reduce((n, c) => n + c.issues.length, 0);
-  if (total === 0) return <p className="aviso">{t.quadroVazio}</p>;
+  if (total === 0) return <p className="aviso">{t.emptyBoard}</p>;
 
   const votarSync = (id: string) => {
     void votar(id);
@@ -48,15 +48,15 @@ export function Board({
 
   return (
     <div className="quadro">
-      {colunas.map(({ coluna, issues }) => (
+      {colunas.map(({ column, issues }) => (
         <BoardColumn
-          key={coluna}
-          coluna={coluna}
+          key={column}
+          column={column}
           quantidade={issues.length}
           onSoltar={onMover}
           onOrdemAutomatica={
-            onOrdemAutomatica && issues.some((i) => i.ordem !== null)
-              ? () => onOrdemAutomatica(coluna)
+            onOrdemAutomatica && issues.some((i) => i.order !== null)
+              ? () => onOrdemAutomatica(column)
               : undefined
           }
         >

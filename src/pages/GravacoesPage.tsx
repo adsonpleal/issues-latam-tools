@@ -24,24 +24,24 @@ export function GravacoesPage() {
 
   // Sem o ramo de carregando, o próprio admin veria um lampejo de 404 a cada
   // recarga, enquanto o SDK de auth ainda estivesse subindo.
-  if (carregando) return <p className="aviso">{t.carregando}</p>;
+  if (carregando) return <p className="aviso">{t.loading}</p>;
   if (!admin) return <NotFoundPage />;
 
   return <Fila />;
 }
 
 function Fila() {
-  useSeo({ title: `${t.gravacoesTitulo} — ${t.siteNome}`, path: "/gravacoes" });
-  const { gravacoes, carregando, erro, erroAcao, promover, marcar, apagar } = useGravacoes();
-  const { fila, promovidas, decididas } = useMemo(() => separarGravacoes(gravacoes), [gravacoes]);
+  useSeo({ title: `${t.recordingsTitle} — ${t.siteName}`, path: "/gravacoes" });
+  const { recordings, carregando, erro, erroAcao, promover, marcar, apagar } = useGravacoes();
+  const { fila, promovidas, decididas } = useMemo(() => separarGravacoes(recordings), [recordings]);
 
   return (
     <div className="pagina">
-      <h1>{t.gravacoesTitulo}</h1>
-      <p className="subtitulo">{t.gravacoesSub}</p>
+      <h1>{t.recordingsTitle}</h1>
+      <p className="subtitulo">{t.recordingsSubtitle}</p>
       <p>
         <Link to="/" className="link-voltar">
-          ← {t.voltar}
+          ← {t.backToBoard}
         </Link>
       </p>
       {erroAcao && <p className="aviso aviso-erro">{erroAcao}</p>}
@@ -52,7 +52,7 @@ function Fila() {
         carregando={carregando}
         erro={erro}
         onPromover={(g) => void promover(g)}
-        onMarcar={(id, estado) => void marcar(id, estado)}
+        onMarcar={(id, state) => void marcar(id, state)}
         onApagar={(id) => void apagar(id)}
       />
     </div>

@@ -1,46 +1,46 @@
 import { useEffect, useMemo } from "react";
 
 import { t } from "../../i18n";
-import { urlDoAnexo, type Anexo } from "../../lib/anexos";
-import type { Comentario } from "../../lib/comentarios";
+import { attachmentUrl, type Attachment } from "../../lib/anexos";
+import type { IssueComment } from "../../lib/comentarios";
 import { formatData } from "../../lib/datas";
 import { TextoComLinks } from "./TextoComLinks";
 
 type Props = {
-  comentarios: Comentario[];
+  comments: IssueComment[];
   /** Só os anexos amarrados a comentário; os do card ficam na `ListaAnexos`. */
-  imagens?: Anexo[];
+  images?: Attachment[];
   /** Só com sessão de admin: dá para tirar o print colado por engano. */
-  onApagarImagem?: (anexoId: string) => void;
+  onApagarImagem?: (attachmentId: string) => void;
 };
 
-export function ListaComentarios({ comentarios, imagens = [], onApagarImagem }: Props) {
+export function ListaComentarios({ comments, images = [], onApagarImagem }: Props) {
   // Um object URL por imagem, revogado junto — sem isto cada snapshot do
   // Firestore deixaria um blob preso na memória da aba.
-  const urls = useMemo(() => new Map(imagens.map((a) => [a.id, urlDoAnexo(a)])), [imagens]);
+  const urls = useMemo(() => new Map(images.map((a) => [a.id, attachmentUrl(a)])), [images]);
   useEffect(() => () => urls.forEach((u) => URL.revokeObjectURL(u)), [urls]);
 
   const porComentario = useMemo(() => {
-    const mapa = new Map<string, Anexo[]>();
-    for (const a of imagens) {
-      if (!a.comentarioId) continue;
-      mapa.set(a.comentarioId, [...(mapa.get(a.comentarioId) ?? []), a]);
+    const mapa = new Map<string, Attachment[]>();
+    for (const a of images) {
+      if (!a.commentId) continue;
+      mapa.set(a.commentId, [...(mapa.get(a.commentId) ?? []), a]);
     }
     return mapa;
-  }, [imagens]);
+  }, [images]);
 
-  if (comentarios.length === 0) return <p className="aviso">{t.semComentarios}</p>;
+  if (comments.length === 0) return <p className="aviso">{t.noComments}</p>;
 
   return (
     <ol className="comentarios">
-      {comentarios.map((c) => (
-        <li key={c.id} className={`comentario comentario-${c.tipo}`}>
+      {comments.map((c) => (
+        <li key={c.id} className={`comentario comentario-${c.type}`}>
           <div className="comentario-topo">
-            <strong>{c.autor}</strong>
-            <time dateTime={c.criadoEm?.toISOString()}>{formatData(c.criadoEm)}</time>
+            <strong>{c.author}</strong>
+            <time dateTime={c.createdAt?.toISOString()}>{formatData(c.createdAt)}</time>
           </div>
           <div className="comentario-texto">
-            <TextoComLinks texto={c.texto} />
+            <TextoComLinks text={c.text} />
           </div>
           {(porComentario.get(c.id)?.length ?? 0) > 0 && (
             <ul className="comentario-imagens">
@@ -50,9 +50,9 @@ export function ListaComentarios({ comentarios, imagens = [], onApagarImagem }: 
                     href={urls.get(a.id)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={t.abrirImagem}
+                    title={t.openImage}
                   >
-                    <img src={urls.get(a.id)} alt={a.nome} className="anexo-preview" />
+                    <img src={urls.get(a.id)} alt={a.name} className="anexo-preview" />
                   </a>
                   {onApagarImagem && (
                     <button
@@ -60,7 +60,7 @@ export function ListaComentarios({ comentarios, imagens = [], onApagarImagem }: 
                       className="botao botao-pequeno"
                       onClick={() => onApagarImagem(a.id)}
                     >
-                      {t.remover}
+                      {t.remove}
                     </button>
                   )}
                 </li>

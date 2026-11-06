@@ -17,215 +17,229 @@ import {
 } from "firebase/firestore";
 
 import { getDb } from "./firebase";
-import { CONTATO_MAX, DESCRICAO_MAX, TITULO_MAX, type ResumoReplay } from "./issues";
+import { CONTACT_MAX, DESCRIPTION_MAX, TITLE_MAX, type ReplaySummary } from "./issues";
 
-export const LIMITE_GRAVACOES = 300;
+export const RECORDINGS_LIMIT = 300;
 
 /**
- * Uma gravação `.rrf` do "Ajude o simulador a acertar as contas".
+ * One `.rrf` recording from "Ajude o simulador a acertar as contas".
  *
- * Não é card: é caixa de entrada. Mora numa coleção que só o admin lê, com o
- * arquivo num subdocumento, e vira ficha do quadro quando a triagem promove —
- * aí sim nasce um `issues/{id}` público com o .rrf nos anexos.
+ * It is not a card: it is an inbox. It lives in a collection only the admin
+ * reads, with the file in a subdocument, and becomes a board card when triage
+ * promotes it -- that is when a public `issues/{id}` is born with the .rrf in
+ * its attachments.
  *
- * Antes isso era um card `arquivado: true`, o que dava dois sentidos para o
- * mesmo booleano: "a triagem despachou" e "ninguém olhou ainda".
+ * This used to be an `arquivado: true` card, which gave one boolean two
+ * meanings: "triage dispatched it" and "nobody has looked yet".
+ *
+ * These names are ours; the stored field names appear only in `toRecording`
+ * below and in the writes further down.
  */
-export type Gravacao = {
+export type Recording = {
   id: string;
-  titulo: string;
-  /** O que quem enviou escreveu na caixa de observações. */
-  notas: string;
-  /** O que o parser leu — é o que a triagem lê para ranquear sem baixar o .rrf. */
-  resumo: ResumoReplay;
-  /** Nick para crédito. Só aparece em público se a ficha for promovida. */
+  title: string;
+  /** What the submitter wrote in the notes box. */
+  notes: string;
+  /** What the parser read -- what triage reads to rank without downloading the .rrf. */
+  summary: ReplaySummary;
+  /** A nickname for credit. Only shows in public if the recording is promoted. */
   nick: string | null;
-  /** Discord/e-mail. A coleção inteira é privada, então não precisa de subdocumento. */
-  contato: string | null;
-  nome: string;
-  tamanho: number;
-  criadoEm: Date | null;
-  estado: EstadoGravacao;
-  /** O card criado pela promoção. É a única coisa daqui que chega ao público. */
+  /** Discord/e-mail. The whole collection is private, so no subdocument is needed. */
+  contact: string | null;
+  fileName: string;
+  size: number;
+  createdAt: Date | null;
+  state: RecordingState;
+  /** The card the promotion created. The only thing from here that reaches the public. */
   issueId: string | null;
-  decididaEm: Date | null;
-  /** Anotação da triagem — nas migradas, o que estava no comentário da ficha. */
-  notaTriagem: string | null;
+  decidedAt: Date | null;
+  /** Triage's annotation -- on the migrated ones, what was in the card's comment. */
+  triageNote: string | null;
 };
 
 /**
- * `fila` espera decisão; `promovida` virou card público; `conferida` já serviu
- * de teste mas não vai para o quadro; `descartada` é o "não presta".
+ * `fila` is awaiting a decision; `promovida` became a public card; `conferida`
+ * served as a test but is not going on the board; `descartada` is the "no good".
  *
- * `descartada` não apaga nada — é o arquivar daqui.
+ * `descartada` deletes nothing -- it is this collection's archive.
+ *
+ * The values are stored on the document, so they keep their spelling.
  */
-export const ESTADOS = ["fila", "promovida", "conferida", "descartada"] as const;
-export type EstadoGravacao = (typeof ESTADOS)[number];
+export const RECORDING_STATES = ["fila", "promovida", "conferida", "descartada"] as const;
+export type RecordingState = (typeof RECORDING_STATES)[number];
 
-export function isEstado(v: unknown): v is EstadoGravacao {
-  return typeof v === "string" && (ESTADOS as readonly string[]).includes(v);
+export function isRecordingState(v: unknown): v is RecordingState {
+  return typeof v === "string" && (RECORDING_STATES as readonly string[]).includes(v);
 }
 
-function toGravacao(snap: QueryDocumentSnapshot<DocumentData>): Gravacao {
+function toRecording(snap: QueryDocumentSnapshot<DocumentData>): Recording {
   const d = snap.data();
   return {
     id: snap.id,
-    titulo: String(d["titulo"] ?? ""),
-    notas: String(d["notas"] ?? ""),
-    resumo: d["resumo"] && typeof d["resumo"] === "object" ? (d["resumo"] as ResumoReplay) : {},
+    title: String(d["titulo"] ?? ""),
+    notes: String(d["notas"] ?? ""),
+    summary:
+      d["resumo"] && typeof d["resumo"] === "object" ? (d["resumo"] as ReplaySummary) : {},
     nick: typeof d["nick"] === "string" && d["nick"] ? d["nick"] : null,
-    contato: typeof d["contato"] === "string" && d["contato"] ? d["contato"] : null,
-    nome: String(d["nome"] ?? ""),
-    tamanho: Number(d["tamanho"] ?? 0),
-    criadoEm: d["criadoEm"]?.toDate?.() ?? null,
-    // Documento fora do formato cai na fila em vez de sumir da tela: aqui o
-    // acervo é privado e pequeno, e uma gravação invisível seria pior do que
-    // uma gravação no lugar errado.
-    estado: isEstado(d["estado"]) ? d["estado"] : "fila",
+    contact: typeof d["contato"] === "string" && d["contato"] ? d["contato"] : null,
+    fileName: String(d["nome"] ?? ""),
+    size: Number(d["tamanho"] ?? 0),
+    createdAt: d["criadoEm"]?.toDate?.() ?? null,
+    // A document outside the shape lands in the queue rather than vanishing
+    // from the screen: this collection is private and small, and an invisible
+    // recording would be worse than one in the wrong place.
+    state: isRecordingState(d["estado"]) ? d["estado"] : "fila",
     issueId: typeof d["issueId"] === "string" && d["issueId"] ? d["issueId"] : null,
-    decididaEm: d["decididaEm"]?.toDate?.() ?? null,
-    notaTriagem:
+    decidedAt: d["decididaEm"]?.toDate?.() ?? null,
+    triageNote:
       typeof d["notaTriagem"] === "string" && d["notaTriagem"] ? d["notaTriagem"] : null,
   };
 }
 
 /**
- * A fila inteira, ao vivo. Sem `where`: a regra de leitura já é `isAdmin()`, e
- * separar por estado acontece na memória — são dezenas de documentos, e o
- * arquivo em si mora fora deles.
+ * The whole queue, live. No `where`: the read rule is already `isAdmin()`, and
+ * splitting by state happens in memory -- there are dozens of documents, and
+ * the file itself lives outside them.
  */
-export function subscribeGravacoes(
-  onGravacoes: (g: Gravacao[]) => void,
+export function subscribeRecordings(
+  onRecordings: (g: Recording[]) => void,
   onError: (e: Error) => void,
 ): () => void {
   const q = query(
     collection(getDb(), "gravacoes"),
     orderBy("criadoEm", "desc"),
-    limit(LIMITE_GRAVACOES),
+    limit(RECORDINGS_LIMIT),
   );
-  return onSnapshot(q, (snap) => onGravacoes(snap.docs.map(toGravacao)), onError);
+  return onSnapshot(q, (snap) => onRecordings(snap.docs.map(toRecording)), onError);
 }
 
-export type ArquivoGravacao = { nome: string; tamanho: number; bytes: Uint8Array };
+export type RecordingFile = { name: string; size: number; bytes: Uint8Array };
 
 /**
- * A descrição do card que a promoção cria: a observação de quem enviou primeiro,
- * e depois o que o parser leu, em uma frase.
+ * The description of the card a promotion creates: the submitter's own note
+ * first, then what the parser read, in one sentence.
  *
- * Montar isto aqui, e não no simulador, é de propósito — o texto é do quadro, e
- * o simulador não deveria ter que saber escrever em pt-BR para o tracker.
+ * Building this here rather than in the simulator is deliberate -- the text
+ * belongs to the board, and the simulator should not have to know how to write
+ * pt-BR for the tracker. The text itself is read by the community, so it stays
+ * in Portuguese.
  */
-export function descricaoDaGravacao(g: Gravacao): string {
-  const s = g.resumo;
-  const partes: string[] = [];
-  if (g.notas) partes.push(g.notas);
+export function recordingDescription(g: Recording): string {
+  const s = g.summary;
+  const parts: string[] = [];
+  if (g.notes) parts.push(g.notes);
   const dur = typeof s.durationMs === "number" ? `${Math.round(s.durationMs / 1000)}s` : "?";
-  partes.push(
+  parts.push(
     `Gravação de ${dur} com ${s.dummyHits ?? 0} golpes em dummy ` +
       `(${s.damageEvents ?? 0} eventos de dano no total), ` +
       `${s.equipChangeCount ?? 0} trocas de equipamento e ` +
       `${s.learnedSkillCount ?? 0} habilidades aprendidas. ` +
-      `Mapa ${s["map"] ?? "?"}. Arquivo ${g.nome || "?"}.`,
+      `Mapa ${s["map"] ?? "?"}. Arquivo ${g.fileName || "?"}.`,
   );
-  return partes.join("\n\n").slice(0, DESCRICAO_MAX);
+  return parts.join("\n\n").slice(0, DESCRIPTION_MAX);
 }
 
 /**
- * Promover é o que publica: cria o card em backlog com o .rrf anexado, o contato
- * no subdocumento privado, e carimba a gravação com o id do card.
+ * Promoting is what publishes: it creates the card in backlog with the .rrf
+ * attached, the contact in the private subdocument, and stamps the recording
+ * with the card's id.
  *
- * Numa escrita atômica só. Meio caminho aqui seria um card sem a gravação (o
- * anexo é o motivo do card existir) ou uma gravação carimbada como promovida
- * apontando para um card que não existe.
+ * In one atomic write. Stopping halfway here would leave a card without the
+ * recording (the attachment is the reason the card exists) or a recording
+ * stamped as promoted pointing at a card that does not exist.
  *
- * O card herda o id da gravação — a origem fica legível sem campo extra — e a
- * data do envio, não a de hoje: o crédito é de quem gravou, e o quadro não deve
- * dizer que a ficha é de agora.
+ * The card inherits the recording's id -- the origin stays readable with no
+ * extra field -- and the submission's date rather than today's: the credit
+ * belongs to whoever recorded it, and the board should not claim the card is
+ * from now.
+ *
+ * Every key written below is a Firestore field name, in full rather than by
+ * shorthand.
  */
-export async function promoverGravacao(g: Gravacao): Promise<string> {
+export async function promoteRecording(g: Recording): Promise<string> {
   const db = getDb();
-  const arquivo = await getArquivo(g.id);
-  const lote = writeBatch(db);
+  const file = await getRecordingFile(g.id);
+  const batch = writeBatch(db);
 
   const card = doc(db, "issues", g.id);
-  lote.set(card, {
+  batch.set(card, {
     projeto: "simulador",
-    titulo: g.titulo.slice(0, TITULO_MAX),
-    descricao: descricaoDaGravacao(g),
+    titulo: g.title.slice(0, TITLE_MAX),
+    descricao: recordingDescription(g),
     tipo: "replay",
     status: "backlog",
     arquivado: false,
     upvotes: 0,
     comentarios: 0,
-    anexos: arquivo ? 1 : 0,
-    criadoEm: g.criadoEm ? Timestamp.fromDate(g.criadoEm) : serverTimestamp(),
+    anexos: file ? 1 : 0,
+    criadoEm: g.createdAt ? Timestamp.fromDate(g.createdAt) : serverTimestamp(),
     atualizadoEm: serverTimestamp(),
-    // Desnormalizado no card para o painel da triagem mostrar o resumo sem ir
-    // buscar a gravação de origem.
-    replay: g.resumo,
+    // Denormalised onto the card so the triage panel can show the summary
+    // without fetching the recording it came from.
+    replay: g.summary,
     ...(g.nick ? { autor: g.nick } : {}),
   });
 
-  if (arquivo) {
-    lote.set(doc(db, "issues", g.id, "anexos", "gravacao"), {
-      nome: arquivo.nome.slice(0, 200),
+  if (file) {
+    batch.set(doc(db, "issues", g.id, "anexos", "gravacao"), {
+      nome: file.name.slice(0, 200),
       tipo: "rrf",
-      tamanho: arquivo.bytes.byteLength,
-      bytes: Bytes.fromUint8Array(arquivo.bytes),
+      tamanho: file.bytes.byteLength,
+      bytes: Bytes.fromUint8Array(file.bytes),
       criadoEm: serverTimestamp(),
     });
   }
 
-  if (g.contato) {
-    lote.set(doc(db, "issues", g.id, "privado", "contato"), {
-      contato: g.contato.slice(0, CONTATO_MAX),
+  if (g.contact) {
+    batch.set(doc(db, "issues", g.id, "privado", "contato"), {
+      contato: g.contact.slice(0, CONTACT_MAX),
       criadoEm: serverTimestamp(),
     });
   }
 
-  lote.update(doc(db, "gravacoes", g.id), {
+  batch.update(doc(db, "gravacoes", g.id), {
     estado: "promovida",
     issueId: g.id,
     decididaEm: serverTimestamp(),
   });
 
-  await lote.commit();
+  await batch.commit();
   return g.id;
 }
 
 /**
- * Carimbo da triagem para o que não vira card. `descartada` é o arquivar daqui:
- * marca, não apaga.
+ * Triage's stamp for what does not become a card. `descartada` is this
+ * collection's archive: it marks, it does not delete.
  */
-export async function marcarGravacao(id: string, estado: EstadoGravacao): Promise<void> {
+export async function markRecording(id: string, state: RecordingState): Promise<void> {
   await updateDoc(doc(getDb(), "gravacoes", id), {
-    estado,
-    decididaEm: estado === "fila" ? null : serverTimestamp(),
+    estado: state,
+    decididaEm: state === "fila" ? null : serverTimestamp(),
   });
 }
 
 /**
- * Apaga a gravação e o arquivo. Exceção ao "nada é apagado nunca" pela mesma
- * razão dos anexos: isto é escrita pública, então precisa existir moderação do
- * que não devia ter entrado. Para gravação legítima que não presta, o caminho é
- * descartar.
+ * Deletes the recording and the file. An exception to "nothing is ever deleted"
+ * for the same reason as attachments: this is a public write, so there has to
+ * be a way to moderate what should never have come in. For a legitimate
+ * recording that is no good, the path is to discard it.
  */
-export async function apagarGravacao(id: string): Promise<void> {
+export async function deleteRecording(id: string): Promise<void> {
   const db = getDb();
-  // Subcoleção não some com o pai — o arquivo é o documento pesado, e deixá-lo
-  // para trás guardaria justamente o que se quis apagar.
+  // A subcollection does not go with its parent -- the file is the heavy
+  // document, and leaving it behind would keep exactly what was meant to go.
   await deleteDoc(doc(db, "gravacoes", id, "arquivo", "rrf")).catch(() => undefined);
   await deleteDoc(doc(db, "gravacoes", id));
 }
 
-/** O .rrf, sob demanda. Fica fora do documento para a lista não baixar tudo. */
-export async function getArquivo(gravacaoId: string): Promise<ArquivoGravacao | null> {
-  const snap = await getDoc(doc(getDb(), "gravacoes", gravacaoId, "arquivo", "rrf"));
+/** The .rrf, on demand. It lives outside the document so the list does not download everything. */
+export async function getRecordingFile(recordingId: string): Promise<RecordingFile | null> {
+  const snap = await getDoc(doc(getDb(), "gravacoes", recordingId, "arquivo", "rrf"));
   if (!snap.exists()) return null;
   const d = snap.data();
   return {
-    nome: String(d["nome"] ?? ""),
-    tamanho: Number(d["tamanho"] ?? 0),
+    name: String(d["nome"] ?? ""),
+    size: Number(d["tamanho"] ?? 0),
     bytes: d["bytes"]?.toUint8Array?.() ?? new Uint8Array(),
   };
 }

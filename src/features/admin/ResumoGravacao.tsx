@@ -1,8 +1,8 @@
-import type { ResumoReplay } from "../../lib/issues";
+import type { ReplaySummary } from "../../lib/issues";
 import { linhasDoResumo } from "./gravacoes";
 
 type Props = {
-  replay: ResumoReplay;
+  replay: ReplaySummary;
   /** `painel-replay` no painel do card, `gravacao-resumo` na fila. */
   className?: string;
 };

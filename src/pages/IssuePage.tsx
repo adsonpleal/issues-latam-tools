@@ -2,8 +2,8 @@ import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { t } from "../i18n";
-import { apagarAnexo, subscribeAnexos, type Anexo } from "../lib/anexos";
-import { subscribeComentarios, type Comentario } from "../lib/comentarios";
+import { deleteAttachment, subscribeAttachments, type Attachment } from "../lib/anexos";
+import { subscribeComments, type IssueComment } from "../lib/comentarios";
 import { subscribeIssue, type Issue } from "../lib/issues";
 import { useSeo } from "../lib/seo";
 import { useSessao } from "../features/admin/SessaoContext";
@@ -30,8 +30,8 @@ export function IssuePage() {
   const { mover, editar, comentar, erro: erroAcao } = useAcoesAdmin(sessao);
 
   const [issue, setIssue] = useState<Issue | null>(null);
-  const [comentarios, setComentarios] = useState<Comentario[]>([]);
-  const [anexos, setAnexos] = useState<Anexo[]>([]);
+  const [comments, setComentarios] = useState<IssueComment[]>([]);
+  const [attachments, setAnexos] = useState<Attachment[]>([]);
   const [carregando, setCarregando] = useState(true);
 
   // As três assinaturas esperam a sessão resolver, e re-assinam quando o uid
@@ -61,12 +61,12 @@ export function IssuePage() {
 
   useEffect(() => {
     if (!issueId || carregandoSessao) return;
-    return subscribeComentarios(issueId, setComentarios, () => setComentarios([]));
+    return subscribeComments(issueId, setComentarios, () => setComentarios([]));
   }, [issueId, carregandoSessao, uid]);
 
   useEffect(() => {
     if (!issueId || carregandoSessao) return;
-    return subscribeAnexos(issueId, setAnexos, () => setAnexos([]));
+    return subscribeAttachments(issueId, setAnexos, () => setAnexos([]));
   }, [issueId, carregandoSessao, uid]);
 
   // Uma subscrição só para os dois usos: o que veio no relato fica na lista de
@@ -74,37 +74,37 @@ export function IssuePage() {
   // porque as duas listas viram object URL — recriá-las a cada render churnaria
   // blob à toa.
   const [anexosDoCard, imagensDeComentario] = useMemo(
-    () => [anexos.filter((a) => !a.comentarioId), anexos.filter((a) => a.comentarioId)],
-    [anexos],
+    () => [attachments.filter((a) => !a.commentId), attachments.filter((a) => a.commentId)],
+    [attachments],
   );
 
   useSeo({
-    title: issue ? `${issue.titulo} — ${t.siteNome}` : `${t.siteNome} — ${t.siteSub}`,
-    description: issue?.descricao.slice(0, 160) || t.siteDescricao,
+    title: issue ? `${issue.title} — ${t.siteName}` : `${t.siteName} — ${t.siteSubtitle}`,
+    description: issue?.description.slice(0, 160) || t.siteDescription,
     path: `/t/${issueId}`,
   });
 
   // Qualquer pessoa anexa arquivo, então precisa existir moderação — e ela mora
   // onde o arquivo aparece, não numa tela à parte.
-  const apagar = admin ? (anexoId: string) => void apagarAnexo(issueId, anexoId) : undefined;
+  const apagar = admin ? (attachmentId: string) => void deleteAttachment(issueId, attachmentId) : undefined;
 
   return (
     <div className="pagina pagina-estreita">
       <p>
         <Link to="/" className="link-voltar">
-          ← {t.voltar}
+          ← {t.backToBoard}
         </Link>
       </p>
 
-      {acabouDeCriar && <p className="aviso aviso-ok">{t.enviado}</p>}
+      {acabouDeCriar && <p className="aviso aviso-ok">{t.submitted}</p>}
       {erroAcao && <p className="aviso aviso-erro">{erroAcao}</p>}
 
-      {(carregando || carregandoSessao) && <p className="aviso">{t.carregando}</p>}
+      {(carregando || carregandoSessao) && <p className="aviso">{t.loading}</p>}
 
       {!carregando && !carregandoSessao && !issue && (
         <>
-          <h1>{t.naoEncontrado}</h1>
-          <p className="subtitulo">{t.naoEncontradoAjuda}</p>
+          <h1>{t.notFound}</h1>
+          <p className="subtitulo">{t.notFoundHelp}</p>
         </>
       )}
 
@@ -112,19 +112,19 @@ export function IssuePage() {
         <>
           <IssueDetail issue={issue} />
           {admin && (
-            <Suspense fallback={<p className="aviso">{t.carregando}</p>}>
+            <Suspense fallback={<p className="aviso">{t.loading}</p>}>
               <AcoesTicket
                 issue={issue}
-                onMover={(coluna) => void mover(issue.id, coluna)}
+                onMover={(column) => void mover(issue.id, column)}
                 onEditar={(campos) => void editar(issue.id, campos)}
               />
             </Suspense>
           )}
-          <ListaAnexos anexos={anexosDoCard} onApagar={apagar} />
-          <h2 className="secao">{t.comentariosLabel(comentarios.length)}</h2>
+          <ListaAnexos attachments={anexosDoCard} onApagar={apagar} />
+          <h2 className="secao">{t.commentCount(comments.length)}</h2>
           <ListaComentarios
-            comentarios={comentarios}
-            imagens={imagensDeComentario}
+            comments={comments}
+            images={imagensDeComentario}
             onApagarImagem={apagar}
           />
           {admin && (
@@ -133,7 +133,7 @@ export function IssuePage() {
                   `htmlFor` do campo de anexos precisa ser único no documento. */}
               <FormularioComentario
                 id="imagens-comentario-ticket"
-                onEnviar={(texto, imagens) => void comentar(issue.id, texto, imagens)}
+                onEnviar={(text, images) => void comentar(issue.id, text, images)}
               />
             </Suspense>
           )}

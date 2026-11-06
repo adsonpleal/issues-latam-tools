@@ -45,7 +45,7 @@ export function App() {
       <SessaoProvider>
         <TopBar />
         <main className="conteudo">
-          <Suspense fallback={<p className="aviso">{t.carregando}</p>}>
+          <Suspense fallback={<p className="aviso">{t.loading}</p>}>
             <Routes>
               <Route path="/" element={<BoardPage />} />
               <Route path="/novo" element={<NewIssuePage />} />

@@ -3,32 +3,32 @@ import { describe, expect, it } from "vitest";
 import type { Issue } from "../../lib/issues";
 import { reordenarPilha, soltarPilha } from "./ordem";
 
-function issue(id: string, ordem: number | null = null): Issue {
+function issue(id: string, order: number | null = null): Issue {
   return {
     id,
-    projeto: "simulador",
-    titulo: id,
-    descricao: "",
-    tipo: "bug",
+    project: "simulador",
+    title: id,
+    description: "",
+    type: "bug",
     status: "backlog",
-    arquivado: false,
+    archived: false,
     upvotes: 0,
-    comentarios: 0,
-    anexos: 0,
-    criadoEm: new Date("2026-01-01"),
-    atualizadoEm: new Date("2026-01-01"),
-    autor: null,
-    ordem,
+    comments: 0,
+    attachments: 0,
+    createdAt: new Date("2026-01-01"),
+    updatedAt: new Date("2026-01-01"),
+    author: null,
+    order,
     replay: null,
   };
 }
 
 /** A pilha como ela fica depois das escritas, para conferir o resultado visual. */
-function aplicar(pilha: Issue[], escritas: { id: string; ordem: number | null }[]): string[] {
-  const mapa = new Map(escritas.map((e) => [e.id, e.ordem]));
+function aplicar(pilha: Issue[], escritas: { id: string; order: number | null }[]): string[] {
+  const mapa = new Map(escritas.map((e) => [e.id, e.order]));
   return pilha
-    .map((i) => ({ id: i.id, ordem: mapa.has(i.id) ? (mapa.get(i.id) ?? null) : i.ordem }))
-    .sort((a, b) => (a.ordem ?? Infinity) - (b.ordem ?? Infinity))
+    .map((i) => ({ id: i.id, order: mapa.has(i.id) ? (mapa.get(i.id) ?? null) : i.order }))
+    .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity))
     .map((i) => i.id);
 }
 
@@ -38,9 +38,9 @@ describe("reordenarPilha", () => {
   it("numera a pilha inteira no primeiro arrasto", () => {
     const escritas = reordenarPilha(pilha, pilha[2]!, "a", true);
     expect(escritas).toEqual([
-      { id: "c", ordem: 0 },
-      { id: "a", ordem: 1 },
-      { id: "b", ordem: 2 },
+      { id: "c", order: 0 },
+      { id: "a", order: 1 },
+      { id: "b", order: 2 },
     ]);
   });
 
@@ -53,8 +53,8 @@ describe("reordenarPilha", () => {
     const arrumada = [issue("a", 0), issue("b", 1), issue("c", 2)];
     const escritas = reordenarPilha(arrumada, arrumada[1]!, "c", false);
     expect(escritas).toEqual([
-      { id: "c", ordem: 1 },
-      { id: "b", ordem: 2 },
+      { id: "c", order: 1 },
+      { id: "b", order: 2 },
     ]);
   });
 
@@ -70,10 +70,10 @@ describe("reordenarPilha", () => {
     const deOutraColuna = issue("z", 7);
     const escritas = reordenarPilha(pilha, deOutraColuna, "b", true);
     expect(escritas).toEqual([
-      { id: "a", ordem: 0 },
-      { id: "z", ordem: 1 },
-      { id: "b", ordem: 2 },
-      { id: "c", ordem: 3 },
+      { id: "a", order: 0 },
+      { id: "z", order: 1 },
+      { id: "b", order: 2 },
+      { id: "c", order: 3 },
     ]);
   });
 
@@ -89,8 +89,8 @@ describe("reordenarPilha", () => {
 describe("soltarPilha", () => {
   it("apaga o número de quem tem um, e só", () => {
     expect(soltarPilha([issue("a", 0), issue("b"), issue("c", 1)])).toEqual([
-      { id: "a", ordem: null },
-      { id: "c", ordem: null },
+      { id: "a", order: null },
+      { id: "c", order: null },
     ]);
   });
 });

@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { t } from "../../i18n";
-import { createIssue, type NovoIssue } from "../../lib/issues";
+import { createIssue, type NewIssue } from "../../lib/issues";
 
 const CHAVE_ESPERA = "issues.latamtools.ultimoEnvio";
 const ESPERA_MS = 60_000;
@@ -32,36 +32,36 @@ function marcaEnvio(): void {
 export type EstadoEnvio = "parado" | "enviando" | "erro";
 
 export function useEnviarIssue() {
-  const [estado, setEstado] = useState<EstadoEnvio>("parado");
+  const [state, setEstado] = useState<EstadoEnvio>("parado");
   const [mensagemErro, setMensagemErro] = useState<string | null>(null);
 
-  async function enviar(dados: NovoIssue & { isca?: string }): Promise<string | null> {
+  async function enviar(data: NewIssue & { isca?: string }): Promise<string | null> {
     // `anexos` já vem pronto do CampoAnexos: reduzido, validado e dentro do teto.
-    if (dados.isca) return null; // campo-isca preenchido: é robô, some em silêncio
-    if (dados.titulo.trim().length < 3) {
+    if (data.isca) return null; // campo-isca preenchido: é robô, some em silêncio
+    if (data.title.trim().length < 3) {
       setEstado("erro");
-      setMensagemErro(t.erroTituloCurto);
+      setMensagemErro(t.summaryTooShort);
       return null;
     }
     if (esperaRestante() > 0) {
       setEstado("erro");
-      setMensagemErro(t.espereUmPouco);
+      setMensagemErro(t.slowDown);
       return null;
     }
 
     setEstado("enviando");
     setMensagemErro(null);
     try {
-      const id = await createIssue(dados);
+      const id = await createIssue(data);
       marcaEnvio();
       setEstado("parado");
       return id;
     } catch {
       setEstado("erro");
-      setMensagemErro(t.erroEnviar);
+      setMensagemErro(t.submitError);
       return null;
     }
   }
 
-  return { estado, mensagemErro, enviar };
+  return { state, mensagemErro, enviar };
 }

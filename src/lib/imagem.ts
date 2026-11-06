@@ -1,4 +1,4 @@
-import { ANEXO_MAX_BYTES } from "./anexos";
+import { ATTACHMENT_MAX_BYTES } from "./anexos";
 
 const LADO_MAX_INICIAL = 1600;
 
@@ -11,9 +11,9 @@ const LADO_MAX_INICIAL = 1600;
  * maior. Sai em WebP, que rende bem melhor que JPEG nesse tipo de captura.
  */
 export async function reduzirImagem(
-  arquivo: File,
-): Promise<{ dados: Uint8Array; nome: string }> {
-  const bitmap = await createImageBitmap(arquivo);
+  file: File,
+): Promise<{ data: Uint8Array; name: string }> {
+  const bitmap = await createImageBitmap(file);
 
   try {
     let lado = LADO_MAX_INICIAL;
@@ -36,8 +36,8 @@ export async function reduzirImagem(
       );
       if (!blob) throw new Error("falha ao converter a imagem");
 
-      if (blob.size <= ANEXO_MAX_BYTES) {
-        return { dados: new Uint8Array(await blob.arrayBuffer()), nome: nomeWebp(arquivo.name) };
+      if (blob.size <= ATTACHMENT_MAX_BYTES) {
+        return { data: new Uint8Array(await blob.arrayBuffer()), name: nomeWebp(file.name) };
       }
 
       // Duas rodadas mexendo só na qualidade; depois começa a encolher.
@@ -51,7 +51,7 @@ export async function reduzirImagem(
   }
 }
 
-function nomeWebp(nome: string): string {
-  const base = nome.replace(/\.[^.]+$/, "") || "imagem";
+function nomeWebp(name: string): string {
+  const base = name.replace(/\.[^.]+$/, "") || "imagem";
   return `${base.slice(0, 180)}.webp`;
 }

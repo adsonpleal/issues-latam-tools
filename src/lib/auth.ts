@@ -23,7 +23,7 @@ const CHAVE_SESSAO = "issues.latamtools.admin";
 
 export type Sessao = {
   uid: string;
-  nome: string;
+  name: string;
   email: string;
   admin: boolean;
 };
@@ -68,7 +68,7 @@ export async function observarSessao(cb: (s: Sessao | null) => void): Promise<()
     }
     cb({
       uid: user.uid,
-      nome: user.displayName ?? user.email ?? "admin",
+      name: user.displayName ?? user.email ?? "admin",
       email: user.email ?? "",
       // Espelho da UI. Quem manda de verdade são as regras: qualquer conta
       // Google consegue entrar e criar um registro de usuário, e nenhuma delas

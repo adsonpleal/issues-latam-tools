@@ -23,11 +23,11 @@ export function BoardPage() {
 
   useSeo({
     title: project
-      ? `${PROJECTS[project].name} — ${t.siteNome} ${t.siteSub}`
-      : `${t.siteNome} — ${t.siteSub}`,
+      ? `${PROJECTS[project].name} — ${t.siteName} ${t.siteSubtitle}`
+      : `${t.siteName} — ${t.siteSubtitle}`,
     description: project
       ? `Bugs e sugestões de ${PROJECTS[project].name}: ${PROJECTS[project].description}. Acompanhe o progresso.`
-      : t.siteDescricao,
+      : t.siteDescription,
     path: project ? `/?projeto=${project}` : "/",
   });
 
@@ -46,16 +46,16 @@ export function BoardPage() {
           Para o admin, evita assinar o Firestore duas vezes (a consulta muda com
           o `admin`) e evita o quadro já pintado piscar de volta para
           "Carregando…" quando o SDK de auth responde. */}
-      {carregandoSessao ? <p className="aviso">{t.carregando}</p> : <Quadro />}
+      {carregandoSessao ? <p className="aviso">{t.loading}</p> : <Quadro />}
     </>
   );
 }
 
 function Quadro() {
   const [params, setParams] = useSearchParams();
-  const projeto = parseProject(params.get("projeto"));
+  const project = parseProject(params.get("projeto"));
   const tipoBruto = params.get("tipo");
-  const tipo = isIssueType(tipoBruto) ? tipoBruto : null;
+  const type = isIssueType(tipoBruto) ? tipoBruto : null;
   const busca = params.get("busca") ?? "";
 
   const { sessao, admin } = useSessao();
@@ -75,8 +75,8 @@ function Quadro() {
   }
 
   const colunas = useMemo(
-    () => (admin ? agruparAdmin : agrupar)(issues, { projeto, tipo, busca }),
-    [admin, issues, projeto, tipo, busca],
+    () => (admin ? agruparAdmin : agrupar)(issues, { project, type, busca }),
+    [admin, issues, project, type, busca],
   );
   // Procurado na lista inteira, não nas colunas: um link direto precisa abrir o
   // card mesmo quando o filtro em vigor o esconderia do quadro.
@@ -94,11 +94,11 @@ function Quadro() {
     // Veio de outra coluna: status e posição saem na mesma escrita, senão o card
     // aparece um instante na coluna nova e no lugar errado.
     const mudouDeColuna = colunaDe(arrastado) !== destino;
-    void ordenar(posicoes, mudouDeColuna ? { id, coluna: destino } : undefined);
+    void ordenar(posicoes, mudouDeColuna ? { id, column: destino } : undefined);
   }
 
-  function ordemAutomatica(coluna: Column) {
-    void ordenar(soltarPilha(pilha(issues, coluna)));
+  function ordemAutomatica(column: Column) {
+    void ordenar(soltarPilha(pilha(issues, column)));
   }
 
   return (
@@ -108,17 +108,17 @@ function Quadro() {
         colunas={colunas}
         carregando={carregando}
         erro={erro}
-        onMover={admin ? (id, coluna) => void mover(id, coluna) : undefined}
+        onMover={admin ? (id, column) => void mover(id, column) : undefined}
         onAbrir={admin ? abrir : undefined}
         onFixar={admin ? fixar : undefined}
         onOrdemAutomatica={admin ? ordemAutomatica : undefined}
       />
       {issueAberta && (
-        <Suspense fallback={<p className="aviso">{t.carregando}</p>}>
+        <Suspense fallback={<p className="aviso">{t.loading}</p>}>
           <PainelIssue
             issue={issueAberta}
             onFechar={() => abrir(null)}
-            onComentar={(texto, imagens) => void comentar(issueAberta.id, texto, imagens)}
+            onComentar={(text, images) => void comentar(issueAberta.id, text, images)}
             onEditar={(campos) => void editar(issueAberta.id, campos)}
           />
         </Suspense>

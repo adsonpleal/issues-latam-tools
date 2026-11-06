@@ -4,16 +4,16 @@ import { STATUS_HELP, STATUS_LABEL, t } from "../../i18n";
 import { isStatus, type Column as Column } from "../../lib/status";
 
 type Props = {
-  coluna: Column;
+  column: Column;
   quantidade: number;
   children: ReactNode;
   /** Só com sessão de admin: transforma a coluna em alvo de drop. */
-  onSoltar?: (id: string, coluna: Column) => void;
+  onSoltar?: (id: string, column: Column) => void;
   /** Só quando a pilha está arrumada à mão: devolve a coluna ao automático. */
   onOrdemAutomatica?: () => void;
 };
 
-export function BoardColumn({ coluna, quantidade, children, onSoltar, onOrdemAutomatica }: Props) {
+export function BoardColumn({ column, quantidade, children, onSoltar, onOrdemAutomatica }: Props) {
   // dragenter/dragleave disparam para cada filho: sem contar a profundidade, o
   // destaque pisca sempre que o ponteiro passa por cima de um card.
   const profundidade = useRef(0);
@@ -49,19 +49,19 @@ export function BoardColumn({ coluna, quantidade, children, onSoltar, onOrdemAut
           if (e.nativeEvent.defaultPrevented) return;
           e.preventDefault();
           const id = e.dataTransfer.getData("text/plain");
-          if (id) onSoltar(id, coluna);
+          if (id) onSoltar(id, column);
         },
       }
     : {};
 
   return (
     <section
-      className={`coluna coluna-${coluna}${sobre ? " coluna-alvo" : ""}`}
-      aria-label={STATUS_LABEL[coluna]}
+      className={`coluna coluna-${column}${sobre ? " coluna-alvo" : ""}`}
+      aria-label={STATUS_LABEL[column]}
       {...alvo}
     >
       <header className="coluna-topo">
-        <h2>{STATUS_LABEL[coluna]}</h2>
+        <h2>{STATUS_LABEL[column]}</h2>
         <span className="coluna-contador" aria-hidden="true">
           {quantidade}
         </span>
@@ -70,15 +70,15 @@ export function BoardColumn({ coluna, quantidade, children, onSoltar, onOrdemAut
             type="button"
             className="coluna-auto"
             onClick={onOrdemAutomatica}
-            title={t.ordemAutomaticaTitulo}
+            title={t.autoOrderTitle}
           >
-            {t.ordemAutomatica}
+            {t.autoOrder}
           </button>
         )}
       </header>
-      {isStatus(coluna) && <p className="coluna-ajuda">{STATUS_HELP[coluna]}</p>}
+      {isStatus(column) && <p className="coluna-ajuda">{STATUS_HELP[column]}</p>}
       <div className="coluna-lista">
-        {quantidade === 0 ? <p className="coluna-vazia">{t.colunaVazia}</p> : children}
+        {quantidade === 0 ? <p className="coluna-vazia">{t.emptyColumn}</p> : children}
       </div>
     </section>
   );

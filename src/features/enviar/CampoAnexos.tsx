@@ -14,19 +14,19 @@ import { shrinkImage } from "../../lib/imagem";
 type Props = {
   attachments: PreparedAttachment[];
   onChange: (attachments: PreparedAttachment[]) => void;
-  /** Precisa ser único na página: o formulário e o painel de comentar coexistem. */
+  /** Has to be unique on the page: the form and the comment panel coexist. */
   id?: string;
-  /** No comentário só entra print — `.rrf` é coisa do relato, não da resposta. */
-  apenasImagens?: boolean;
+  /** A comment takes screenshots only -- the `.rrf` belongs to the report, not to the reply. */
+  imagesOnly?: boolean;
 };
 
-export function AttachmentField({ attachments, onChange, id = "anexos", apenasImagens = false }: Props) {
-  const [preparando, setPreparando] = useState(false);
+export function AttachmentField({ attachments, onChange, id = "anexos", imagesOnly = false }: Props) {
+  const [preparing, setPreparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
 
-  // As miniaturas viram object URL; sem revogar, cada troca de arquivo deixa um
-  // blob preso na memória da aba.
+  // The thumbnails become object URLs; without revoking them, every file swap
+  // leaves a blob stuck in the tab's memory.
   const previews = useMemo(
     () =>
       attachments.map((a) =>
@@ -41,52 +41,52 @@ export function AttachmentField({ attachments, onChange, id = "anexos", apenasIm
     [previews],
   );
 
-  async function aoEscolher(e: ChangeEvent<HTMLInputElement>) {
-    const escolhidos = Array.from(e.target.files ?? []);
+  async function onPick(e: ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(e.target.files ?? []);
     if (input.current) input.current.value = "";
-    if (escolhidos.length === 0) return;
+    if (picked.length === 0) return;
 
     setError(null);
-    setPreparando(true);
-    const nextParams: PreparedAttachment[] = [];
-    const problemas: string[] = [];
+    setPreparing(true);
+    const next: PreparedAttachment[] = [];
+    const problems: string[] = [];
 
-    for (const file of escolhidos) {
-      if (attachments.length + nextParams.length >= ATTACHMENTS_MAX) {
-        problemas.push(t.attachmentTooMany);
+    for (const file of picked) {
+      if (attachments.length + next.length >= ATTACHMENTS_MAX) {
+        problems.push(t.attachmentTooMany);
         break;
       }
       const type = classifyFile(file);
-      if (!type || (apenasImagens && type !== "imagem")) {
-        problemas.push(
-          apenasImagens ? t.attachmentImageOnly(file.name) : t.attachmentBadType(file.name),
+      if (!type || (imagesOnly && type !== "imagem")) {
+        problems.push(
+          imagesOnly ? t.attachmentImageOnly(file.name) : t.attachmentBadType(file.name),
         );
         continue;
       }
       try {
         if (type === "imagem") {
           const { data, name } = await shrinkImage(file);
-          nextParams.push({ name, type, data });
+          next.push({ name, type, data });
         } else {
-          // .rrf vai como está — encolher um replay não é opção.
+          // The .rrf goes as it is -- shrinking a replay is not an option.
           if (file.size > ATTACHMENT_MAX_BYTES) {
-            problemas.push(t.attachmentTooBig(file.name, formatSize(ATTACHMENT_MAX_BYTES)));
+            problems.push(t.attachmentTooBig(file.name, formatSize(ATTACHMENT_MAX_BYTES)));
             continue;
           }
-          nextParams.push({
+          next.push({
             name: file.name,
             type,
             data: new Uint8Array(await file.arrayBuffer()),
           });
         }
       } catch {
-        problemas.push(t.attachmentUnreadable(file.name));
+        problems.push(t.attachmentUnreadable(file.name));
       }
     }
 
-    setPreparando(false);
-    if (problemas.length) setError(problemas.join(" "));
-    if (nextParams.length) onChange([...attachments, ...nextParams]);
+    setPreparing(false);
+    if (problems.length) setError(problems.join(" "));
+    if (next.length) onChange([...attachments, ...next]);
   }
 
   function remove(i: number) {
@@ -95,26 +95,26 @@ export function AttachmentField({ attachments, onChange, id = "anexos", apenasIm
 
   return (
     <div className="campo">
-      <label htmlFor={id}>{apenasImagens ? t.fieldImages : t.fieldAttachments}</label>
+      <label htmlFor={id}>{imagesOnly ? t.fieldImages : t.fieldAttachments}</label>
       <input
         id={id}
         ref={input}
         type="file"
         multiple
-        accept={apenasImagens ? "image/*" : ACCEPTED_EXTENSIONS}
-        onChange={(e) => void aoEscolher(e)}
-        disabled={preparando || attachments.length >= ATTACHMENTS_MAX}
+        accept={imagesOnly ? "image/*" : ACCEPTED_EXTENSIONS}
+        onChange={(e) => void onPick(e)}
+        disabled={preparing || attachments.length >= ATTACHMENTS_MAX}
         aria-describedby={`ajuda-${id}`}
       />
       <p className="campo-ajuda" id={`ajuda-${id}`}>
-        {apenasImagens ? t.fieldImagesHelp : t.fieldAttachmentsHelp}
+        {imagesOnly ? t.fieldImagesHelp : t.fieldAttachmentsHelp}
       </p>
 
-      {preparando && <p className="campo-ajuda">{t.attachmentPreparing}</p>}
+      {preparing && <p className="campo-ajuda">{t.attachmentPreparing}</p>}
       {error && <p className="aviso aviso-erro">{error}</p>}
 
       {attachments.length > 0 && (
-        <ul className="anexos-escolhidos">
+        <ul className="anexos-picked">
           {attachments.map((a, i) => (
             <li key={`${a.name}-${i}`}>
               {previews[i] ? (

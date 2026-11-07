@@ -3,7 +3,7 @@ import { useState } from "react";
 import { STATUS_LABEL, t } from "../../i18n";
 import type { Issue } from "../../lib/issues";
 import { ADMIN_COLUMNS, type Column } from "../../lib/status";
-import { FormularioEdicao, useContato, type EditableFields } from "./AcoesIssue";
+import { EditForm, useContact, type EditableFields } from "./AcoesIssue";
 
 type Props = {
   issue: Issue;
@@ -12,28 +12,28 @@ type Props = {
 };
 
 /**
- * O que `/t/:id` ganha logo abaixo da ficha quando existe sessão de admin —
- * mesma URL que o público abre. O formulário de comentário não está aqui: ele
- * fica no fim da página, depois da lista, que é onde se responde.
+ * What `/t/:id` gains right below the record when there is an admin session --
+ * the same URL the public opens. The comment form is not here: it sits at the
+ * end of the page, after the list, which is where one replies.
  *
- * O seletor de coluna não é enfeite: é por aqui que se desarquiva um card, e a
- * página do card virou o único lugar onde um card arquivado é alcançável pelo
- * link direto.
+ * The column selector is no ornament: this is where a card gets unarchived, and
+ * the card's page became the only place an archived card is reachable from a
+ * direct link.
  */
 export function TicketActions({ issue, onMove, onEdit }: Props) {
-  const [editando, setEditando] = useState(false);
-  const contact = useContato(issue.id);
+  const [editing, setEditing] = useState(false);
+  const contact = useContact(issue.id);
 
   return (
     <section className="acoes-admin">
-      {editando ? (
-        <FormularioEdicao
+      {editing ? (
+        <EditForm
           issue={issue}
           onSave={(fields) => {
             onEdit(fields);
-            setEditando(false);
+            setEditing(false);
           }}
-          onCancelar={() => setEditando(false)}
+          onCancel={() => setEditing(false)}
         />
       ) : (
         <>
@@ -41,7 +41,7 @@ export function TicketActions({ issue, onMove, onEdit }: Props) {
             <strong>{t.contactLabel}:</strong> {contact ?? t.noContact}
           </p>
           <div className="acoes-admin-linha">
-            <button type="button" className="botao botao-pequeno" onClick={() => setEditando(true)}>
+            <button type="button" className="botao botao-pequeno" onClick={() => setEditing(true)}>
               {t.edit}
             </button>
             <label className="campo-inline">

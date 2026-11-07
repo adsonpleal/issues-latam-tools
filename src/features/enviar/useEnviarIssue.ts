@@ -3,19 +3,23 @@ import { useState } from "react";
 import { t } from "../../i18n";
 import { createIssue, type NewIssue } from "../../lib/issues";
 
-const CHAVE_ESPERA = "issues.latamtools.ultimoEnvio";
-const ESPERA_MS = 60_000;
+/**
+ * The stored key keeps its spelling: it is a localStorage key already set on
+ * real machines.
+ */
+const WAIT_KEY = "issues.latamtools.ultimoEnvio";
+const WAIT_MS = 60_000;
 
 /**
- * Regra de segurança não sabe limitar taxa. O que dá para fazer no cliente é
- * encarecer o caso bobo: uma espera de um minuto entre envios e um campo-isca
- * que só robô preenche. Quem realmente quiser floodar consegue — o plano B
- * documentado é ligar o App Check com reCAPTCHA, e ele não está ligado.
+ * A security rule cannot rate-limit. What the client can do is make the silly
+ * case expensive: a one-minute wait between submissions and a honeypot field
+ * only a robot fills in. Anybody who really wants to flood can -- the
+ * documented plan B is turning App Check on with reCAPTCHA, and it is off.
  */
-function esperaRestante(): number {
+function waitLeft(): number {
   try {
-    const last = Number(localStorage.getItem(CHAVE_ESPERA) ?? 0);
-    return Math.max(0, last + ESPERA_MS - Date.now());
+    const last = Number(localStorage.getItem(WAIT_KEY) ?? 0);
+    return Math.max(0, last + WAIT_MS - Date.now());
   } catch {
     return 0;
   }
@@ -23,9 +27,9 @@ function esperaRestante(): number {
 
 function submitMark(): void {
   try {
-    localStorage.setItem(CHAVE_ESPERA, String(Date.now()));
+    localStorage.setItem(WAIT_KEY, String(Date.now()));
   } catch {
-    /* sem persistência, sem espera */
+    /* no persistence, no wait */
   }
 }
 
@@ -35,15 +39,16 @@ export function useSubmitIssue() {
   const [state, setState] = useState<SubmitState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  async function submit(data: NewIssue & { isca?: string }): Promise<string | null> {
-    // `anexos` já vem pronto do CampoAnexos: reduzido, validado e dentro do teto.
-    if (data.isca) return null; // campo-isca preenchido: é robô, some em silêncio
+  async function submit(data: NewIssue & { honeypot?: string }): Promise<string | null> {
+    // The attachments arrive ready from AttachmentField: shrunk, validated and
+    // under the ceiling.
+    if (data.honeypot) return null; // honeypot filled in: a robot, vanish quietly
     if (data.title.trim().length < 3) {
       setState("error");
       setErrorMessage(t.summaryTooShort);
       return null;
     }
-    if (esperaRestante() > 0) {
+    if (waitLeft() > 0) {
       setState("error");
       setErrorMessage(t.slowDown);
       return null;

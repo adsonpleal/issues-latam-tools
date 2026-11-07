@@ -10,49 +10,50 @@ import { AttachmentField } from "../enviar/CampoAnexos";
 export type EditableFields = Pick<Issue, "title" | "description" | "type" | "project">;
 
 /**
- * As peças de edição que o painel do quadro e a página do card usam iguais.
+ * The editing pieces the board's panel and the card's page use alike.
  *
- * Elas moravam dentro do `PainelIssue` enquanto o painel era o único lugar com
- * poderes. Agora que `/t/:id` também edita, o que não pode acontecer é a mesma
- * regra de rascunho existir em dois arquivos e divergir.
+ * They lived inside `IssuePanel` while the panel was the only place with
+ * powers. Now that `/t/:id` edits too, what must not happen is the same draft
+ * rule living in two files and drifting apart.
  */
 
 /**
- * Contato de quem reportou: mora num subdocumento que só o admin lê. Ausente na
- * maioria dos cards — é campo opcional, e os migrados das planilhas só têm
- * quando a pessoa preencheu.
+ * The reporter's contact: it lives in a subdocument only the admin reads.
+ * Missing from most cards -- it is an optional field, and the ones migrated from
+ * the spreadsheets only have it where the person filled it in.
  */
-export function useContato(issueId: string): string | null {
-  const [contact, setContato] = useState<string | null>(null);
+export function useContact(issueId: string): string | null {
+  const [contact, setContact] = useState<string | null>(null);
 
   useEffect(() => {
-    setContato(null);
+    setContact(null);
     void getContact(issueId)
-      .then(setContato)
-      .catch(() => setContato(null));
+      .then(setContact)
+      .catch(() => setContact(null));
   }, [issueId]);
 
   return contact;
 }
 
-type PropsEdicao = {
+type EditProps = {
   issue: Issue;
   onSave: (fields: EditableFields) => void;
-  onCancelar: () => void;
+  onCancel: () => void;
 };
 
-export function FormularioEdicao({ issue, onSave, onCancelar }: PropsEdicao) {
-  const [rascunho, setRascunho] = useState<EditableFields>({
+export function EditForm({ issue, onSave, onCancel }: EditProps) {
+  const [draft, setDraft] = useState<EditableFields>({
     title: issue.title,
     description: issue.description,
     type: issue.type,
     project: issue.project,
   });
 
-  // O quadro é onSnapshot: se o card mudar embaixo do formulário — outra aba, ou
-  // a própria escrita voltando do servidor — o rascunho volta para o que vale.
+  // The board is onSnapshot: if the card changes underneath the form -- another
+  // tab, or this very write coming back from the server -- the draft returns to
+  // what holds.
   useEffect(() => {
-    setRascunho({
+    setDraft({
       title: issue.title,
       description: issue.description,
       type: issue.type,
@@ -65,8 +66,8 @@ export function FormularioEdicao({ issue, onSave, onCancelar }: PropsEdicao) {
       <label className="campo">
         <span>{t.fieldSummary}</span>
         <input
-          value={rascunho.title}
-          onChange={(e) => setRascunho({ ...rascunho, title: e.target.value })}
+          value={draft.title}
+          onChange={(e) => setDraft({ ...draft, title: e.target.value })}
           maxLength={120}
         />
       </label>
@@ -74,16 +75,16 @@ export function FormularioEdicao({ issue, onSave, onCancelar }: PropsEdicao) {
         <span>{t.fieldDetails}</span>
         <textarea
           rows={8}
-          value={rascunho.description}
-          onChange={(e) => setRascunho({ ...rascunho, description: e.target.value })}
+          value={draft.description}
+          onChange={(e) => setDraft({ ...draft, description: e.target.value })}
           maxLength={4000}
         />
       </label>
       <label className="campo">
         <span>{t.fieldProject}</span>
         <select
-          value={rascunho.project}
-          onChange={(e) => setRascunho({ ...rascunho, project: e.target.value as Project })}
+          value={draft.project}
+          onChange={(e) => setDraft({ ...draft, project: e.target.value as Project })}
         >
           {PROJECT_SLUGS.map((s) => (
             <option key={s} value={s}>
@@ -95,8 +96,8 @@ export function FormularioEdicao({ issue, onSave, onCancelar }: PropsEdicao) {
       <label className="campo">
         <span>{t.fieldType}</span>
         <select
-          value={rascunho.type}
-          onChange={(e) => setRascunho({ ...rascunho, type: e.target.value as IssueType })}
+          value={draft.type}
+          onChange={(e) => setDraft({ ...draft, type: e.target.value as IssueType })}
         >
           {ISSUE_TYPES.map((tp) => (
             <option key={tp} value={tp}>
@@ -106,10 +107,10 @@ export function FormularioEdicao({ issue, onSave, onCancelar }: PropsEdicao) {
         </select>
       </label>
       <div className="formulario-acoes">
-        <button type="button" className="botao botao-primario" onClick={() => onSave(rascunho)}>
+        <button type="button" className="botao botao-primario" onClick={() => onSave(draft)}>
           {t.save}
         </button>
-        <button type="button" className="botao" onClick={onCancelar}>
+        <button type="button" className="botao" onClick={onCancel}>
           {t.cancel}
         </button>
       </div>
@@ -117,18 +118,19 @@ export function FormularioEdicao({ issue, onSave, onCancelar }: PropsEdicao) {
   );
 }
 
-type PropsComentario = {
+type CommentProps = {
   /**
-   * Id do campo de anexos, obrigatório: o `htmlFor` do `CampoAnexos` precisa ser
-   * único no documento, e agora existem duas instâncias deste formulário no app.
+   * The attachment field's id, mandatory: `AttachmentField`'s `htmlFor` has to
+   * be unique in the document, and there are now two instances of this form in
+   * the app.
    */
   id: string;
   onSubmit: (text: string, images: PreparedAttachment[]) => void;
 };
 
-export function CommentForm({ id, onSubmit }: PropsComentario) {
-  const [text, setTexto] = useState("");
-  const [images, setImagens] = useState<PreparedAttachment[]>([]);
+export function CommentForm({ id, onSubmit }: CommentProps) {
+  const [text, setText] = useState("");
+  const [images, setImages] = useState<PreparedAttachment[]>([]);
 
   return (
     <form
@@ -137,8 +139,8 @@ export function CommentForm({ id, onSubmit }: PropsComentario) {
         e.preventDefault();
         if (!text.trim()) return;
         onSubmit(text, images);
-        setTexto("");
-        setImagens([]);
+        setText("");
+        setImages([]);
       }}
     >
       <label className="campo">
@@ -146,12 +148,12 @@ export function CommentForm({ id, onSubmit }: PropsComentario) {
         <textarea
           rows={3}
           value={text}
-          onChange={(e) => setTexto(e.target.value)}
+          onChange={(e) => setText(e.target.value)}
           placeholder={t.commentPlaceholder}
           maxLength={4000}
         />
       </label>
-      <AttachmentField id={id} apenasImagens attachments={images} onChange={setImagens} />
+      <AttachmentField id={id} imagesOnly attachments={images} onChange={setImages} />
       <button type="submit" className="botao botao-primario">
         {t.comment}
       </button>

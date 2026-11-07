@@ -16,14 +16,14 @@ export type QueueState = {
 };
 
 /**
- * A caixa de entrada ao vivo, mais as ações da triagem.
+ * The live inbox, plus triage's actions.
  *
- * Só a rota /gravacoes usa: a regra de leitura da coleção é `isAdmin()`,
- * então para qualquer outra pessoa isto não devolve nada — nem uma lista vazia,
- * um erro de permissão.
+ * Only the /gravacoes route uses it: the collection's read rule is `isAdmin()`,
+ * so for anybody else this returns nothing -- not even an empty list, a
+ * permission error.
  */
 export function useRecordings() {
-  const [recordings, setGravacoes] = useState<Recording[]>([]);
+  const [recordings, setRecordings] = useState<Recording[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -32,8 +32,8 @@ export function useRecordings() {
     setLoading(true);
     setError(null);
     return subscribeRecordings(
-      (lista) => {
-        setGravacoes(lista);
+      (list) => {
+        setRecordings(list);
         setLoading(false);
       },
       (e) => {
@@ -43,8 +43,9 @@ export function useRecordings() {
     );
   }, []);
 
-  // Sem estado otimista: o onSnapshot repinta a linha na pilha nova assim que a
-  // escrita é aceita, e é o mesmo mecanismo que move card no quadro.
+  // No optimistic state: the onSnapshot repaints the row in its new stack as
+  // soon as the write is accepted, the same mechanism that moves a card on the
+  // board.
   const promote = useCallback(async (g: Recording) => {
     setActionError(null);
     return promoteRecording(g).catch((e: Error) => {

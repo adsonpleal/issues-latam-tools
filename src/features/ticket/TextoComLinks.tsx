@@ -1,42 +1,43 @@
 import { Fragment } from "react";
 
-// Global só para o split (que precisa dele); o teste usa uma cópia sem `g`,
-// porque `test` em regex global carrega lastIndex e alterna resultado a cada
-// chamada — bug clássico e silencioso.
+// Global only for the split (which needs it); the test uses a copy without `g`,
+// because `test` on a global regex carries lastIndex and alternates its result
+// on every call -- the classic silent bug.
 const URL_SPLIT = /(https?:\/\/[^\s<>"']+)/g;
-const URL_TESTE = /^https?:\/\//;
-// Pontuação colada no fim ("...?r=abc." no fim da frase) não faz parte da URL.
-const PONTUACAO_FINAL = /[.,;:!?)\]]+$/;
+const URL_TEST = /^https?:\/\//;
+// Punctuation stuck to the end ("...?r=abc." at the end of a sentence) is not
+// part of the URL.
+const TRAILING_PUNCTUATION = /[.,;:!?)\]]+$/;
 
-function Pedaco({ text }: { text: string }) {
-  if (!URL_TESTE.test(text)) return <>{text}</>;
+function Piece({ text }: { text: string }) {
+  if (!URL_TEST.test(text)) return <>{text}</>;
 
-  const sobra = text.match(PONTUACAO_FINAL)?.[0] ?? "";
-  const url = sobra ? text.slice(0, -sobra.length) : text;
+  const trailing = text.match(TRAILING_PUNCTUATION)?.[0] ?? "";
+  const url = trailing ? text.slice(0, -trailing.length) : text;
 
   return (
     <>
       <a href={url} target="_blank" rel="noopener noreferrer nofollow">
         {url}
       </a>
-      {sobra}
+      {trailing}
     </>
   );
 }
 
 /**
- * Texto de terceiro sempre entra como texto: os links viram <a> montando nós do
- * React, nunca por innerHTML. Sem isso, uma descrição com <script> dentro seria
- * exatamente o que parece.
+ * Somebody else's text always comes in as text: the links become <a> by
+ * building React nodes, never through innerHTML. Without that, a description
+ * with a <script> inside would be exactly what it looks like.
  */
 export function TextWithLinks({ text }: { text: string }) {
   return (
     <>
-      {text.split("\n").map((linha, iLinha) => (
-        <Fragment key={iLinha}>
-          {iLinha > 0 && <br />}
-          {linha.split(URL_SPLIT).map((pedaco, i) => (
-            <Pedaco key={i} text={pedaco} />
+      {text.split("\n").map((line, lineIndex) => (
+        <Fragment key={lineIndex}>
+          {lineIndex > 0 && <br />}
+          {line.split(URL_SPLIT).map((piece, i) => (
+            <Piece key={i} text={piece} />
           ))}
         </Fragment>
       ))}

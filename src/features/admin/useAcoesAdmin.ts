@@ -18,18 +18,19 @@ export function useAdminActions(session: Session | null) {
   const move = useCallback(
     async (id: string, column: Column) => {
       setError(null);
-      // Sem estado local: o onSnapshot do quadro já compensa a latência e pinta
-      // o card na coluna nova antes da escrita chegar em São Paulo.
+      // No local state: the board's onSnapshot already compensates for the
+      // latency and paints the card in its new column before the write reaches
+      // São Paulo.
       await moveIssue(id, column).catch((e: Error) => setError(e.message));
     },
     [],
   );
 
   const sort = useCallback(
-    async (positions: Position[], movido?: { id: string; column: Column }) => {
-      if (positions.length === 0 && !movido) return;
+    async (positions: Position[], moved?: { id: string; column: Column }) => {
+      if (positions.length === 0 && !moved) return;
       setError(null);
-      await sortIssues(positions, movido).catch((e: Error) => setError(e.message));
+      await sortIssues(positions, moved).catch((e: Error) => setError(e.message));
     },
     [],
   );

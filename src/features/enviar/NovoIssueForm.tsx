@@ -19,19 +19,21 @@ export function NewIssueForm() {
   const navigate = useNavigate();
   const { state, errorMessage, submit } = useSubmitIssue();
 
-  // O projeto vem pré-selecionado do link "Reportar" do site de origem.
+  // The project arrives pre-selected from the origin site's "Reportar" link.
+  // The query parameter and the field ids are public, so they keep their
+  // spelling.
   const [project, setProject] = useState<Project>(parseProject(params.get("projeto")) ?? "simulador");
   const [type, setType] = useState<IssueType>("bug");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [author, setAuthor] = useState("");
-  const [contact, setContato] = useState("");
+  const [contact, setContact] = useState("");
   const [attachments, setAttachments] = useState<PreparedAttachment[]>([]);
-  const [isca, setIsca] = useState("");
+  const [honeypot, setHoneypot] = useState("");
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    const id = await submit({ project, type, title, description, author, contact, attachments, isca });
+    const id = await submit({ project, type, title, description, author, contact, attachments, honeypot });
     if (id) navigate(`/t/${id}?novo=1`);
   }
 
@@ -55,9 +57,9 @@ export function NewIssueForm() {
 
       <fieldset className="campo campo-radio">
         <legend>{t.fieldType}</legend>
-        {/* Os rádios ficam numa div própria: o fieldset herda o
-            `flex-direction: column` de `.campo`, e é a linha que precisa ser
-            horizontal, não a legenda junto com eles. */}
+        {/* The radios live in a div of their own: the fieldset inherits
+            `flex-direction: column` from `.campo`, and it is the row that has
+            to be horizontal, not the legend along with them. */}
         <div className="radio-linha">
           {FORM_ISSUE_TYPES.map((tp) => (
             <label key={tp} className="radio">
@@ -120,7 +122,7 @@ export function NewIssueForm() {
         <input
           id="contato"
           value={contact}
-          onChange={(e) => setContato(e.target.value)}
+          onChange={(e) => setContact(e.target.value)}
           maxLength={CONTACT_MAX}
           aria-describedby="ajuda-contato"
         />
@@ -129,8 +131,9 @@ export function NewIssueForm() {
         </p>
       </div>
 
-      {/* Campo-isca: invisível e fora da ordem de tabulação, então gente nunca
-          preenche. Robô que preenche formulário por atacado preenche. */}
+      {/* The honeypot: invisible and out of the tab order, so a person never
+          fills it in. A robot filling forms wholesale does. The class name is
+          the stylesheet's, so it keeps its spelling. */}
       <div className="isca" aria-hidden="true">
         <label htmlFor="website">Não preencha este campo</label>
         <input
@@ -138,8 +141,8 @@ export function NewIssueForm() {
           name="website"
           tabIndex={-1}
           autoComplete="off"
-          value={isca}
-          onChange={(e) => setIsca(e.target.value)}
+          value={honeypot}
+          onChange={(e) => setHoneypot(e.target.value)}
         />
       </div>
 

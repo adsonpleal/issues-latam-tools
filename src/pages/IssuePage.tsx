@@ -23,7 +23,8 @@ const CommentForm = lazy(() =>
 export function IssuePage() {
   const { issueId = "" } = useParams();
   const [params] = useSearchParams();
-  const acabouDeCriar = params.get("novo") === "1";
+  // The query parameter is a public URL, so it keeps its spelling.
+  const justCreated = params.get("novo") === "1";
 
   const { session, admin, loading: loadingSession } = useSession();
   const uid = session?.uid ?? null;
@@ -34,17 +35,18 @@ export function IssuePage() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // As três assinaturas esperam a sessão resolver, e re-assinam quando o uid
-  // muda. Não é capricho: card arquivado nega a leitura para quem não é admin, e
-  // um onSnapshot que toma permission-denied MORRE — não tenta de novo quando o
-  // token chega depois. Assinar antes da hora deixaria o admin olhando um "não
-  // encontrado" que nada mais consertaria.
+  // The three subscriptions wait for the session to resolve, and resubscribe
+  // when the uid changes. This is not fussiness: an archived card denies the
+  // read to anybody who is not the admin, and an onSnapshot that takes a
+  // permission-denied DIES -- it does not retry when the token arrives later.
+  // Subscribing too early would leave the admin staring at a "not found" that
+  // nothing else would repair.
   useEffect(() => {
     if (!issueId || loadingSession) return;
     setLoading(true);
-    // Card arquivado devolve permission-denied, e inexistente devolve vazio. Os
-    // dois viram o MESMO "não encontrado" de propósito: a diferença entre as
-    // respostas contaria que existe um card arquivado com aquele id.
+    // An archived card answers permission-denied, and a non-existent one answers
+    // empty. Both become the SAME "not found" on purpose: the difference between
+    // the answers would tell that an archived card with that id exists.
     const cancel = subscribeIssue(
       issueId,
       (i) => {
@@ -69,10 +71,10 @@ export function IssuePage() {
     return subscribeAttachments(issueId, setAttachments, () => setAttachments([]));
   }, [issueId, loadingSession, uid]);
 
-  // Uma subscrição só para os dois usos: o que veio no relato fica na lista de
-  // anexos, o que foi colado numa atualização aparece dentro dela. Memoizado
-  // porque as duas listas viram object URL — recriá-las a cada render churnaria
-  // blob à toa.
+  // One subscription for both uses: what came with the report stays in the
+  // attachment list, what was pasted into an update shows up inside it.
+  // Memoised because both lists become object URLs -- rebuilding them on every
+  // render would churn blobs for nothing.
   const [cardAttachments, commentImages] = useMemo(
     () => [attachments.filter((a) => !a.commentId), attachments.filter((a) => a.commentId)],
     [attachments],
@@ -84,8 +86,8 @@ export function IssuePage() {
     path: `/t/${issueId}`,
   });
 
-  // Qualquer pessoa anexa arquivo, então precisa existir moderação — e ela mora
-  // onde o arquivo aparece, não numa tela à parte.
+  // Anybody can attach a file, so moderation has to exist -- and it lives where
+  // the file shows up, not on a screen of its own.
   const remove = admin ? (attachmentId: string) => void deleteAttachment(issueId, attachmentId) : undefined;
 
   return (
@@ -96,7 +98,7 @@ export function IssuePage() {
         </Link>
       </p>
 
-      {acabouDeCriar && <p className="aviso aviso-ok">{t.submitted}</p>}
+      {justCreated && <p className="aviso aviso-ok">{t.submitted}</p>}
       {actionError && <p className="aviso aviso-erro">{actionError}</p>}
 
       {(loading || loadingSession) && <p className="aviso">{t.loading}</p>}
@@ -125,12 +127,12 @@ export function IssuePage() {
           <CommentList
             comments={comments}
             images={commentImages}
-            onApagarImagem={remove}
+            onDeleteImage={remove}
           />
           {admin && (
             <Suspense fallback={null}>
-              {/* Id próprio: o painel do quadro tem o mesmo formulário, e o
-                  `htmlFor` do campo de anexos precisa ser único no documento. */}
+              {/* An id of its own: the board's panel has the same form, and the
+                  attachment field's `htmlFor` has to be unique in the document. */}
               <CommentForm
                 id="imagens-comentario-ticket"
                 onSubmit={(text, images) => void comment(issue.id, text, images)}

@@ -9,8 +9,8 @@ import { AttachmentList } from "../ticket/ListaAnexos";
 import { CommentList } from "../ticket/ListaComentarios";
 import {
   CommentForm,
-  FormularioEdicao,
-  useContato,
+  EditForm,
+  useContact,
   type EditableFields,
 } from "./AcoesIssue";
 import { RecordingSummary } from "./ResumoGravacao";
@@ -23,17 +23,18 @@ type Props = {
 };
 
 /**
- * O card aberto sem sair do quadro — é onde a triagem acontece, porque dá para
- * ler a ficha e arrastar a coluna na mesma tela. A mesma ficha, inteira e com os
- * mesmos poderes, também abre em `/t/:id`; as peças de edição são as mesmas.
+ * The card opened without leaving the board -- this is where triage happens,
+ * because the record can be read and the column dragged on the same screen. The
+ * same record, whole and with the same powers, also opens at `/t/:id`; the
+ * editing pieces are the same ones.
  */
 export function IssuePanel({ issue, onClose, onComment, onEdit }: Props) {
   const [comments, setComments] = useState<IssueComment[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [editando, setEditando] = useState(false);
-  const contact = useContato(issue.id);
+  const [editing, setEditing] = useState(false);
+  const contact = useContact(issue.id);
 
-  useEffect(() => setEditando(false), [issue.id]);
+  useEffect(() => setEditing(false), [issue.id]);
 
   useEffect(
     () => subscribeComments(issue.id, setComments, () => setComments([])),
@@ -42,8 +43,8 @@ export function IssuePanel({ issue, onClose, onComment, onEdit }: Props) {
 
   useEffect(() => subscribeAttachments(issue.id, setAttachments, () => setAttachments([])), [issue.id]);
 
-  // Mesma subcoleção, dois lugares na tela: sem `comentarioId` é anexo do card,
-  // com `comentarioId` é print colado numa atualização.
+  // One subcollection, two places on screen: with no `comentarioId` it is the
+  // card's attachment, with one it is a screenshot pasted into an update.
   const [cardAttachments, commentImages] = useMemo(
     () => [attachments.filter((a) => !a.commentId), attachments.filter((a) => a.commentId)],
     [attachments],
@@ -52,20 +53,20 @@ export function IssuePanel({ issue, onClose, onComment, onEdit }: Props) {
   return (
     <aside className="painel" aria-label={issue.title}>
       <div className="painel-topo">
-        <h2>{editando ? t.edit : issue.title}</h2>
+        <h2>{editing ? t.edit : issue.title}</h2>
         <button type="button" className="botao botao-pequeno" onClick={onClose}>
           ✕
         </button>
       </div>
 
-      {editando ? (
-        <FormularioEdicao
+      {editing ? (
+        <EditForm
           issue={issue}
           onSave={(fields) => {
             onEdit(fields);
-            setEditando(false);
+            setEditing(false);
           }}
-          onCancelar={() => setEditando(false)}
+          onCancel={() => setEditing(false)}
         />
       ) : (
         <>
@@ -78,7 +79,7 @@ export function IssuePanel({ issue, onClose, onComment, onEdit }: Props) {
           <p className="linha-contato">
             <strong>{t.contactLabel}:</strong> {contact ?? t.noContact}
           </p>
-          <button type="button" className="botao botao-pequeno" onClick={() => setEditando(true)}>
+          <button type="button" className="botao botao-pequeno" onClick={() => setEditing(true)}>
             {t.edit}
           </button>
         </>
@@ -90,7 +91,7 @@ export function IssuePanel({ issue, onClose, onComment, onEdit }: Props) {
       <CommentList
         comments={comments}
         images={commentImages}
-        onApagarImagem={(attachmentId) => void deleteAttachment(issue.id, attachmentId)}
+        onDeleteImage={(attachmentId) => void deleteAttachment(issue.id, attachmentId)}
       />
 
       <CommentForm id="imagens-comentario-painel" onSubmit={onComment} />

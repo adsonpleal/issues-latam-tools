@@ -18,6 +18,7 @@ const IssuePanel = lazy(() =>
 
 export function BoardPage() {
   const [params] = useSearchParams();
+  // The query parameters are public URLs, so they keep their spelling.
   const project = parseProject(params.get("projeto"));
   const { loading: loadingSession } = useSession();
 
@@ -41,11 +42,11 @@ export function BoardPage() {
           </a>
         </p>
       )}
-      {/* O quadro só monta com a sessão já resolvida. Para o público isso é de
-          graça — sem marca em localStorage, a sessão resolve na primeira render.
-          Para o admin, evita assinar o Firestore duas vezes (a consulta muda com
-          o `admin`) e evita o quadro já pintado piscar de volta para
-          "Carregando…" quando o SDK de auth responde. */}
+      {/* The board only mounts with the session already resolved. For the public
+          that is free -- with no mark in localStorage, the session resolves on
+          the first render. For the admin it avoids subscribing to Firestore
+          twice (the query changes with `admin`) and keeps an already painted
+          board from flashing back to "Carregando…" when the auth SDK answers. */}
       {loadingSession ? <p className="aviso">{t.loading}</p> : <BoardBody />}
     </>
   );
@@ -59,40 +60,42 @@ function BoardBody() {
   const search = params.get("busca") ?? "";
 
   const { session, admin } = useSession();
-  // Com admin, a consulta perde o where de arquivado — a regra permite listar
-  // tudo para este e-mail, então a gaveta de arquivados aparece.
+  // With an admin, the query loses the archived `where` -- the rule allows
+  // listing everything for this e-mail, so the archive drawer shows up.
   const { issues, loading, error } = useBoard({ admin });
   const { move, sort, comment, edit, error: actionError } = useAdminActions(session);
 
-  // O painel aberto mora na querystring, junto dos filtros: assim a URL da barra
-  // de endereço já é o link do card, e voltar no navegador fecha o painel.
+  // The open panel lives in the query string, next to the filters: that way the
+  // address bar's URL is already the card's link, and going back in the browser
+  // closes the panel.
   const openId = params.get("card");
   function open(id: string | null) {
-    const nextParams = new URLSearchParams(params);
-    if (id) nextParams.set("card", id);
-    else nextParams.delete("card");
-    setParams(nextParams);
+    const next = new URLSearchParams(params);
+    if (id) next.set("card", id);
+    else next.delete("card");
+    setParams(next);
   }
 
   const columns = useMemo(
     () => (admin ? groupForAdmin : group)(issues, { project, type, search }),
     [admin, issues, project, type, search],
   );
-  // Procurado na lista inteira, não nas colunas: um link direto precisa abrir o
-  // card mesmo quando o filtro em vigor o esconderia do quadro.
+  // Looked up in the whole list, not in the columns: a direct link has to open
+  // the card even when the filter in force would hide it from the board.
   const openIssue = admin ? (issues.find((i) => i.id === openId) ?? null) : null;
 
-  // Soltar em cima de um card fixa a posição. A conta roda sempre na pilha
-  // COMPLETA da coluna de destino — o que está na tela pode ser um pedaço dela,
-  // e renumerar só o pedaço embaralharia o que o filtro esconde.
+  // Dropping onto a card pins the position. The arithmetic always runs on the
+  // destination column's COMPLETE stack -- what is on screen may be a slice of
+  // it, and renumbering only the slice would shuffle what the filter hides.
   function pin(id: string, targetId: string, before: boolean) {
     const dragged = issues.find((i) => i.id === id);
     const target = issues.find((i) => i.id === targetId);
     if (!dragged || !target) return;
     const destination = columnOf(target);
     const positions = reorderStack(stack(issues, destination), dragged, targetId, before);
-    // Veio de outra coluna: status e posição saem na mesma escrita, senão o card
-    // aparece um instante na coluna nova e no lugar errado.
+    // It came from another column: status and position go out in the same
+    // write, otherwise the card shows for an instant in the new column and in
+    // the wrong place.
     const changedColumn = columnOf(dragged) !== destination;
     void sort(positions, changedColumn ? { id, column: destination } : undefined);
   }

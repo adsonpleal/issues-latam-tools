@@ -7,7 +7,7 @@ function setMeta(selector: string, attr: "content" | "href", value: string) {
   if (el) el.setAttribute(attr, value);
 }
 
-/** Ajusta título/description/canonical por rota. SPA, então é tudo no cliente. */
+/** Sets title/description/canonical per route. It is a SPA, so all client-side. */
 export function useSeo(opts: { title: string; description?: string; path?: string }): void {
   const { title, description, path } = opts;
   useEffect(() => {

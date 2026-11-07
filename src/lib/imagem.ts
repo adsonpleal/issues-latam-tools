@@ -1,14 +1,15 @@
 import { ATTACHMENT_MAX_BYTES } from "./anexos";
 
-const LADO_MAX_INICIAL = 1600;
+const INITIAL_MAX_SIDE = 1600;
 
 /**
- * Reduz a imagem no navegador até caber no teto de um documento do Firestore.
- * Print de celular chega com 3–5 MB; depois disto fica em 150–400 kB, que é
- * mais do que suficiente para enxergar um bug de interface.
+ * Shrinks the image in the browser until it fits a Firestore document's
+ * ceiling. A phone screenshot arrives at 3-5 MB; after this it is 150-400 kB,
+ * which is more than enough to see an interface bug.
  *
- * Vai apertando em passes: primeiro baixa a qualidade, depois encolhe o lado
- * maior. Sai em WebP, que rende bem melhor que JPEG nesse tipo de captura.
+ * It tightens in passes: first it lowers the quality, then it shrinks the
+ * longer side. It comes out as WebP, which does far better than JPEG on this
+ * kind of capture.
  */
 export async function shrinkImage(
   file: File,
@@ -16,36 +17,36 @@ export async function shrinkImage(
   const bitmap = await createImageBitmap(file);
 
   try {
-    let lado = LADO_MAX_INICIAL;
-    let qualidade = 0.82;
+    let side = INITIAL_MAX_SIDE;
+    let quality = 0.82;
 
-    for (let tentativa = 0; tentativa < 6; tentativa++) {
-      const escala = Math.min(1, lado / Math.max(bitmap.width, bitmap.height));
-      const largura = Math.max(1, Math.round(bitmap.width * escala));
-      const altura = Math.max(1, Math.round(bitmap.height * escala));
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const scale = Math.min(1, side / Math.max(bitmap.width, bitmap.height));
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
 
       const canvas = document.createElement("canvas");
-      canvas.width = largura;
-      canvas.height = altura;
+      canvas.width = width;
+      canvas.height = height;
       const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("sem canvas 2d");
-      ctx.drawImage(bitmap, 0, 0, largura, altura);
+      if (!ctx) throw new Error("no 2d canvas");
+      ctx.drawImage(bitmap, 0, 0, width, height);
 
       const blob = await new Promise<Blob | null>((r) =>
-        canvas.toBlob(r, "image/webp", qualidade),
+        canvas.toBlob(r, "image/webp", quality),
       );
-      if (!blob) throw new Error("falha ao converter a imagem");
+      if (!blob) throw new Error("could not convert the image");
 
       if (blob.size <= ATTACHMENT_MAX_BYTES) {
         return { data: new Uint8Array(await blob.arrayBuffer()), name: webpName(file.name) };
       }
 
-      // Duas rodadas mexendo só na qualidade; depois começa a encolher.
-      if (tentativa < 2) qualidade -= 0.15;
-      else lado = Math.round(lado * 0.7);
+      // Two rounds touching only the quality; after that it starts shrinking.
+      if (attempt < 2) quality -= 0.15;
+      else side = Math.round(side * 0.7);
     }
 
-    throw new Error("imagem grande demais mesmo depois de reduzir");
+    throw new Error("image still too large after shrinking");
   } finally {
     bitmap.close();
   }

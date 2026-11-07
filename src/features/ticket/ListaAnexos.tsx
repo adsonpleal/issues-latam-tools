@@ -5,7 +5,7 @@ import { formatSize, attachmentUrl, type Attachment } from "../../lib/anexos";
 
 type Props = {
   attachments: Attachment[];
-  /** Só com sessão de admin: qualquer pessoa anexa, então precisa dar para tirar. */
+  /** Only with an admin session: anybody can attach, so removal has to exist. */
   onDelete?: (attachmentId: string) => void;
 };
 

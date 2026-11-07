@@ -6,13 +6,15 @@ import { PROJECTS, PROJECT_SLUGS, parseProject } from "../lib/projetos";
 import { ISSUE_TYPES, isIssueType } from "../lib/status";
 
 /**
- * Os filtros moram na querystring, não em estado local: mudar o filtro já deixa
- * a URL pronta para compartilhar, e é essa mesma URL que o botão "Acompanhar"
- * dos outros sites abre (`/?projeto=visuais`).
+ * The filters live in the query string, not in local state: changing a filter
+ * already leaves the URL ready to share, and it is that same URL the other
+ * sites' "Acompanhar" button opens (`/?projeto=visuais`).
  *
- * A barra é a mesma para todo mundo. Com sessão de admin ela ganha o nome, o
- * link das gravações e o Sair — que era o cabeçalho do portão de /admin, na
- * época em que existia uma rota para pendurá-lo.
+ * The bar is the same for everybody. With an admin session it gains the name,
+ * the recordings link and Sair -- which used to be the header of the /admin
+ * gate, back when there was a route to hang it on.
+ *
+ * The parameter names are public URLs, so they keep their spelling.
  */
 export function TopBar() {
   const { session, admin, signOut } = useSession();
@@ -22,11 +24,11 @@ export function TopBar() {
   const type = isIssueType(rawType) ? rawType : null;
   const search = params.get("busca") ?? "";
 
-  function atualiza(chave: string, value: string) {
-    const nextParams = new URLSearchParams(params);
-    if (value) nextParams.set(chave, value);
-    else nextParams.delete(chave);
-    setParams(nextParams, { replace: true });
+  function update(key: string, value: string) {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next, { replace: true });
   }
 
   return (
@@ -42,7 +44,7 @@ export function TopBar() {
           <span className="visually-hidden">{t.filterByProject}</span>
           <select
             value={project ?? ""}
-            onChange={(e) => atualiza("projeto", e.target.value)}
+            onChange={(e) => update("projeto", e.target.value)}
             title={t.filterByProject}
           >
             <option value="">{t.allProjects}</option>
@@ -58,7 +60,7 @@ export function TopBar() {
           <span className="visually-hidden">{t.filterByType}</span>
           <select
             value={type ?? ""}
-            onChange={(e) => atualiza("tipo", e.target.value)}
+            onChange={(e) => update("tipo", e.target.value)}
             title={t.filterByType}
           >
             <option value="">{t.allTypes}</option>
@@ -76,7 +78,7 @@ export function TopBar() {
             type="search"
             value={search}
             placeholder={t.searchPlaceholder}
-            onChange={(e) => atualiza("busca", e.target.value)}
+            onChange={(e) => update("busca", e.target.value)}
           />
         </label>
       </div>

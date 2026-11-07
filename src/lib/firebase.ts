@@ -2,8 +2,9 @@ import { initializeApp, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
 
 /**
- * Config do app web. Não é segredo — chave de API do Firebase é identificador de
- * projeto, não credencial; quem protege os dados são as regras em firestore.rules.
+ * The web app's config. It is not a secret -- a Firebase API key is a project
+ * identifier, not a credential; what protects the data are the rules in
+ * firestore.rules.
  */
 const config = {
   apiKey: "AIzaSyCcBw2edbq0x15csy4h4w_ZBZOGnpNvBro",
@@ -17,7 +18,7 @@ const config = {
 let app: FirebaseApp | null = null;
 let db: Firestore | null = null;
 
-/** Inicialização preguiçosa: quem só abre o quadro não paga por nada extra. */
+/** Lazy initialisation: whoever only opens the board pays for nothing extra. */
 export function getDb(): Firestore {
   if (!db) {
     app ??= initializeApp(config);

@@ -2,22 +2,22 @@ import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { t } from "../i18n";
-import { deleteAttachment, subscribeAttachments, type Attachment } from "../lib/anexos";
-import { subscribeComments, type IssueComment } from "../lib/comentarios";
+import { deleteAttachment, subscribeAttachments, type Attachment } from "../lib/attachments";
+import { subscribeComments, type IssueComment } from "../lib/comments";
 import { subscribeIssue, type Issue } from "../lib/issues";
 import { useSeo } from "../lib/seo";
-import { useSession } from "../features/admin/SessaoContext";
-import { useAdminActions } from "../features/admin/useAcoesAdmin";
+import { useSession } from "../features/admin/SessionContext";
+import { useAdminActions } from "../features/admin/useAdminActions";
 import { IssueDetail } from "../features/ticket/IssueDetail";
-import { AttachmentList } from "../features/ticket/ListaAnexos";
-import { CommentList } from "../features/ticket/ListaComentarios";
+import { AttachmentList } from "../features/ticket/AttachmentList";
+import { CommentList } from "../features/ticket/CommentList";
 
 const TicketActions = lazy(() =>
-  import("../features/admin/AcoesTicket").then((m) => ({ default: m.TicketActions })),
+  import("../features/admin/TicketActions").then((m) => ({ default: m.TicketActions })),
 );
 
 const CommentForm = lazy(() =>
-  import("../features/admin/AcoesIssue").then((m) => ({ default: m.CommentForm })),
+  import("../features/admin/IssueActions").then((m) => ({ default: m.CommentForm })),
 );
 
 export function IssuePage() {

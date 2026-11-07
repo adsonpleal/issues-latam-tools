@@ -3,7 +3,7 @@ import { useState } from "react";
 import { STATUS_LABEL, t } from "../../i18n";
 import type { Issue } from "../../lib/issues";
 import { ADMIN_COLUMNS, type Column } from "../../lib/status";
-import { EditForm, useContact, type EditableFields } from "./AcoesIssue";
+import { EditForm, useContact, type EditableFields } from "./IssueActions";
 
 type Props = {
   issue: Issue;

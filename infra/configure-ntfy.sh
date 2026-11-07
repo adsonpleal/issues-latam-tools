@@ -3,7 +3,7 @@
 # broken cannot be delivered through Discord — see README, "Quando o próprio
 # Discord é o problema".
 #
-# The topic is the same one `tools/triagem.mjs` publishes to, and it is a secret:
+# The topic is the same one `tools/triage.mjs` publishes to, and it is a secret:
 # whoever knows an ntfy topic can publish to it.
 set -euo pipefail
-exec "$(dirname "$0")/configure-segredo.sh" NTFY_TOPICO 20-ntfy.conf
+exec "$(dirname "$0")/configure-secret.sh" NTFY_TOPICO 20-ntfy.conf

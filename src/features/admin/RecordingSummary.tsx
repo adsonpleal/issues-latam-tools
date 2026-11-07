@@ -1,5 +1,5 @@
 import type { ReplaySummary } from "../../lib/issues";
-import { summaryRows } from "./gravacoes";
+import { summaryRows } from "./recordings";
 
 type Props = {
   replay: ReplaySummary;

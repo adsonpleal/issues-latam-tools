@@ -7,9 +7,9 @@ import {
   ACCEPTED_EXTENSIONS,
   classifyFile,
   formatSize,
-} from "../../lib/anexos";
-import type { PreparedAttachment } from "../../lib/anexos";
-import { shrinkImage } from "../../lib/imagem";
+} from "../../lib/attachments";
+import type { PreparedAttachment } from "../../lib/attachments";
+import { shrinkImage } from "../../lib/image";
 
 type Props = {
   attachments: PreparedAttachment[];

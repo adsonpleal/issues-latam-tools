@@ -19,7 +19,7 @@
 
 import { readFileSync } from "node:fs";
 
-import { accessToken } from "./credencial.mjs";
+import { accessToken } from "./credential.mjs";
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");

@@ -2,9 +2,9 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { STATUS_LABEL, TYPE_LABEL, t } from "../../i18n";
-import { formatRelative } from "../../lib/datas";
+import { formatRelative } from "../../lib/dates";
 import type { Issue } from "../../lib/issues";
-import { PROJECTS } from "../../lib/projetos";
+import { PROJECTS } from "../../lib/projects";
 import { ADMIN_COLUMNS, type Column } from "../../lib/status";
 
 type Props = {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Issue } from "../../lib/issues";
-import { group, groupForAdmin, filter, NO_FILTERS, stack } from "./agrupar";
+import { group, groupForAdmin, filter, NO_FILTERS, stack } from "./group";
 
 function issue(over: Partial<Issue> & { id: string }): Issue {
   return {

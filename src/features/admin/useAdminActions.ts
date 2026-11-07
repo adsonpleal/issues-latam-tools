@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 
-import type { PreparedAttachment } from "../../lib/anexos";
-import { addComment } from "../../lib/comentarios";
+import type { PreparedAttachment } from "../../lib/attachments";
+import { addComment } from "../../lib/comments";
 import {
   editIssue,
   moveIssue,

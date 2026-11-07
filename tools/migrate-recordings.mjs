@@ -6,8 +6,8 @@
 // Target: `issues` with type `replay`, the .rrf as an attachment and the
 // parser's summary in the `replay` field.
 //
-//   node tools/migrar-gravacoes.mjs --dry-run
-//   node tools/migrar-gravacoes.mjs
+//   node tools/migrate-recordings.mjs --dry-run
+//   node tools/migrate-recordings.mjs
 //
 // ALL of them arrive archived, including the ones already reviewed. In the
 // source the collection is `allow read: if false` on purpose -- the comment on
@@ -22,7 +22,7 @@
 // builds for a card's title and description is read by the community, so it
 // stays in Portuguese.
 
-import { accessToken } from "./credencial.mjs";
+import { accessToken } from "./credential.mjs";
 
 const SOURCE_PROJECT = "simulador-latam-ro";
 const TARGET_PROJECT = "issues-latam-tools";

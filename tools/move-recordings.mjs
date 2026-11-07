@@ -2,8 +2,8 @@
 // Takes the recordings that never became a card off the board and puts them in
 // the `gravacoes` collection.
 //
-//   node tools/mover-gravacoes.mjs --dry-run
-//   node tools/mover-gravacoes.mjs
+//   node tools/move-recordings.mjs --dry-run
+//   node tools/move-recordings.mjs
 //
 // Recordings from "Ajude o simulador" used to be born as `arquivado: true`
 // cards. That gave one boolean two meanings -- "triage dispatched it" and
@@ -30,7 +30,7 @@
 // Field names, collection names and the stored `estado` values below are
 // Firestore's, so they keep the database's spelling.
 
-import { accessToken } from "./credencial.mjs";
+import { accessToken } from "./credential.mjs";
 
 const PROJECT_ID = "issues-latam-tools";
 const dryRun = process.argv.includes("--dry-run");

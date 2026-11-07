@@ -148,7 +148,7 @@ vira card) e `descartada`. **Descartar não apaga**: é o arquivar daqui. Apagar
 existe, e é só para upload que não devia ter entrado — mesma razão pela qual
 anexo tem delete.
 
-`npm run mover-gravacoes` recolhe para a coleção nova qualquer gravação que ainda
+`npm run move-recordings` recolhe para a coleção nova qualquer gravação que ainda
 apareça como card arquivado — o que acontece enquanto houver simulador antigo em
 cache por aí. É idempotente e não toca no que já foi promovido.
 
@@ -178,7 +178,7 @@ o card chega a `resolvido` ou `nao_sera_feito`, e a checagem roda a cada 10 min
 — não a cada tique — porque cada uma custa uma leitura por card acompanhado, e
 ler demais já estourou a cota do plano gratuito uma vez.
 
-Quem faz isso é `tools/anunciar-discord.mjs`, rodando na instância Oracle do ragassets como
+Quem faz isso é `tools/announce-discord.mjs`, rodando na instância Oracle do ragassets como
 one-shot do systemd a cada 2 min (`infra/issues-discord.{service,timer}`). O
 plano gratuito do Firebase não tem Cloud Functions, então o gatilho tem que vir
 de fora; e como o serviço não escuta em porta nenhuma, não há endpoint público
@@ -231,7 +231,7 @@ escapado e sem caractere invisível. Se 25 cards chegarem num intervalo de 2 min
 ele para em vez de repassar a enxurrada.
 
 ```bash
-node tools/anunciar-discord.mjs --dry-run --desde 2020-01-01T00:00:00Z --max 100
+node tools/announce-discord.mjs --dry-run --desde 2020-01-01T00:00:00Z --max 100
 ```
 
 Renderiza os cards existentes como embeds sem postar nada — é o teste de olho
@@ -243,9 +243,9 @@ Card novo também abre uma sessão do Claude Code que vai validar o relato e, se
 ele proceder, levá-lo até um PR com CI verde no repositório do projeto.
 
 ```bash
-npm run triagem estado        # o que a automação enxerga agora
-npm run triagem fila          # o que ela pegaria no próximo tique
-npm run triagem reconciliar   # PR mesclado -> card resolvido
+npm run triage estado        # o que a automação enxerga agora
+npm run triage fila          # o que ela pegaria no próximo tique
+npm run triage reconciliar   # PR mesclado -> card resolvido
 ```
 
 **O quadro é a fila.** Não há banco nem arquivo de pendências à parte: `status`
@@ -254,7 +254,7 @@ vai com precondição de `updateTime`, então dois despachantes não conseguem p
 o mesmo card. A consequência boa é que a fila é a coluna que você já olha: tirar
 um card dela é arrastá-lo para outra coluna, e nada aqui precisa saber disso.
 
-**Marca d'água, como no anunciador.** `npm run triagem bootstrap` grava "a partir
+**Marca d'água, como no anunciador.** `npm run triage bootstrap` grava "a partir
 de agora" e o que já estava em `reportado` fica para trás. Sem isso, ligar a
 automação com a fila cheia despejaria uma sessão por card acumulado. Rode uma vez
 só, à mão: um turno automático nunca grava a marca.
@@ -264,7 +264,7 @@ do Firestore nem do GitHub — é da máquina, que roda os testes, sobe instânc
 tira captura de cada sessão. Só conta o que a automação pegou: card que você
 moveu à mão para `em_progresso` não ocupa vaga.
 
-**O caminho de volta é o PR.** A sessão registra o PR no card (`npm run triagem
+**O caminho de volta é o PR.** A sessão registra o PR no card (`npm run triage
 pr <id> <dono/repo#N>`), e `reconciliar` pergunta ao `gh` se ele foi mesclado —
 só então o card vira `resolvido`, com o link no comentário. Card só fecha com
 merge como prova; nenhuma sessão move card para `resolvido` por conta própria.
@@ -272,8 +272,8 @@ merge como prova; nenhuma sessão move card para `resolvido` por conta própria.
 **O aviso vai para o celular pelo [ntfy.sh](https://ntfy.sh).**
 
 ```bash
-npm run triagem -- avisar <id> --mensagem "PR #77 pronto para revisão. CI verde."
-npm run triagem -- alarme --mensagem "Despachante parado."   # sem card para apontar
+npm run triage -- avisar <id> --mensagem "PR #77 pronto para revisão. CI verde."
+npm run triage -- alarme --mensagem "Despachante parado."   # sem card para apontar
 ```
 
 O nome do tópico **não está aqui nem no código**: este repositório é público, e
@@ -355,7 +355,7 @@ from time to time on purpose, because a stalled resident process stays "alive"
 forever with its announcements stopped. The on-disk watermark is what makes the
 restart neither lose nor repeat a card.
 
-**This one reads anonymously**, like the announcer and unlike `triagem.mjs`: the
+**This one reads anonymously**, like the announcer and unlike `triage.mjs`: the
 rules allow listing `arquivado == false` with `limit <= 500`, so the listener
 cannot read `privado/contato` even by accident. An admin credential would
 override the rules and throw that guarantee away.
@@ -409,10 +409,10 @@ estão em `.agents/skills/deploy/SKILL.md`.
 `data/seed-issues.json` é a fonte da verdade do que veio do mundo antigo.
 
 ```bash
-npm run importar     # relê as planilhas + o Firestore do recap e regenera o JSON
+npm run import     # relê as planilhas + o Firestore do recap e regenera o JSON
 npm run seed -- --dry-run
 npm run seed
-npm run mover-gravacoes -- --dry-run   # gravação que virou card arquivado -> coleção `gravacoes`
+npm run move-recordings -- --dry-run   # gravação que virou card arquivado -> coleção `gravacoes`
 ```
 
 O seed é idempotente: usa id determinístico e cria com `currentDocument.exists=false`,
@@ -420,7 +420,7 @@ então rodar de novo pula o que existe em vez de sobrescrever. Sem isso, uma
 segunda execução devolveria para *Reportado* um card já movido para *Em progresso*.
 
 As planilhas não tinham campo de título — a tabela `REVISAO` em
-`tools/importar-planilhas.mjs` é a leitura humana de cada linha, feita uma vez
+`tools/import-spreadsheets.mjs` é a leitura humana de cada linha, feita uma vez
 na migração e chaveada pela origem (para reescrever um título não mudar o id do
 card).
 

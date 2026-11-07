@@ -7,7 +7,7 @@ import {
   subscribeRecordings,
   type RecordingState,
   type Recording,
-} from "../../lib/gravacoes";
+} from "../../lib/recordings";
 
 export type QueueState = {
   recordings: Recording[];

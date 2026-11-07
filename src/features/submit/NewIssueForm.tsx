@@ -9,10 +9,10 @@ import {
   TITLE_MAX,
   type PreparedAttachment,
 } from "../../lib/issues";
-import { PROJECTS, PROJECT_SLUGS, parseProject, type Project } from "../../lib/projetos";
+import { PROJECTS, PROJECT_SLUGS, parseProject, type Project } from "../../lib/projects";
 import { FORM_ISSUE_TYPES, type IssueType } from "../../lib/status";
-import { AttachmentField } from "./CampoAnexos";
-import { useSubmitIssue } from "./useEnviarIssue";
+import { AttachmentField } from "./AttachmentField";
+import { useSubmitIssue } from "./useSubmitIssue";
 
 export function NewIssueForm() {
   const [params] = useSearchParams();

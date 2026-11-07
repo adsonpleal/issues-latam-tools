@@ -3,9 +3,9 @@ import { useState } from "react";
 import { t } from "../../i18n";
 import type { Issue } from "../../lib/issues";
 import type { Column } from "../../lib/status";
-import { useVotes } from "../votos/useVotos";
-import type { ColumnGroup } from "./agrupar";
-import { BoardColumn } from "./Coluna";
+import { useVotes } from "../votes/useVotes";
+import type { ColumnGroup } from "./group";
+import { BoardColumn } from "./BoardColumn";
 import { IssueCard } from "./IssueCard";
 
 type Props = {

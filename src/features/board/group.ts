@@ -1,5 +1,5 @@
 import type { Issue } from "../../lib/issues";
-import type { Project } from "../../lib/projetos";
+import type { Project } from "../../lib/projects";
 import type { Column, IssueType } from "../../lib/status";
 import { COLUMNS, ADMIN_COLUMNS, sortsByUpdatedAt } from "../../lib/status";
 

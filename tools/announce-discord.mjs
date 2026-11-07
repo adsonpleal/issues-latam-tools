@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Announces the public board's new cards on Discord.
 //
-//   node tools/anunciar-discord.mjs --dry-run --since 2020-01-01T00:00:00Z --max 100
-//   node tools/anunciar-discord.mjs --bootstrap
-//   node tools/anunciar-discord.mjs
+//   node tools/announce-discord.mjs --dry-run --since 2020-01-01T00:00:00Z --max 100
+//   node tools/announce-discord.mjs --bootstrap
+//   node tools/announce-discord.mjs
 //
 // The Portuguese flag spellings (`--desde`, `--estado`, `--limite`) still work:
 // they are in the README and in the deploy skill, and they are what gets typed
@@ -53,7 +53,7 @@ const DEFAULT_STATE_PATH = env.ESTADO || "/var/lib/issues-discord/estado.json";
  * The deadman's way out of Discord, and it has **no default in the code on
  * purpose**: this repository is public, and an ntfy topic is the password of
  * whoever publishes to it. Same reasoning as `ntfyTopic()` in
- * `tools/triagem.mjs`. Comes from a root-only systemd drop-in, like the bot
+ * `tools/triage.mjs`. Comes from a root-only systemd drop-in, like the bot
  * token, and is never logged.
  *
  * The env var's name is the deployed unit's, so it stays as it is written there.
@@ -302,7 +302,7 @@ export function threadName(card) {
 }
 
 /**
- * `owner/repo#N` is how `tools/triagem.mjs` writes the `pr` field. Validate it
+ * `owner/repo#N` is how `tools/triage.mjs` writes the `pr` field. Validate it
  * instead of trusting it: this builds a link that gets posted under the bot's
  * identity, and a field is a field -- anything that does not match exactly is
  * dropped rather than linked.

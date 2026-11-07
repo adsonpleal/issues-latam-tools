@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { STATUS_LABEL as STATUS_LABEL_APP, TYPE_LABEL as TYPE_LABEL_APP } from "../src/i18n";
-import { PROJECTS as PROJECTS_APP } from "../src/lib/projetos";
+import { PROJECTS as PROJECTS_APP } from "../src/lib/projects";
 import {
   PROJECTS,
   STATUS_LABEL,
@@ -22,7 +22,7 @@ import {
   threadName,
   toCard,
   truncate,
-} from "./anunciar-discord.mjs";
+} from "./announce-discord.mjs";
 
 /**
  * The tool is .mjs with no build step, so it cannot import the app's .ts and

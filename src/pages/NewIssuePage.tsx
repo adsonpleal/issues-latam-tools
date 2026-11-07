@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 
 import { t } from "../i18n";
 import { useSeo } from "../lib/seo";
-import { NewIssueForm } from "../features/enviar/NovoIssueForm";
+import { NewIssueForm } from "../features/submit/NewIssueForm";
 
 export function NewIssuePage() {
   useSeo({

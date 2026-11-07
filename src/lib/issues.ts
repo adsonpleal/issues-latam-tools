@@ -17,10 +17,10 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 
-import { ATTACHMENTS_MAX, uploadAttachment, type PreparedAttachment } from "./anexos";
+import { ATTACHMENTS_MAX, uploadAttachment, type PreparedAttachment } from "./attachments";
 import { getDb } from "./firebase";
-import type { Project } from "./projetos";
-import { isProject } from "./projetos";
+import type { Project } from "./projects";
+import { isProject } from "./projects";
 import type { Column, Status, IssueType } from "./status";
 import { isStatus, isIssueType } from "./status";
 
@@ -171,7 +171,7 @@ export async function getIssue(id: string): Promise<Issue | null> {
 
 // Lives in `anexos.ts`, with the rest of that subject -- a comment uploads a
 // file too now, and importing from `issues` for that would be a crooked path.
-export type { PreparedAttachment } from "./anexos";
+export type { PreparedAttachment } from "./attachments";
 
 export type NewIssue = {
   project: Project;

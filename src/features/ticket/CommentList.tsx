@@ -1,10 +1,10 @@
 import { useEffect, useMemo } from "react";
 
 import { t } from "../../i18n";
-import { attachmentUrl, type Attachment } from "../../lib/anexos";
-import type { IssueComment } from "../../lib/comentarios";
-import { formatDate } from "../../lib/datas";
-import { TextWithLinks } from "./TextoComLinks";
+import { attachmentUrl, type Attachment } from "../../lib/attachments";
+import type { IssueComment } from "../../lib/comments";
+import { formatDate } from "../../lib/dates";
+import { TextWithLinks } from "./TextWithLinks";
 
 type Props = {
   comments: IssueComment[];

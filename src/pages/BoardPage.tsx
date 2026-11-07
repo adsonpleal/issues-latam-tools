@@ -2,18 +2,18 @@ import { Suspense, lazy, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { t } from "../i18n";
-import { PROJECTS, parseProject } from "../lib/projetos";
+import { PROJECTS, parseProject } from "../lib/projects";
 import { useSeo } from "../lib/seo";
 import { isIssueType, type Column } from "../lib/status";
-import { useSession } from "../features/admin/SessaoContext";
-import { useAdminActions } from "../features/admin/useAcoesAdmin";
-import { group, groupForAdmin, columnOf, stack } from "../features/board/agrupar";
+import { useSession } from "../features/admin/SessionContext";
+import { useAdminActions } from "../features/admin/useAdminActions";
+import { group, groupForAdmin, columnOf, stack } from "../features/board/group";
 import { Board } from "../features/board/Board";
-import { reorderStack, releaseStack } from "../features/board/ordem";
+import { reorderStack, releaseStack } from "../features/board/order";
 import { useBoard } from "../features/board/useBoard";
 
 const IssuePanel = lazy(() =>
-  import("../features/admin/PainelIssue").then((m) => ({ default: m.IssuePanel })),
+  import("../features/admin/IssuePanel").then((m) => ({ default: m.IssuePanel })),
 );
 
 export function BoardPage() {

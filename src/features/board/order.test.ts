@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Issue } from "../../lib/issues";
-import { reorderStack, releaseStack } from "./ordem";
+import { reorderStack, releaseStack } from "./order";
 
 function issue(id: string, order: number | null = null): Issue {
   return {

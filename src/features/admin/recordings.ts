@@ -1,5 +1,5 @@
 import { t } from "../../i18n";
-import type { Recording } from "../../lib/gravacoes";
+import type { Recording } from "../../lib/recordings";
 import type { ReplaySummary } from "../../lib/issues";
 
 /**

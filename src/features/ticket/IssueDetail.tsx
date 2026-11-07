@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
 
 import { STATUS_LABEL, TYPE_LABEL, t } from "../../i18n";
-import { formatDate } from "../../lib/datas";
+import { formatDate } from "../../lib/dates";
 import type { Issue } from "../../lib/issues";
-import { PROJECTS } from "../../lib/projetos";
-import { useVotes } from "../votos/useVotos";
-import { TextWithLinks } from "./TextoComLinks";
+import { PROJECTS } from "../../lib/projects";
+import { useVotes } from "../votes/useVotes";
+import { TextWithLinks } from "./TextWithLinks";
 
 export function IssueDetail({ issue }: { issue: Issue }) {
   const { hasVoted, vote } = useVotes();

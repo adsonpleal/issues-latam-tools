@@ -1,13 +1,16 @@
-# Relógio do anunciador. É este que se habilita, não o serviço.
+# The announcer's clock. This is the one you enable, not the service.
 #
 #   systemctl enable --now issues-discord.timer
 #   systemctl list-timers issues-discord.timer --all
 #
-# 120 s e não 60 s: a cota do Firestore não é o limite (720 execuções/dia dão
-# ~1,5k leituras contra as 50k do plano gratuito), mas o systemd loga
-# "Starting/Finished" a cada disparo e não há como calar isso por unit. A 60 s
-# são ~2.880 linhas/dia de ruído no journal; a 120 s, metade. O atraso que isso
-# custa num anúncio de report não muda nada para ninguém.
+# 120 s and not 60 s: the Firestore quota is not the limit (720 runs/day make
+# ~1.5k reads against the free plan's 50k), but systemd logs "Starting/Finished"
+# on every trigger and there is no way to silence that per unit. At 60 s that is
+# ~2,880 lines/day of noise in the journal; at 120 s, half. The delay that costs
+# a report's announcement changes nothing for anybody.
+#
+# The Description is what `systemctl` shows the operator, so it stays in
+# Portuguese.
 
 [Unit]
 Description=issues-discord — dispara o anunciador a cada 2 min
@@ -17,9 +20,9 @@ OnBootSec=2min
 OnUnitActiveSec=120s
 AccuracySec=15s
 RandomizedDelaySec=15s
-# Persistent=false de propósito: o marco d'água está no disco, então uma execução
-# perdida (máquina desligada, deploy) se recupera sozinha no tique seguinte —
-# não há nada a "repor" com uma rajada na volta.
+# Persistent=false on purpose: the watermark is on disk, so a missed run (the
+# machine off, a deploy) recovers by itself on the next tick -- there is nothing
+# to "make up" with a burst on the way back.
 Persistent=false
 Unit=issues-discord.service
 

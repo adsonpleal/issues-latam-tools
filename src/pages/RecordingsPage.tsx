@@ -3,10 +3,10 @@ import { Link } from "react-router-dom";
 
 import { t } from "../i18n";
 import { useSeo } from "../lib/seo";
-import { splitRecordings } from "../features/admin/gravacoes";
-import { RecordingList } from "../features/admin/ListaGravacoes";
-import { useRecordings } from "../features/admin/useGravacoes";
-import { useSession } from "../features/admin/SessaoContext";
+import { splitRecordings } from "../features/admin/recordings";
+import { RecordingList } from "../features/admin/RecordingList";
+import { useRecordings } from "../features/admin/useRecordings";
+import { useSession } from "../features/admin/SessionContext";
 import { NotFoundPage } from "./NotFoundPage";
 
 /**
@@ -20,7 +20,7 @@ import { NotFoundPage } from "./NotFoundPage";
  * Without an admin session the page is "not found", like any address that does
  * not exist: not even the queue's existence is an answer anybody is owed.
  */
-export function GravacoesPage() {
+export function RecordingsPage() {
   const { admin, loading } = useSession();
 
   // Without the loading branch the admin themself would see a flash of 404 on

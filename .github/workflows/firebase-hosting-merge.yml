@@ -16,8 +16,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # Fixado: o 22.23.0 regrediu a busca do token da service account
-          # ("Premature close" no undici) e derrubou o deploy dos projetos irmãos.
+          # Pinned: 22.23.0 regressed the service-account token lookup
+          # ("Premature close" in undici) and broke the sibling projects' deploy.
           node-version: 22.22.3
           cache: npm
 
@@ -31,11 +31,11 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ISSUES_LATAM_TOOLS }}
           channelId: live
           projectId: issues-latam-tools
-          # Fixado: o firebase-tools 15.22.2 regrediu a autenticação por service
-          # account. Mesma trava que o simulador já carrega.
+          # Pinned: firebase-tools 15.22.2 regressed service-account
+          # authentication. The same pin the simulator already carries.
           firebaseToolsVersion: "15.22.1"
 
-# As regras e os índices do Firestore NÃO saem daqui — o deploy deles é manual
-# (`firebase deploy --only firestore`). Assim a credencial do CI não precisa de
-# permissão de escrita no banco, e uma regressão de regra não entra de carona
-# num push de rotina.
+# The Firestore rules and indexes do NOT ship from here -- deploying them is
+# manual (`firebase deploy --only firestore`). That way the CI credential needs
+# no write permission on the database, and a rule regression cannot hitch a ride
+# on a routine push.

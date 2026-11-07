@@ -2,10 +2,10 @@ import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { RECORDING_STATE_LABEL, t } from "../../i18n";
-import { formatSize } from "../../lib/anexos";
-import { formatRelative } from "../../lib/datas";
-import { getRecordingFile, type RecordingState, type Recording } from "../../lib/gravacoes";
-import { RecordingSummary } from "./ResumoGravacao";
+import { formatSize } from "../../lib/attachments";
+import { formatRelative } from "../../lib/dates";
+import { getRecordingFile, type RecordingState, type Recording } from "../../lib/recordings";
+import { RecordingSummary } from "./RecordingSummary";
 
 type Actions = {
   onPromote: (g: Recording) => void;

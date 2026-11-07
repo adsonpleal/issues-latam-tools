@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 
 import { t } from "../../i18n";
-import { formatSize, attachmentUrl, type Attachment } from "../../lib/anexos";
+import { formatSize, attachmentUrl, type Attachment } from "../../lib/attachments";
 
 type Props = {
   attachments: Attachment[];

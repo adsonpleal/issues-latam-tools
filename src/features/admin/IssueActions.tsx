@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 
 import { TYPE_LABEL, t } from "../../i18n";
-import type { PreparedAttachment } from "../../lib/anexos";
+import type { PreparedAttachment } from "../../lib/attachments";
 import { getContact, type Issue } from "../../lib/issues";
-import { PROJECTS, PROJECT_SLUGS, type Project } from "../../lib/projetos";
+import { PROJECTS, PROJECT_SLUGS, type Project } from "../../lib/projects";
 import { ISSUE_TYPES, type IssueType } from "../../lib/status";
-import { AttachmentField } from "../enviar/CampoAnexos";
+import { AttachmentField } from "../submit/AttachmentField";
 
 export type EditableFields = Pick<Issue, "title" | "description" | "type" | "project">;
 

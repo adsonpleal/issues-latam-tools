@@ -14,7 +14,7 @@
 // they are stored; `--saida` still works beside `--out` because that is what
 // the README says to type.
 //
-//   node tools/importar-planilhas.mjs [--out data/seed-issues.json]
+//   node tools/import-spreadsheets.mjs [--out data/seed-issues.json]
 
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";

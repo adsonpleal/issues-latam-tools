@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 
 import { t } from "../i18n";
 import { useSeo } from "../lib/seo";
-import { useSession } from "../features/admin/SessaoContext";
+import { useSession } from "../features/admin/SessionContext";
 
 /**
  * The only door. It is linked from nowhere -- and does not need to be: there is
@@ -19,7 +19,7 @@ import { useSession } from "../features/admin/SessaoContext";
  * network round trip in the middle of a user gesture -- exactly what Safari
  * counts as losing activation, and blocks the popup for.
  */
-export function EntrarPage() {
+export function SignInPage() {
   useSeo({ title: `${t.signIn} — ${t.siteName}` });
   const { session, admin, loading, activate, signIn, signOut } = useSession();
   // What the popup answered wrong. Without this, a failed sign-in is a click

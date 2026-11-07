@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 // The automatic triage queue: the board itself is the queue.
 //
-//   node tools/triagem.mjs bootstrap          # watermark = now, nothing from the past is taken
-//   node tools/triagem.mjs queue              # what is ready to take, as JSON
-//   node tools/triagem.mjs take <id>          # backlog -> em_progresso, locks the card
-//   node tools/triagem.mjs pr <id> <owner/repo#N>
-//   node tools/triagem.mjs refuse <id> --reason "..."    # stays in backlog, refused: true
-//   node tools/triagem.mjs reconcile          # merged PR -> resolvido
-//   node tools/triagem.mjs notify <id> --message "..."   # push to the phone
-//   node tools/triagem.mjs alarm --message "..."         # same, with no card: the dispatcher
-//   node tools/triagem.mjs state              # what the automation can see right now
+//   node tools/triage.mjs bootstrap          # watermark = now, nothing from the past is taken
+//   node tools/triage.mjs queue              # what is ready to take, as JSON
+//   node tools/triage.mjs take <id>          # backlog -> em_progresso, locks the card
+//   node tools/triage.mjs pr <id> <owner/repo#N>
+//   node tools/triage.mjs refuse <id> --reason "..."    # stays in backlog, refused: true
+//   node tools/triage.mjs reconcile          # merged PR -> resolvido
+//   node tools/triage.mjs notify <id> --message "..."   # push to the phone
+//   node tools/triage.mjs alarm --message "..."         # same, with no card: the dispatcher
+//   node tools/triage.mjs state              # what the automation can see right now
 //
 // There is no queue in a file of its own, and that is the central decision:
 // `status` in Firestore IS the queue. Taking a card means moving it to
@@ -30,7 +30,7 @@
 // `criadoEm` (when it was filed), because a card approved today may have been
 // reported weeks ago.
 //
-// Writes are AUTHENTICATED (tools/credencial.mjs), unlike the announcer, which
+// Writes are AUTHENTICATED (tools/credential.mjs), unlike the announcer, which
 // reads anonymously on purpose. Here there is no choice: moving a card and
 // commenting are writes the rules only allow the admin. In exchange, this
 // script never reads `privado/contato` -- there is no code path to it.
@@ -49,7 +49,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { accessToken } from "./credencial.mjs";
+import { accessToken } from "./credential.mjs";
 
 const FIREBASE_PROJECT = process.env["FIREBASE_PROJECT_ID"] || "issues-latam-tools";
 const BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/(default)/documents`;
@@ -761,7 +761,7 @@ const commands = {
 
 const [command, ...args] = process.argv.slice(2);
 
-if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("triagem.mjs")) {
+if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("triage.mjs")) {
   if (!command || !(command in commands)) {
     console.error(`commands: ${Object.keys(commands).join(", ")}`);
     process.exit(2);

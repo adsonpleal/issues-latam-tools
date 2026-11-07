@@ -1,4 +1,4 @@
-import { ATTACHMENT_MAX_BYTES } from "./anexos";
+import { ATTACHMENT_MAX_BYTES } from "./attachments";
 
 const INITIAL_MAX_SIDE = 1600;
 

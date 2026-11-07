@@ -1,50 +1,54 @@
 #!/usr/bin/env bash
 #
-# Ativa a unit e o timer deste projeto: compara o que o deploy acabou de copiar para
-# /opt/issues-discord/infra com o que está em /etc/systemd/system/ e, se mudou, instala e
-# recarrega o systemd.
+# Activates this project's unit and timer: compares what the deploy just copied to
+# /opt/issues-discord/infra with what is in /etc/systemd/system/ and, if it changed,
+# installs it and reloads systemd.
 #
-# Existe pela mesma pegadinha do latam-market: o deploy só mexe em /opt. A unit mora em
-# /etc/systemd/system/, então editar um `Environment=` mudava um arquivo que ia para a
-# máquina e nunca era lido — o serviço seguia rodando com o ambiente antigo.
+# It exists because of the same trap as latam-market: the deploy only touches /opt. The
+# unit lives in /etc/systemd/system/, so editing an `Environment=` changed a file that
+# travelled to the machine and was never read -- the service kept running with the old
+# environment.
 #
-# Chamado pelo deploy, e seguro de rodar à mão — SEM sudo, que ele já pede onde precisa:
+# Called by the deploy, and safe to run by hand -- WITHOUT sudo, which it asks for where
+# it needs it:
 #
 #   /opt/issues-discord/infra/apply-unit.sh
 #
-# Idempotente: sem mudança, não recarrega nem reinicia nada.
+# Idempotent: with no change it reloads and restarts nothing.
+#
+# What it prints is read by whoever is deploying, so it stays in Portuguese.
 set -euo pipefail
 
 BASE=${1:-/opt/issues-discord/infra}
-MUDOU=0
+CHANGED=0
 
-for arquivo in issues-discord.service issues-discord.timer; do
-  NOVO="$BASE/$arquivo"
-  ATIVO="/etc/systemd/system/$arquivo"
+for file in issues-discord.service issues-discord.timer; do
+  NEW="$BASE/$file"
+  ACTIVE="/etc/systemd/system/$file"
 
-  test -s "$NOVO"
+  test -s "$NEW"
 
-  if cmp -s "$NOVO" "$ATIVO" 2>/dev/null; then
-    echo "$arquivo inalterado"
+  if cmp -s "$NEW" "$ACTIVE" 2>/dev/null; then
+    echo "$file inalterado"
     continue
   fi
 
-  echo "$arquivo mudou:"
-  diff -u "$ATIVO" "$NOVO" 2>/dev/null || true
-  sudo install -m 0644 "$NOVO" "$ATIVO"
-  MUDOU=1
+  echo "$file mudou:"
+  diff -u "$ACTIVE" "$NEW" 2>/dev/null || true
+  sudo install -m 0644 "$NEW" "$ACTIVE"
+  CHANGED=1
 done
 
-if [ "$MUDOU" -eq 0 ]; then
+if [ "$CHANGED" -eq 0 ]; then
   echo "nada a aplicar"
   exit 0
 fi
 
 sudo systemctl daemon-reload
 
-# Reinicia o TIMER, nunca o serviço: `systemctl restart issues-discord.service` dispararia
-# uma execução fora de hora, e o serviço é oneshot — ele não fica de pé para ser
-# reiniciado. Quem precisa reler a unit é o relógio.
+# Restart the TIMER, never the service: `systemctl restart issues-discord.service` would
+# fire a run out of turn, and the service is oneshot -- it does not stay up to be
+# restarted. What needs to re-read the unit is the clock.
 if systemctl is-enabled --quiet issues-discord.timer 2>/dev/null; then
   sudo systemctl restart issues-discord.timer
   echo "unit aplicada, timer reiniciado"

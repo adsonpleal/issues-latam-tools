@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { Recording } from "../../lib/gravacoes";
-import { formatDuration, summaryRows, splitRecordings } from "./gravacoes";
+import type { Recording } from "../../lib/recordings";
+import { formatDuration, summaryRows, splitRecordings } from "./recordings";
 
 function recording(over: Partial<Recording> & { id: string }): Recording {
   return {

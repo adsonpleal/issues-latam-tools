@@ -1,8 +1,8 @@
 import { Link, useSearchParams } from "react-router-dom";
 
-import { useSession } from "../features/admin/SessaoContext";
+import { useSession } from "../features/admin/SessionContext";
 import { TYPE_LABEL, t } from "../i18n";
-import { PROJECTS, PROJECT_SLUGS, parseProject } from "../lib/projetos";
+import { PROJECTS, PROJECT_SLUGS, parseProject } from "../lib/projects";
 import { ISSUE_TYPES, isIssueType } from "../lib/status";
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { PROJECTS as PROJECTS_APP } from "../src/lib/projetos";
+import { PROJECTS as PROJECTS_APP } from "../src/lib/projects";
 import { COLUMNS } from "../src/lib/status";
 import {
   FOLDERS,
@@ -10,7 +10,7 @@ import {
   screenForInjection,
   toCard,
   triageQueue,
-} from "./triagem.mjs";
+} from "./triage.mjs";
 
 /**
  * A fixture shaped like a Firestore document, so its keys are the names the

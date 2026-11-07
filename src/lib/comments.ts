@@ -10,7 +10,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 
-import { ATTACHMENTS_MAX, uploadAttachment, type PreparedAttachment } from "./anexos";
+import { ATTACHMENTS_MAX, uploadAttachment, type PreparedAttachment } from "./attachments";
 import { getDb } from "./firebase";
 
 export const COMMENT_MAX = 4000;

@@ -1,9 +1,9 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 
-import { SessionProvider } from "../features/admin/SessaoContext";
+import { SessionProvider } from "../features/admin/SessionContext";
 import { t } from "../i18n";
-import { isProject } from "../lib/projetos";
+import { isProject } from "../lib/projects";
 import { BoardPage } from "../pages/BoardPage";
 import { IssuePage } from "../pages/IssuePage";
 import { NewIssuePage } from "../pages/NewIssuePage";
@@ -15,12 +15,12 @@ import { TopBar } from "./TopBar";
 // no reason for the public to download them -- but the real weight, the auth
 // SDK, is held back by the mark in localStorage (see lib/auth.ts), not by the
 // route.
-const EntrarPage = lazy(() =>
-  import("../pages/EntrarPage").then((m) => ({ default: m.EntrarPage })),
+const SignInPage = lazy(() =>
+  import("../pages/SignInPage").then((m) => ({ default: m.SignInPage })),
 );
 
-const GravacoesPage = lazy(() =>
-  import("../pages/GravacoesPage").then((m) => ({ default: m.GravacoesPage })),
+const RecordingsPage = lazy(() =>
+  import("../pages/RecordingsPage").then((m) => ({ default: m.RecordingsPage })),
 );
 
 /**
@@ -54,11 +54,11 @@ export function App() {
               <Route path="/" element={<BoardPage />} />
               <Route path="/novo" element={<NewIssuePage />} />
               <Route path="/t/:issueId" element={<IssuePage />} />
-              <Route path="/entrar" element={<EntrarPage />} />
+              <Route path="/entrar" element={<SignInPage />} />
               {/* These come before the project shortcut -- router v7 orders by
                   specificity, so `/:slug` would not steal either of them
                   anyway, but it reads in the right order. */}
-              <Route path="/gravacoes" element={<GravacoesPage />} />
+              <Route path="/gravacoes" element={<RecordingsPage />} />
               <Route path="/:slug" element={<ProjectShortcut />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>

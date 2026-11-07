@@ -4,7 +4,7 @@
 // player on the site, so translating one would change the product. The keys of
 // the four label maps at the bottom are stored values (a card's status, a
 // recording's state, an issue's type) and keep the database's spelling.
-import type { RecordingState } from "./lib/gravacoes";
+import type { RecordingState } from "./lib/recordings";
 import type { Column, Status, IssueType } from "./lib/status";
 
 export const t = {

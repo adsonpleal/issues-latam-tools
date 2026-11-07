@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { TYPE_LABEL, t } from "../../i18n";
-import { deleteAttachment, subscribeAttachments, type Attachment, type PreparedAttachment } from "../../lib/anexos";
-import { subscribeComments, type IssueComment } from "../../lib/comentarios";
+import { deleteAttachment, subscribeAttachments, type Attachment, type PreparedAttachment } from "../../lib/attachments";
+import { subscribeComments, type IssueComment } from "../../lib/comments";
 import type { Issue } from "../../lib/issues";
-import { PROJECTS } from "../../lib/projetos";
-import { AttachmentList } from "../ticket/ListaAnexos";
-import { CommentList } from "../ticket/ListaComentarios";
+import { PROJECTS } from "../../lib/projects";
+import { AttachmentList } from "../ticket/AttachmentList";
+import { CommentList } from "../ticket/CommentList";
 import {
   CommentForm,
   EditForm,
   useContact,
   type EditableFields,
-} from "./AcoesIssue";
-import { RecordingSummary } from "./ResumoGravacao";
+} from "./IssueActions";
+import { RecordingSummary } from "./RecordingSummary";
 
 type Props = {
   issue: Issue;

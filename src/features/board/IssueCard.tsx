@@ -11,26 +11,35 @@ type Props = {
   issue: Issue;
   hasVoted: boolean;
   onVote: (id: string) => void;
-  /** Presente só com sessão de admin: liga o arrastar e o seletor de coluna. */
+  /** Only with an admin session: turns dragging and the column selector on. */
   onMove?: (id: string, column: Column) => void;
-  /** Presente só com sessão de admin: abre o painel em vez de navegar. */
+  /** Only with an admin session: opens the panel instead of navigating. */
   onOpen?: (id: string) => void;
-  /** Soltar um card em cima deste, acima ou abaixo da metade da altura. */
+  /** Dropping a card onto this one, above or below half its height. */
   onPin?: (id: string, targetId: string, before: boolean) => void;
-  /** Um degrau para cima (-1) ou para baixo (1) na pilha. */
-  onDegrau?: (delta: -1 | 1) => void;
-  primeiro?: boolean;
+  /** One step up (-1) or down (1) the stack. */
+  onStep?: (delta: -1 | 1) => void;
+  first?: boolean;
   last?: boolean;
-  /** Id do card em movimento no quadro inteiro, ou null. */
-  arrastando?: string | null;
-  onArrastar?: (id: string | null) => void;
+  /** Id of the card in motion anywhere on the board, or null. */
+  dragging?: string | null;
+  onDragging?: (id: string | null) => void;
 };
 
-/** Metade de cima do card significa "solta antes"; metade de baixo, "depois". */
-function metadeDeCima(e: React.DragEvent<HTMLElement>): boolean {
+/** The top half of the card means "drop before"; the bottom half, "after". */
+function isTopHalf(e: React.DragEvent<HTMLElement>): boolean {
   const r = e.currentTarget.getBoundingClientRect();
   return e.clientY < r.top + r.height / 2;
 }
+
+/**
+ * The insertion marks are CSS class names, part of the stylesheet's contract,
+ * so they keep their Portuguese spelling while the state above them is ours.
+ */
+const INSERTION_CLASS = {
+  before: "issue-card-antes",
+  after: "issue-card-depois",
+} as const;
 
 export function IssueCard({
   issue,
@@ -39,68 +48,70 @@ export function IssueCard({
   onMove,
   onOpen,
   onPin,
-  onDegrau,
-  primeiro,
+  onStep,
+  first,
   last,
-  arrastando,
-  onArrastar,
+  dragging,
+  onDragging,
 }: Props) {
   const project = PROJECTS[issue.project];
   const admin = Boolean(onMove);
-  const [insercao, setInsercao] = useState<"antes" | "depois" | null>(null);
+  const [insertion, setInsertion] = useState<"before" | "after" | null>(null);
 
-  // Só vira alvo quando há outro card no ar: sem isso o card acusaria posição
-  // de encaixe enquanto ele mesmo está sendo arrastado.
-  const recebe = Boolean(onPin) && Boolean(arrastando) && arrastando !== issue.id;
+  // It only becomes a target while another card is in the air: without this the
+  // card would show a drop position while it is the one being dragged.
+  const isTarget = Boolean(onPin) && Boolean(dragging) && dragging !== issue.id;
 
-  const target = recebe
+  const target = isTarget
     ? {
         onDragOver: (e: React.DragEvent<HTMLElement>) => {
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
-          setInsercao(metadeDeCima(e) ? "antes" : "depois");
+          setInsertion(isTopHalf(e) ? "before" : "after");
         },
         onDragLeave: (e: React.DragEvent<HTMLElement>) => {
-          // dragleave também dispara ao entrar num filho (o botão de voto, o
-          // seletor). Sair de verdade é quando o destino está fora do card.
-          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setInsercao(null);
+          // dragleave also fires on entering a child (the vote button, the
+          // selector). A real exit is when the destination is outside the card.
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setInsertion(null);
         },
         onDrop: (e: React.DragEvent<HTMLElement>) => {
-          // O preventDefault é o que avisa a coluna, no caminho de subida, que
-          // este drop já tem dono — senão ela move o card e joga a posição fora.
+          // The preventDefault is what tells the column, on the way up, that
+          // this drop already has an owner -- otherwise it moves the card and
+          // throws the position away.
           e.preventDefault();
-          setInsercao(null);
+          setInsertion(null);
           const id = e.dataTransfer.getData("text/plain");
-          if (id && id !== issue.id) onPin?.(id, issue.id, metadeDeCima(e));
+          if (id && id !== issue.id) onPin?.(id, issue.id, isTopHalf(e));
         },
       }
     : {};
 
-  // Amarrado ao `recebe`, não só ao estado: o arrasto pode terminar com o
-  // ponteiro parado em cima deste card, e aí o risco de encaixe ficaria pintado
-  // depois que já não há nada para encaixar.
-  const marca = recebe && insercao ? ` issue-card-alvo issue-card-${insercao}` : "";
-  const emMovimento = arrastando === issue.id ? " issue-card-arrastando" : "";
+  // Tied to `isTarget`, not only to the state: the drag can end with the
+  // pointer resting on this card, and then the insertion line would stay
+  // painted after there is nothing left to insert.
+  const mark = isTarget && insertion ? ` issue-card-alvo ${INSERTION_CLASS[insertion]}` : "";
+  const moving = dragging === issue.id ? " issue-card-arrastando" : "";
 
   return (
     <article
-      className={`issue-card${marca}${emMovimento}`}
-      // `draggable` só existe com sessão — o DOM público nem recebe o atributo.
+      className={`issue-card${mark}${moving}`}
+      // `draggable` only exists with a session -- the public DOM never even
+      // receives the attribute.
       draggable={admin || undefined}
       onDragStart={
         admin
           ? (e) => {
               e.dataTransfer.setData("text/plain", issue.id);
               e.dataTransfer.effectAllowed = "move";
-              onArrastar?.(issue.id);
+              onDragging?.(issue.id);
             }
           : undefined
       }
       onDragEnd={
         admin
           ? () => {
-              onArrastar?.(null);
-              setInsercao(null);
+              onDragging?.(null);
+              setInsertion(null);
             }
           : undefined
       }
@@ -155,10 +166,10 @@ export function IssueCard({
       </div>
 
       {onMove && (
-        // Arrastar não funciona em toque nenhum — nem Safari do iPhone, nem
-        // Chrome do Android. O seletor e as setas são o mecanismo de verdade; o
-        // arrastar é só o atalho no desktop. De quebra funcionam no teclado e no
-        // leitor de tela.
+        // Dragging works on no touch device at all -- not iPhone Safari, not
+        // Android Chrome. The selector and the arrows are the real mechanism;
+        // dragging is only the desktop shortcut. As a bonus they work with the
+        // keyboard and the screen reader.
         <div className="issue-card-admin">
           <label className="issue-card-mover">
             <span className="visually-hidden">{t.moveTo}</span>
@@ -174,12 +185,12 @@ export function IssueCard({
             </select>
           </label>
 
-          {onDegrau && (
+          {onStep && (
             <span className="issue-card-degrau">
               <button
                 type="button"
-                onClick={() => onDegrau(-1)}
-                disabled={primeiro}
+                onClick={() => onStep(-1)}
+                disabled={first}
                 title={t.moveUp}
                 aria-label={t.moveUp}
               >
@@ -187,7 +198,7 @@ export function IssueCard({
               </button>
               <button
                 type="button"
-                onClick={() => onDegrau(1)}
+                onClick={() => onStep(1)}
                 disabled={last}
                 title={t.moveDown}
                 aria-label={t.moveDown}

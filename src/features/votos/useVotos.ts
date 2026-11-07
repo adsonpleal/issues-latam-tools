@@ -2,47 +2,52 @@ import { useCallback, useState } from "react";
 
 import { upvoteIssue } from "../../lib/issues";
 
-const CHAVE = "issues.latamtools.votos";
+/**
+ * The stored key keeps its spelling: it is a localStorage key already set on
+ * real machines, and renaming it would throw every vote cast so far away.
+ */
+const STORAGE_KEY = "issues.latamtools.votos";
 
 /**
- * Um voto por navegador, guardado em localStorage — mesma forma do quadro de
- * sugestões do recap. Limpar o storage ou trocar de navegador vota de novo, e
- * tudo bem: o voto é um termômetro de prioridade, não uma eleição. A regra do
- * Firestore garante só que cada escrita mexe em um campo e soma exatamente 1.
+ * One vote per browser, kept in localStorage -- the same shape as the recap's
+ * suggestion board. Clearing the storage or switching browsers votes again, and
+ * that is fine: the vote is a thermometer for priority, not an election. The
+ * Firestore rule only guarantees that each write touches one field and adds
+ * exactly 1.
  */
-function lerVotos(): Record<string, true> {
+function readVotes(): Record<string, true> {
   try {
-    const bruto = localStorage.getItem(CHAVE);
-    return bruto ? (JSON.parse(bruto) as Record<string, true>) : {};
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, true>) : {};
   } catch {
-    // localStorage bloqueado (modo privado antigo, storage cheio): sem memória
-    // de voto, mas o quadro continua funcionando.
+    // localStorage blocked (old private mode, storage full): no memory of the
+    // vote, but the board keeps working.
     return {};
   }
 }
 
-function gravarVotos(votes: Record<string, true>): void {
+function writeVotes(votes: Record<string, true>): void {
   try {
-    localStorage.setItem(CHAVE, JSON.stringify(votes));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(votes));
   } catch {
-    /* sem persistência, segue o jogo */
+    /* no persistence; carry on */
   }
 }
 
 export function useVotes() {
-  const [votes, setVotos] = useState<Record<string, true>>(lerVotos);
+  const [votes, setVotes] = useState<Record<string, true>>(readVotes);
 
   const hasVoted = useCallback((id: string) => votes[id] === true, [votes]);
 
   const vote = useCallback(
     async (id: string) => {
       if (votes[id]) return;
-      // Grava antes de mandar: se a escrita falhar, o pior caso é a pessoa achar
-      // que votou. O contrário — deixar votar de novo por causa de uma falha de
-      // rede — é pior e mais confuso.
-      const nextParams = { ...votes, [id]: true as const };
-      setVotos(nextParams);
-      gravarVotos(nextParams);
+      // Stored before sending: if the write fails, the worst case is somebody
+      // thinking they voted. The opposite -- letting them vote again because of
+      // a network failure -- is worse and more confusing.
+      const next = { ...votes, [id]: true as const };
+      setVotes(next);
+      writeVotes(next);
       await upvoteIssue(id).catch(() => undefined);
     },
     [votes],

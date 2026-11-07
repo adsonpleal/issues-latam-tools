@@ -3,21 +3,21 @@ import { summaryRows } from "./gravacoes";
 
 type Props = {
   replay: ReplaySummary;
-  /** `painel-replay` no painel do card, `gravacao-resumo` na fila. */
+  /** `painel-replay` in the card's panel, `gravacao-resumo` in the queue. */
   className?: string;
 };
 
-/** O resumo do parser, para a triagem ranquear sem baixar o .rrf. */
+/** The parser's summary, for triage to rank without downloading the .rrf. */
 export function RecordingSummary({ replay, className = "painel-replay" }: Props) {
   return (
     <dl className={className}>
-      {summaryRows(replay).map((linha) => (
-        <div key={linha.chave}>
+      {summaryRows(replay).map((row) => (
+        <div key={row.key}>
           <dt>
-            {linha.rotulo}
-            {linha.help && <span className="campo-ajuda"> ({linha.help})</span>}
+            {row.label}
+            {row.help && <span className="campo-ajuda"> ({row.help})</span>}
           </dt>
-          <dd>{linha.value}</dd>
+          <dd>{row.value}</dd>
         </div>
       ))}
     </dl>

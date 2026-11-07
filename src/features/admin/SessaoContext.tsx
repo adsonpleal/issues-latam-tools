@@ -8,87 +8,88 @@ import {
 } from "react";
 
 import {
-  entrar as entrarNoGoogle,
+  signInWithGoogle,
   watchSession,
-  signOut as sairDoGoogle,
+  signOut as signOutOfGoogle,
   maybeHasSession,
   type Session,
 } from "../../lib/auth";
 
 type SessionState = {
   session: Session | null;
-  /** Atalho de `sessao?.admin` — é o que quase todo mundo quer perguntar. */
+  /** Shorthand for `session?.admin` -- what almost everybody wants to ask. */
   admin: boolean;
-  /** Verdadeiro só enquanto o SDK de auth ainda não respondeu. */
+  /** True only while the auth SDK has not answered yet. */
   loading: boolean;
-  /** Liga o observador mesmo sem a marca. Só a /entrar chama. */
-  ativar: () => void;
-  entrar: () => Promise<void>;
+  /** Turns the watcher on even without the mark. Only /entrar calls this. */
+  activate: () => void;
+  signIn: () => Promise<void>;
   signOut: () => Promise<void>;
 };
 
 const Context = createContext<SessionState | null>(null);
 
 /**
- * A sessão de admin, para o app inteiro. Não existe mais rota de admin: cada
- * página pergunta aqui se deve mostrar os controles.
+ * The admin session, for the whole app. There is no admin route any more: each
+ * page asks here whether it should show the controls.
  *
- * O contrato caro é este: **sem a marca em localStorage, nada disto toca o SDK
- * de auth**. Visitante sem marca sai daqui já resolvido, na primeira render, com
- * `carregando: false` — nenhum flash de "carregando", nenhum kB a mais.
+ * This is the contract that costs something: **without the mark in
+ * localStorage, none of this touches the auth SDK**. A visitor with no mark
+ * leaves here already resolved, on the first render, with `loading: false` --
+ * no flash of "loading", not one extra kB.
  */
 export function SessionProvider({ children }: { children: ReactNode }) {
-  // Inicializador do useState, não efeito: o público precisa sair resolvido já
-  // na primeira render, sem uma segunda passada.
-  const [observando, setObservando] = useState(maybeHasSession);
+  // A useState initialiser, not an effect: the public has to come out resolved
+  // on the very first render, without a second pass.
+  const [watching, setWatching] = useState(maybeHasSession);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(observando);
+  const [loading, setLoading] = useState(watching);
 
   useEffect(() => {
-    if (!observando) return;
+    if (!watching) return;
     let cancel: (() => void) | undefined;
-    let vivo = true;
+    let alive = true;
     void watchSession((s) => {
       setSession(s);
       setLoading(false);
     })
       .then((fn) => {
-        // O import dinâmico do SDK pode terminar depois da desmontagem.
-        if (vivo) cancel = fn;
+        // The SDK's dynamic import can finish after the unmount.
+        if (alive) cancel = fn;
         else fn();
       })
       .catch(() => {
-        // Offline, ou bloqueador comendo o chunk. Sem este ramo o quadro ficaria
-        // preso em "carregando" para sempre, porque as páginas esperam a sessão
-        // resolver antes de assinar o Firestore.
-        if (vivo) setLoading(false);
+        // Offline, or a blocker eating the chunk. Without this branch the board
+        // would be stuck on "loading" forever, because the pages wait for the
+        // session to resolve before subscribing to Firestore.
+        if (alive) setLoading(false);
       });
     return () => {
-      vivo = false;
+      alive = false;
       cancel?.();
     };
-  }, [observando]);
+  }, [watching]);
 
-  // Ligar o observador sem marca nenhuma. O guarda importa: chamar de novo
-  // depois de resolvido prenderia `carregando` em true para sempre, porque o
-  // onAuthStateChanged não dispara uma segunda vez.
-  const ativar = useCallback(() => {
-    if (observando) return;
-    setObservando(true);
+  // Turning the watcher on with no mark at all. The guard matters: calling it
+  // again after it has resolved would pin `loading` to true forever, because
+  // onAuthStateChanged does not fire a second time.
+  const activate = useCallback(() => {
+    if (watching) return;
+    setWatching(true);
     setLoading(true);
-  }, [observando]);
+  }, [watching]);
 
-  const entrar = useCallback(async () => {
-    await entrarNoGoogle();
+  const signIn = useCallback(async () => {
+    await signInWithGoogle();
   }, []);
 
   const signOut = useCallback(async () => {
-    await sairDoGoogle();
+    await signOutOfGoogle();
   }, []);
 
   return (
     <Context.Provider
-      value={{ session, admin: Boolean(session?.admin), loading, ativar, entrar, signOut }}
+      value={{ session, admin: Boolean(session?.admin), loading, activate, signIn, signOut }}
     >
       {children}
     </Context.Provider>
@@ -97,6 +98,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
 export function useSession(): SessionState {
   const state = useContext(Context);
-  if (!state) throw new Error("useSessao fora do SessaoProvider");
+  if (!state) throw new Error("useSession outside SessionProvider");
   return state;
 }

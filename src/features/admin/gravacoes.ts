@@ -3,15 +3,16 @@ import type { Recording } from "../../lib/gravacoes";
 import type { ReplaySummary } from "../../lib/issues";
 
 /**
- * A fila da triagem, em três pilhas.
+ * The triage queue, in three stacks.
  *
- * `fila` é o que espera decisão; `decididas` junta conferida e descartada, que
- * são as duas formas de fechar sem publicar; `promovidas` já viraram card.
+ * `queue` is what awaits a decision; `decided` joins `conferida` and
+ * `descartada`, the two ways of closing without publishing; `promoted` already
+ * became a card.
  */
 export type RecordingQueue = {
   queue: Recording[];
-  promovidas: Recording[];
-  decididas: Recording[];
+  promoted: Recording[];
+  decided: Recording[];
 };
 
 function timeOf(d: Date | null): number {
@@ -19,87 +20,87 @@ function timeOf(d: Date | null): number {
 }
 
 export function splitRecordings(recordings: Recording[]): RecordingQueue {
-  // A fila ordena pela chegada; as decididas, pelo carimbo — ali o que interessa
-  // é o que acabou de sair, não o que foi gravado primeiro.
-  const porChegada = (a: Recording, b: Recording) => timeOf(b.createdAt) - timeOf(a.createdAt);
-  const porDecisao = (a: Recording, b: Recording) => timeOf(b.decidedAt) - timeOf(a.decidedAt);
+  // The queue sorts by arrival; the decided ones by the stamp -- there what
+  // matters is what just left, not what was recorded first.
+  const byArrival = (a: Recording, b: Recording) => timeOf(b.createdAt) - timeOf(a.createdAt);
+  const byDecision = (a: Recording, b: Recording) => timeOf(b.decidedAt) - timeOf(a.decidedAt);
 
   return {
-    queue: recordings.filter((g) => g.state === "fila").sort(porChegada),
-    promovidas: recordings.filter((g) => g.state === "promovida").sort(porDecisao),
-    decididas: recordings
+    queue: recordings.filter((g) => g.state === "fila").sort(byArrival),
+    promoted: recordings.filter((g) => g.state === "promovida").sort(byDecision),
+    decided: recordings
       .filter((g) => g.state === "conferida" || g.state === "descartada")
-      .sort(porDecisao),
+      .sort(byDecision),
   };
 }
 
-/** "2m 13s". O .rrf mede em milissegundos, e ninguém lê 133400 como dois minutos. */
+/** "2m 13s". The .rrf measures in milliseconds, and nobody reads 133400 as two minutes. */
 export function formatDuration(ms: unknown): string | null {
   if (typeof ms !== "number" || !Number.isFinite(ms) || ms <= 0) return null;
   const total = Math.round(ms / 1000);
   const min = Math.floor(total / 60);
-  const seg = total % 60;
-  return min ? `${min}m ${seg}s` : `${seg}s`;
+  const sec = total % 60;
+  return min ? `${min}m ${sec}s` : `${sec}s`;
 }
 
-export type SummaryRow = { chave: string; rotulo: string; value: string; help?: string };
+export type SummaryRow = { key: string; label: string; value: string; help?: string };
 
 /**
- * O que a triagem lê de uma gravação, numa lista só — a mesma na fila e no
- * painel do card promovido. Ficar num lugar é o que impede as duas telas de
- * discordarem sobre o que importa: trocas de equipamento separam "fórmula
- * errada" de "item faltando no banco", e golpes em dummy é o que gera crítico
- * suficiente para fechar a conta.
+ * What triage reads off a recording, in a single list -- the same one in the
+ * queue and in the promoted card's panel. Living in one place is what stops the
+ * two screens from disagreeing about what matters: equipment changes separate
+ * "wrong formula" from "item missing from the database", and dummy hits are what
+ * produce enough crits to close the arithmetic.
  */
 export function summaryRows(replay: ReplaySummary): SummaryRow[] {
   const rows: SummaryRow[] = [
     {
-      chave: "personagem",
-      rotulo: t.recordingCharacter,
+      key: "character",
+      label: t.recordingCharacter,
       value: `${replay.className ?? "?"} — ${replay.player ?? "?"} (nv ${replay.baseLevel ?? "?"}/${
         replay.jobLevel ?? "?"
       })`,
     },
     {
-      chave: "golpes",
-      rotulo: t.recordingHits,
+      key: "hits",
+      label: t.recordingHits,
       value: `${replay.dummyHits ?? 0} em dummy · ${replay.damageEvents ?? 0} no total`,
     },
-    { chave: "trocas", rotulo: t.recordingEquipChanges, value: String(replay.equipChangeCount ?? 0) },
+    { key: "changes", label: t.recordingEquipChanges, value: String(replay.equipChangeCount ?? 0) },
   ];
 
   if (replay.traits && Object.keys(replay.traits).length > 0) {
     rows.push({
-      chave: "talentos",
-      rotulo: t.recordingTraits,
-      // Separador visível: o espaço duplo que estava aqui antes colapsava para
-      // um só no HTML, e "POW 10 CON 5" lia como um número atrás do outro.
+      key: "traits",
+      label: t.recordingTraits,
+      // A visible separator: the double space that used to be here collapsed to
+      // one in the HTML, and "POW 10 CON 5" read as one number after another.
       value: Object.entries(replay.traits)
         .map(([k, v]) => `${k.toUpperCase()} ${v}`)
         .join(" · "),
-      // De onde vieram muda o peso: lido da gravação é fato, informado no
-      // formulário é palavra de quem gravou.
+      // Where they came from changes the weight: read off the recording is a
+      // fact, typed into the form is the word of whoever recorded it.
       help: replay.traitsSource === "replay" ? t.traitsFromRecording : t.traitsFromForm,
     });
   }
 
   if (replay.skippedItems && replay.skippedItems.length > 0) {
     rows.push({
-      chave: "itens",
-      rotulo: t.recordingUnknownItems,
+      key: "items",
+      label: t.recordingUnknownItems,
       value: replay.skippedItems.join(", "),
     });
   }
 
-  const duracao = formatDuration(replay.durationMs);
-  if (duracao) rows.push({ chave: "duracao", rotulo: t.recordingDuration, value: duracao });
+  const duration = formatDuration(replay.durationMs);
+  if (duration) rows.push({ key: "duration", label: t.recordingDuration, value: duration });
 
-  // A migração escreveu string vazia quando a origem não tinha o campo, por isso
-  // `||` e não `??`.
-  rows.push({ chave: "versao", rotulo: t.recordingAppVersion, value: replay.appVersion || "?" });
+  // The migration wrote an empty string when the source had no such field,
+  // which is why this is `||` and not `??`.
+  rows.push({ key: "version", label: t.recordingAppVersion, value: replay.appVersion || "?" });
 
   if (replay.fileName) {
-    rows.push({ chave: "arquivo", rotulo: t.recordingFile, value: replay.fileName });
+    rows.push({ key: "file", label: t.recordingFile, value: replay.fileName });
   }
 
   return rows;

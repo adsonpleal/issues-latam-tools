@@ -11,7 +11,7 @@ export type Filters = {
 
 export const NO_FILTERS: Filters = { project: null, type: null, search: "" };
 
-/** Sem acento e em minúsculas, para "gravitacional" achar "Gravitacional". */
+/** Lowercase and unaccented, so "gravitacional" finds "Gravitacional". */
 function normalise(s: string): string {
   return s
     .toLocaleLowerCase("pt-BR")
@@ -20,11 +20,11 @@ function normalise(s: string): string {
 }
 
 export function filter(issues: Issue[], filters: Filters): Issue[] {
-  const termo = normalise(filters.search.trim());
+  const term = normalise(filters.search.trim());
   return issues.filter((i) => {
     if (filters.project && i.project !== filters.project) return false;
     if (filters.type && i.type !== filters.type) return false;
-    if (termo && !normalise(`${i.title} ${i.description}`).includes(termo)) return false;
+    if (term && !normalise(`${i.title} ${i.description}`).includes(term)) return false;
     return true;
   });
 }
@@ -34,27 +34,27 @@ function timeOf(d: Date | null): number {
 }
 
 /**
- * A coluna onde o card aparece. `arquivado` não é status: é o booleano que tira
- * o card das cinco colunas e o joga na gaveta.
+ * The column a card shows in. `arquivado` is not a status: it is the boolean
+ * that takes the card out of the five columns and drops it in the drawer.
  */
 export function columnOf(issue: Issue): Column {
   return issue.archived ? "arquivado" : issue.status;
 }
 
 function compare(a: Issue, b: Issue, column: Column): number {
-  // Arrumado à mão manda em tudo. Quem não foi arrumado flui embaixo, pela
-  // regra da coluna — é o que faz um card novo cair no fim de uma pilha
-  // arrumada em vez de se enfiar no meio dela.
+  // Arranged by hand wins over everything. Whatever was not arranged flows
+  // below it by the column's own rule -- that is what makes a new card land at
+  // the end of an arranged stack instead of wedging into the middle of it.
   if (a.order !== null || b.order !== null) {
     if (a.order === null) return 1;
     if (b.order === null) return -1;
     if (a.order !== b.order) return a.order - b.order;
   }
   if (sortsByUpdatedAt(column)) {
-    // Colunas de encerramento: o que saiu mais recentemente vem primeiro.
+    // The closing columns: whatever shipped most recently comes first.
     return timeOf(b.updatedAt) - timeOf(a.updatedAt);
   }
-  // Resto do quadro: mais votado primeiro, empate desempatado pelo mais novo.
+  // The rest of the board: most voted first, ties broken by the newest.
   if (b.upvotes !== a.upvotes) return b.upvotes - a.upvotes;
   return timeOf(b.createdAt) - timeOf(a.createdAt);
 }
@@ -62,32 +62,33 @@ function compare(a: Issue, b: Issue, column: Column): number {
 export type ColumnGroup = { column: Column; issues: Issue[] };
 
 /**
- * A pilha de uma coluna, na ordem da tela.
+ * One column's stack, in screen order.
  *
- * O agrupamento passa a lista já filtrada; quem vai **gravar** ordem passa a
- * lista inteira, sem filtro. Isso não é detalhe: arrastar com um filtro ligado
- * não pode embaralhar o que o filtro está escondendo. Como a pilha completa
- * preserva a posição relativa dos escondidos, "soltar antes do card X" quer
- * dizer a mesma coisa nas duas.
+ * Grouping passes the already-filtered list; anything about to **write** an
+ * order passes the whole list, unfiltered. That is not a detail: dragging with
+ * a filter on must not shuffle what the filter is hiding. Because the complete
+ * stack preserves the relative position of the hidden cards, "drop before card
+ * X" means the same thing in both.
  */
 export function stack(issues: Issue[], column: Column): Issue[] {
   return issues.filter((i) => columnOf(i) === column).sort((a, b) => compare(a, b, column));
 }
 
 /**
- * Filtra, agrupa por status e ordena. Função pura de propósito — é a única parte
- * do quadro que dá para testar sem Firestore, e é onde mora toda a lógica.
+ * Filters, groups by status and sorts. A pure function on purpose -- it is the
+ * one part of the board that can be tested without Firestore, and it is where
+ * all the logic lives.
  */
 export function group(issues: Issue[], filters: Filters): ColumnGroup[] {
-  const visiveis = filter(issues, filters);
+  const visible = filter(issues, filters);
   return COLUMNS.map((column) => ({
     column: column as Column,
-    issues: stack(visiveis, column),
+    issues: stack(visible, column),
   }));
 }
 
-/** Igual ao `agrupar`, mais a gaveta de arquivados no fim. Só com sessão. */
+/** Same as `group`, plus the archived drawer at the end. Only with a session. */
 export function groupForAdmin(issues: Issue[], filters: Filters): ColumnGroup[] {
-  const visiveis = filter(issues, filters);
-  return ADMIN_COLUMNS.map((column) => ({ column, issues: stack(visiveis, column) }));
+  const visible = filter(issues, filters);
+  return ADMIN_COLUMNS.map((column) => ({ column, issues: stack(visible, column) }));
 }

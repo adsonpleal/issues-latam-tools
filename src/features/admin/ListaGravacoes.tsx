@@ -8,63 +8,63 @@ import { getRecordingFile, type RecordingState, type Recording } from "../../lib
 import { RecordingSummary } from "./ResumoGravacao";
 
 type Actions = {
-  onPromover: (g: Recording) => void;
+  onPromote: (g: Recording) => void;
   onMark: (id: string, state: RecordingState) => void;
   onDelete: (id: string) => void;
 };
 
 type Props = Actions & {
   queue: Recording[];
-  promovidas: Recording[];
-  decididas: Recording[];
+  promoted: Recording[];
+  decided: Recording[];
   loading: boolean;
   error: string | null;
 };
 
 export function RecordingList({
   queue,
-  promovidas,
-  decididas,
+  promoted,
+  decided,
   loading,
   error,
   ...actions
 }: Props) {
   if (error) return <p className="aviso aviso-erro">{t.recordingsError}</p>;
   if (loading) return <p className="aviso">{t.loading}</p>;
-  if (queue.length + promovidas.length + decididas.length === 0) {
+  if (queue.length + promoted.length + decided.length === 0) {
     return <p className="aviso">{t.recordingsEmpty}</p>;
   }
 
   return (
     <>
-      <Secao title={t.recordingsQueue} help={t.recordingsQueueHelp} recordings={queue} empty={t.queueEmpty}>
-        {(g) => <Ficha key={g.id} recording={g} {...actions} />}
-      </Secao>
+      <Section title={t.recordingsQueue} help={t.recordingsQueueHelp} recordings={queue} empty={t.queueEmpty}>
+        {(g) => <RecordingRow key={g.id} recording={g} {...actions} />}
+      </Section>
 
-      {promovidas.length > 0 && (
-        <Secao
+      {promoted.length > 0 && (
+        <Section
           title={t.recordingsPromoted}
           help={t.recordingsPromotedHelp}
-          recordings={promovidas}
+          recordings={promoted}
         >
-          {(g) => <Ficha key={g.id} recording={g} {...actions} />}
-        </Secao>
+          {(g) => <RecordingRow key={g.id} recording={g} {...actions} />}
+        </Section>
       )}
 
-      {decididas.length > 0 && (
-        <Secao
+      {decided.length > 0 && (
+        <Section
           title={t.recordingsClosed}
           help={t.recordingsClosedHelp}
-          recordings={decididas}
+          recordings={decided}
         >
-          {(g) => <Ficha key={g.id} recording={g} {...actions} />}
-        </Secao>
+          {(g) => <RecordingRow key={g.id} recording={g} {...actions} />}
+        </Section>
       )}
     </>
   );
 }
 
-function Secao({
+function Section({
   title,
   help,
   recordings,
@@ -92,14 +92,14 @@ function Secao({
   );
 }
 
-function Ficha({
+function RecordingRow({
   recording,
-  onPromover,
+  onPromote,
   onMark,
   onDelete,
 }: Actions & { recording: Recording }) {
   const inQueue = recording.state === "fila";
-  const promovida = recording.state === "promovida";
+  const isPromoted = recording.state === "promovida";
 
   return (
     <li className="gravacao">
@@ -126,8 +126,9 @@ function Ficha({
       )}
 
       <div className="gravacao-rodape">
-        {/* Nick e contato só existem nesta tela: a coleção é privada, e o nick
-            só chega ao público se a ficha virar card. */}
+        {/* The nick and the contact exist only on this screen: the collection is
+            private, and the nick only reaches the public if the recording
+            becomes a card. */}
         {recording.nick && <span className="issue-card-meta">{t.reportedBy(recording.nick)}</span>}
         {recording.contact && (
           <span className="issue-card-meta">
@@ -138,7 +139,7 @@ function Ficha({
           {formatRelative(recording.createdAt)}
         </time>
         <span className="issue-card-meta">{formatSize(recording.size)}</span>
-        {promovida && recording.issueId && (
+        {isPromoted && recording.issueId && (
           <Link className="issue-card-meta" to={`/t/${recording.issueId}`}>
             {t.viewCard}
           </Link>
@@ -146,7 +147,7 @@ function Ficha({
       </div>
 
       <div className="gravacao-acoes">
-        <BotaoBaixar recording={recording} />
+        <DownloadButton recording={recording} />
 
         {inQueue ? (
           <>
@@ -170,15 +171,15 @@ function Ficha({
               type="button"
               className="botao botao-primario botao-pequeno"
               title={t.promoteTitle}
-              onClick={() => onPromover(recording)}
+              onClick={() => onPromote(recording)}
             >
               {t.promote}
             </button>
           </>
         ) : (
-          // Promovida não volta para a fila: o card já existe, e o caminho de
-          // desfazer é arquivá-lo no quadro.
-          !promovida && (
+          // A promoted recording does not go back to the queue: the card already
+          // exists, and the way to undo it is to archive it on the board.
+          !isPromoted && (
             <>
               <button
                 type="button"
@@ -192,8 +193,9 @@ function Ficha({
                 className="botao botao-pequeno botao-perigo"
                 title={t.deleteRecordingTitle}
                 onClick={() => {
-                  // Apagar é para upload que não devia ter entrado, e não tem
-                  // volta — por isso é o único clique do site que pergunta.
+                  // Deleting is for an upload that should never have arrived,
+                  // and there is no way back -- which is why it is the only
+                  // click on the site that asks.
                   if (window.confirm(t.deleteRecordingConfirm(recording.title))) {
                     onDelete(recording.id);
                   }
@@ -210,10 +212,10 @@ function Ficha({
 }
 
 /**
- * O .rrf mora num subdocumento, então só é baixado quando alguém pede — a lista
- * inteira com os arquivos dentro seriam megabytes por abertura de página.
+ * The .rrf lives in a subdocument, so it is only downloaded when somebody asks
+ * -- the whole list with the files inside would be megabytes per page open.
  */
-function BotaoBaixar({ recording }: { recording: Recording }) {
+function DownloadButton({ recording }: { recording: Recording }) {
   const [state, setState] = useState<"ready" | "downloading" | "error">("ready");
 
   async function download() {
@@ -223,10 +225,10 @@ function BotaoBaixar({ recording }: { recording: Recording }) {
       setState("error");
       return;
     }
-    // Uint8Array vindo do Firestore pode ter byteOffset; o slice normaliza.
-    const copia = file.bytes.slice();
+    // A Uint8Array off Firestore may carry a byteOffset; the slice normalises it.
+    const copy = file.bytes.slice();
     const url = URL.createObjectURL(
-      new Blob([copia as unknown as BlobPart], { type: "application/octet-stream" }),
+      new Blob([copy as unknown as BlobPart], { type: "application/octet-stream" }),
     );
     const a = document.createElement("a");
     a.href = url;

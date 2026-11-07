@@ -10,20 +10,21 @@ import { useSession } from "../features/admin/SessaoContext";
 import { NotFoundPage } from "./NotFoundPage";
 
 /**
- * A caixa de entrada das gravações do "Ajude o simulador a acertar as contas".
+ * The inbox for the recordings from "Ajude o simulador a acertar as contas".
  *
- * Elas não são cards: vivem numa coleção que só o admin lê, e o botão Promover é
- * o que cria a ficha pública com o .rrf anexado. Antes disso não existe URL que
- * devolva a gravação para ninguém — que é o que o consentimento promete.
+ * They are not cards: they live in a collection only the admin reads, and the
+ * Promote button is what creates the public record with the .rrf attached.
+ * Before that there is no URL that hands the recording to anybody -- which is
+ * what the consent promises.
  *
- * Sem sessão de admin a página é "não encontrado", igual a qualquer endereço que
- * não existe: nem a existência da fila é resposta que se deva a alguém.
+ * Without an admin session the page is "not found", like any address that does
+ * not exist: not even the queue's existence is an answer anybody is owed.
  */
 export function GravacoesPage() {
   const { admin, loading } = useSession();
 
-  // Sem o ramo de carregando, o próprio admin veria um lampejo de 404 a cada
-  // recarga, enquanto o SDK de auth ainda estivesse subindo.
+  // Without the loading branch the admin themself would see a flash of 404 on
+  // every reload, while the auth SDK was still coming up.
   if (loading) return <p className="aviso">{t.loading}</p>;
   if (!admin) return <NotFoundPage />;
 
@@ -33,7 +34,7 @@ export function GravacoesPage() {
 function Queue() {
   useSeo({ title: `${t.recordingsTitle} — ${t.siteName}`, path: "/gravacoes" });
   const { recordings, loading, error, actionError, promote, mark, remove } = useRecordings();
-  const { queue, promovidas, decididas } = useMemo(() => splitRecordings(recordings), [recordings]);
+  const { queue, promoted, decided } = useMemo(() => splitRecordings(recordings), [recordings]);
 
   return (
     <div className="pagina">
@@ -47,11 +48,11 @@ function Queue() {
       {actionError && <p className="aviso aviso-erro">{actionError}</p>}
       <RecordingList
         queue={queue}
-        promovidas={promovidas}
-        decididas={decididas}
+        promoted={promoted}
+        decided={decided}
         loading={loading}
         error={error}
-        onPromover={(g) => void promote(g)}
+        onPromote={(g) => void promote(g)}
         onMark={(id, state) => void mark(id, state)}
         onDelete={(id) => void remove(id)}
       />

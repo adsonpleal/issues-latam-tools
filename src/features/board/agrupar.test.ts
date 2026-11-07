@@ -9,6 +9,7 @@ function issue(over: Partial<Issue> & { id: string }): Issue {
     title: "titulo",
     description: "descricao",
     type: "bug",
+    // The column values are stored on the document, so they keep their spelling.
     status: "reportado",
     archived: false,
     upvotes: 0,
@@ -23,44 +24,44 @@ function issue(over: Partial<Issue> & { id: string }): Issue {
   };
 }
 
-describe("filtrar", () => {
+describe("filter", () => {
   const base = [
     issue({ id: "a", project: "simulador", type: "bug", title: "Carta Mosca Caçadora" }),
     issue({ id: "b", project: "recap", type: "feature", title: "Falta Ceifador de Almas" }),
     issue({ id: "c", project: "simulador", type: "feature", description: "tooltip no item" }),
   ];
 
-  it("sem filtro devolve tudo", () => {
+  it("returns everything with no filter", () => {
     expect(filter(base, NO_FILTERS)).toHaveLength(3);
   });
 
-  it("filtra por projeto", () => {
+  it("filters by project", () => {
     const r = filter(base, { ...NO_FILTERS, project: "simulador" });
     expect(r.map((i) => i.id)).toEqual(["a", "c"]);
   });
 
-  it("filtra por tipo", () => {
+  it("filters by type", () => {
     const r = filter(base, { ...NO_FILTERS, type: "feature" });
     expect(r.map((i) => i.id)).toEqual(["b", "c"]);
   });
 
-  it("combina projeto e tipo", () => {
+  it("combines project and type", () => {
     const r = filter(base, { ...NO_FILTERS, project: "simulador", type: "feature" });
     expect(r.map((i) => i.id)).toEqual(["c"]);
   });
 
-  it("busca ignora acento e caixa", () => {
+  it("searches past accents and case", () => {
     expect(filter(base, { ...NO_FILTERS, search: "cacadora" }).map((i) => i.id)).toEqual(["a"]);
     expect(filter(base, { ...NO_FILTERS, search: "CEIFADOR" }).map((i) => i.id)).toEqual(["b"]);
   });
 
-  it("busca também na descrição", () => {
+  it("searches the description too", () => {
     expect(filter(base, { ...NO_FILTERS, search: "tooltip" }).map((i) => i.id)).toEqual(["c"]);
   });
 });
 
-describe("agrupar", () => {
-  it("devolve as cinco colunas na ordem, mesmo vazias", () => {
+describe("group", () => {
+  it("returns the five columns in order, even empty", () => {
     const r = group([], NO_FILTERS);
     expect(r.map((c) => c.column)).toEqual([
       "reportado",
@@ -72,34 +73,34 @@ describe("agrupar", () => {
     expect(r.every((c) => c.issues.length === 0)).toBe(true);
   });
 
-  it("nunca mostra arquivado — nem quando o status ainda é público", () => {
+  it("never shows an archived card -- not even while the status is still public", () => {
     const r = group([issue({ id: "x", status: "resolvido", archived: true })], NO_FILTERS);
     expect(r.flatMap((c) => c.issues)).toHaveLength(0);
   });
 
-  it("ordena as colunas abertas por votos e desempata pelo mais novo", () => {
+  it("sorts the open columns by votes and breaks ties by the newest", () => {
     const r = group(
       [
-        issue({ id: "poucos", upvotes: 1, createdAt: new Date("2026-05-01") }),
-        issue({ id: "muitos", upvotes: 9, createdAt: new Date("2026-01-01") }),
-        issue({ id: "novo", upvotes: 1, createdAt: new Date("2026-06-01") }),
+        issue({ id: "few-votes", upvotes: 1, createdAt: new Date("2026-05-01") }),
+        issue({ id: "many-votes", upvotes: 9, createdAt: new Date("2026-01-01") }),
+        issue({ id: "newer", upvotes: 1, createdAt: new Date("2026-06-01") }),
       ],
       NO_FILTERS,
     );
-    expect(r[0]?.issues.map((i) => i.id)).toEqual(["muitos", "novo", "poucos"]);
+    expect(r[0]?.issues.map((i) => i.id)).toEqual(["many-votes", "newer", "few-votes"]);
   });
 
-  it("ordena resolvido pela última atualização, não por votos", () => {
+  it("sorts resolvido by the last update, not by votes", () => {
     const r = group(
       [
         issue({
-          id: "antigo",
+          id: "older",
           status: "resolvido",
           upvotes: 99,
           updatedAt: new Date("2026-01-01"),
         }),
         issue({
-          id: "recente",
+          id: "recent",
           status: "resolvido",
           upvotes: 0,
           updatedAt: new Date("2026-08-01"),
@@ -107,54 +108,54 @@ describe("agrupar", () => {
       ],
       NO_FILTERS,
     );
-    const resolvido = r.find((c) => c.column === "resolvido");
-    expect(resolvido?.issues.map((i) => i.id)).toEqual(["recente", "antigo"]);
+    const resolved = r.find((c) => c.column === "resolvido");
+    expect(resolved?.issues.map((i) => i.id)).toEqual(["recent", "older"]);
   });
 
-  it("ordem arrumada à mão manda mais que os votos", () => {
+  it("an order arranged by hand outranks the votes", () => {
     const r = group(
       [
-        issue({ id: "campeao", upvotes: 99 }),
-        issue({ id: "fixado", upvotes: 0, order: 0 }),
+        issue({ id: "champion", upvotes: 99 }),
+        issue({ id: "pinned", upvotes: 0, order: 0 }),
       ],
       NO_FILTERS,
     );
-    expect(r[0]?.issues.map((i) => i.id)).toEqual(["fixado", "campeao"]);
+    expect(r[0]?.issues.map((i) => i.id)).toEqual(["pinned", "champion"]);
   });
 
-  it("quem não foi arrumado flui embaixo da pilha arrumada, pela regra da coluna", () => {
+  it("whoever was not arranged flows below the arranged stack, by the column's rule", () => {
     const r = group(
       [
-        issue({ id: "solto-pouco", upvotes: 1 }),
-        issue({ id: "fixado-2", order: 1 }),
-        issue({ id: "solto-muito", upvotes: 8 }),
-        issue({ id: "fixado-1", order: 0 }),
+        issue({ id: "loose-few", upvotes: 1 }),
+        issue({ id: "pinned-2", order: 1 }),
+        issue({ id: "loose-many", upvotes: 8 }),
+        issue({ id: "pinned-1", order: 0 }),
       ],
       NO_FILTERS,
     );
     expect(r[0]?.issues.map((i) => i.id)).toEqual([
-      "fixado-1",
-      "fixado-2",
-      "solto-muito",
-      "solto-pouco",
+      "pinned-1",
+      "pinned-2",
+      "loose-many",
+      "loose-few",
     ]);
   });
 
-  it("a ordem manual também vale nas colunas de encerramento", () => {
+  it("the manual order holds in the closing columns too", () => {
     const r = group(
       [
-        issue({ id: "recente", status: "resolvido", updatedAt: new Date("2026-08-01") }),
-        issue({ id: "fixado", status: "resolvido", updatedAt: new Date("2026-01-01"), order: 0 }),
+        issue({ id: "recent", status: "resolvido", updatedAt: new Date("2026-08-01") }),
+        issue({ id: "pinned", status: "resolvido", updatedAt: new Date("2026-01-01"), order: 0 }),
       ],
       NO_FILTERS,
     );
     expect(r.find((c) => c.column === "resolvido")?.issues.map((i) => i.id)).toEqual([
-      "fixado",
-      "recente",
+      "pinned",
+      "recent",
     ]);
   });
 
-  it("aplica o filtro de projeto dentro das colunas", () => {
+  it("applies the project filter inside the columns", () => {
     const r = group(
       [
         issue({ id: "a", project: "recap" }),
@@ -166,34 +167,34 @@ describe("agrupar", () => {
   });
 });
 
-describe("pilha", () => {
-  it("devolve a coluna inteira, ignorando qualquer filtro", () => {
+describe("stack", () => {
+  it("returns the whole column, ignoring any filter", () => {
     const r = stack(
       [
         issue({ id: "a", status: "backlog", upvotes: 1, project: "recap" }),
         issue({ id: "b", status: "backlog", upvotes: 5, project: "calc" }),
-        issue({ id: "fora", status: "reportado" }),
+        issue({ id: "outside", status: "reportado" }),
       ],
       "backlog",
     );
     expect(r.map((i) => i.id)).toEqual(["b", "a"]);
   });
 
-  it("a gaveta de arquivados é uma pilha como as outras", () => {
+  it("the archive drawer is a stack like any other", () => {
     const r = stack([issue({ id: "x", status: "resolvido", archived: true })], "arquivado");
     expect(r.map((i) => i.id)).toEqual(["x"]);
   });
 });
 
-describe("agruparAdmin", () => {
-  it("acrescenta a coluna de arquivados no fim", () => {
+describe("groupForAdmin", () => {
+  it("adds the archive column at the end", () => {
     const r = groupForAdmin([issue({ id: "x", archived: true })], NO_FILTERS);
     expect(r).toHaveLength(6);
     expect(r[5]?.column).toBe("arquivado");
     expect(r[5]?.issues.map((i) => i.id)).toEqual(["x"]);
   });
 
-  it("card arquivado sai da coluna de status original", () => {
+  it("an archived card leaves its original status column", () => {
     const r = groupForAdmin(
       [issue({ id: "x", status: "em_progresso", archived: true })],
       NO_FILTERS,

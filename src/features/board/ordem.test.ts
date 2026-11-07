@@ -23,53 +23,53 @@ function issue(id: string, order: number | null = null): Issue {
   };
 }
 
-/** A pilha como ela fica depois das escritas, para conferir o resultado visual. */
-function aplicar(stack: Issue[], escritas: { id: string; order: number | null }[]): string[] {
-  const mapa = new Map(escritas.map((e) => [e.id, e.order]));
+/** The stack as it ends up after the writes, to check the visual result. */
+function apply(stack: Issue[], writes: { id: string; order: number | null }[]): string[] {
+  const byId = new Map(writes.map((w) => [w.id, w.order]));
   return stack
-    .map((i) => ({ id: i.id, order: mapa.has(i.id) ? (mapa.get(i.id) ?? null) : i.order }))
+    .map((i) => ({ id: i.id, order: byId.has(i.id) ? (byId.get(i.id) ?? null) : i.order }))
     .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity))
     .map((i) => i.id);
 }
 
-describe("reordenarPilha", () => {
+describe("reorderStack", () => {
   const stack = [issue("a"), issue("b"), issue("c")];
 
-  it("numera a pilha inteira no primeiro arrasto", () => {
-    const escritas = reorderStack(stack, stack[2]!, "a", true);
-    expect(escritas).toEqual([
+  it("numbers the whole stack on the first drag", () => {
+    const writes = reorderStack(stack, stack[2]!, "a", true);
+    expect(writes).toEqual([
       { id: "c", order: 0 },
       { id: "a", order: 1 },
       { id: "b", order: 2 },
     ]);
   });
 
-  it("soltar depois do alvo põe o card logo abaixo dele", () => {
-    const escritas = reorderStack(stack, stack[0]!, "b", false);
-    expect(aplicar(stack, escritas)).toEqual(["b", "a", "c"]);
+  it("dropping after the target puts the card right below it", () => {
+    const writes = reorderStack(stack, stack[0]!, "b", false);
+    expect(apply(stack, writes)).toEqual(["b", "a", "c"]);
   });
 
-  it("grava só o que mudou de posição", () => {
-    const arrumada = [issue("a", 0), issue("b", 1), issue("c", 2)];
-    const escritas = reorderStack(arrumada, arrumada[1]!, "c", false);
-    expect(escritas).toEqual([
+  it("writes only what changed position", () => {
+    const arranged = [issue("a", 0), issue("b", 1), issue("c", 2)];
+    const writes = reorderStack(arranged, arranged[1]!, "c", false);
+    expect(writes).toEqual([
       { id: "c", order: 1 },
       { id: "b", order: 2 },
     ]);
   });
 
-  it("soltar em cima de si mesmo não escreve nada", () => {
+  it("dropping onto itself writes nothing", () => {
     expect(reorderStack(stack, stack[1]!, "b", true)).toEqual([]);
   });
 
-  it("alvo fora da pilha não escreve nada", () => {
-    expect(reorderStack(stack, stack[0]!, "sumiu", true)).toEqual([]);
+  it("a target outside the stack writes nothing", () => {
+    expect(reorderStack(stack, stack[0]!, "gone", true)).toEqual([]);
   });
 
-  it("card vindo de outra coluna entra na pilha de destino", () => {
-    const deOutraColuna = issue("z", 7);
-    const escritas = reorderStack(stack, deOutraColuna, "b", true);
-    expect(escritas).toEqual([
+  it("a card arriving from another column joins the destination stack", () => {
+    const fromAnotherColumn = issue("z", 7);
+    const writes = reorderStack(stack, fromAnotherColumn, "b", true);
+    expect(writes).toEqual([
       { id: "a", order: 0 },
       { id: "z", order: 1 },
       { id: "b", order: 2 },
@@ -77,17 +77,17 @@ describe("reordenarPilha", () => {
     ]);
   });
 
-  it("posição é gravada sobre a pilha inteira, não sobre o que o filtro mostra", () => {
-    // "b" está escondido por um filtro; arrastar "c" para cima de "a" não pode
-    // levá-lo junto nem trocá-lo de lugar com quem ele nunca viu.
-    const completa = [issue("a", 0), issue("b", 1), issue("c", 2)];
-    const escritas = reorderStack(completa, completa[2]!, "a", true);
-    expect(aplicar(completa, escritas)).toEqual(["c", "a", "b"]);
+  it("writes the position over the whole stack, not over what the filter shows", () => {
+    // "b" is hidden by a filter; dragging "c" onto "a" must not carry it along
+    // nor swap it with somebody it never saw.
+    const whole = [issue("a", 0), issue("b", 1), issue("c", 2)];
+    const writes = reorderStack(whole, whole[2]!, "a", true);
+    expect(apply(whole, writes)).toEqual(["c", "a", "b"]);
   });
 });
 
-describe("soltarPilha", () => {
-  it("apaga o número de quem tem um, e só", () => {
+describe("releaseStack", () => {
+  it("clears the number from whoever has one, and only those", () => {
     expect(releaseStack([issue("a", 0), issue("b"), issue("c", 1)])).toEqual([
       { id: "a", order: null },
       { id: "c", order: null },

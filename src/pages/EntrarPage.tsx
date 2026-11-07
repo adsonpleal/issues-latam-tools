@@ -6,28 +6,28 @@ import { useSeo } from "../lib/seo";
 import { useSession } from "../features/admin/SessaoContext";
 
 /**
- * A única porta. Não é linkada de lugar nenhum — e não precisa ser: só existe um
- * admin, e ele sabe o endereço.
+ * The only door. It is linked from nowhere -- and does not need to be: there is
+ * exactly one admin, and they know the address.
  *
- * Ela liga o observador de sessão sem consultar a marca em localStorage, e é
- * isso que a torna o conserto para quando a marca se perde (storage limpo, outro
- * navegador do mesmo perfil): se a sessão do Firebase ainda estiver viva no
- * IndexedDB, esta página reconhece e redireciona sem popup nenhum.
+ * It turns the session watcher on without consulting the localStorage mark, and
+ * that is what makes it the repair for a lost mark (cleared storage, another
+ * browser on the same profile): if the Firebase session is still alive in
+ * IndexedDB, this page recognises it and redirects with no popup at all.
  *
- * De quebra, subscrever na montagem já deixa o módulo de auth em cache antes do
- * clique. Sem isso, o `await import(...)` dentro do handler seria uma ida à rede
- * no meio de um gesto do usuário — que é exatamente o que o Safari conta como
- * perda de ativação para bloquear o popup.
+ * As a bonus, subscribing on mount leaves the auth module cached before the
+ * click. Without that, the `await import(...)` inside the handler would be a
+ * network round trip in the middle of a user gesture -- exactly what Safari
+ * counts as losing activation, and blocks the popup for.
  */
 export function EntrarPage() {
   useSeo({ title: `${t.signIn} — ${t.siteName}` });
-  const { session, admin, loading, ativar, entrar, signOut } = useSession();
-  // O que o popup respondeu de errado. Sem isto, falhar em entrar é um clique
-  // que não faz nada — e popup bloqueado, que é a falha mais comum, some sem
-  // deixar rastro na tela.
+  const { session, admin, loading, activate, signIn, signOut } = useSession();
+  // What the popup answered wrong. Without this, a failed sign-in is a click
+  // that does nothing -- and a blocked popup, which is the commonest failure,
+  // vanishes without leaving a trace on screen.
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(ativar, [ativar]);
+  useEffect(activate, [activate]);
 
   if (admin) return <Navigate replace to="/" />;
 
@@ -44,7 +44,7 @@ export function EntrarPage() {
               className="botao botao-primario"
               onClick={() => {
                 setError(null);
-                entrar().catch((e: { code?: string; message?: string }) =>
+                signIn().catch((e: { code?: string; message?: string }) =>
                   setError(e.code ?? e.message ?? "desconhecido"),
                 );
               }}

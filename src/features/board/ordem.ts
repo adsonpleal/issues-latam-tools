@@ -1,33 +1,33 @@
 import type { Issue, Position } from "../../lib/issues";
 
 /**
- * A conta da ordem manual do quadro, sem Firestore nenhum.
+ * The arithmetic of the board's manual order, with no Firestore at all.
  *
- * O modelo é WYSIWYG e de propósito: soltar um card em qualquer posição **fixa
- * a pilha inteira** do jeito que ela ficou na tela, numerada de 0 para baixo.
- * A alternativa — prender só o card arrastado e deixar o resto fluindo por
- * votos — não consegue segurá-lo no meio de vizinhos que não têm número, e o
- * card volta sozinho para outro lugar assim que alguém vota.
+ * The model is WYSIWYG and deliberately so: dropping a card anywhere **pins
+ * the whole stack** exactly as it ended up on screen, numbered from 0 down.
+ * The alternative -- pinning only the dragged card and letting the rest keep
+ * flowing by votes -- cannot hold it between neighbours that have no number,
+ * and the card wanders off on its own the moment somebody votes.
  *
- * O preço é que a pilha para de responder aos votos depois do primeiro arrasto.
- * É por isso que a coluna ganha o botão de voltar à ordem automática.
+ * The price is that the stack stops responding to votes after the first drag.
+ * That is why the column gets a button to go back to automatic order.
  */
 
-/** Numera a pilha de 0 para baixo, devolvendo só o que de fato mudou. */
+/** Numbers the stack from 0 down, returning only what actually changed. */
 function numberStack(stack: Issue[]): Position[] {
-  const escritas: Position[] = [];
+  const writes: Position[] = [];
   stack.forEach((issue, i) => {
-    if (issue.order !== i) escritas.push({ id: issue.id, order: i });
+    if (issue.order !== i) writes.push({ id: issue.id, order: i });
   });
-  return escritas;
+  return writes;
 }
 
 /**
- * Solta `arrastado` imediatamente antes (ou depois) de `alvoId` dentro de
- * `pilha`, e devolve as escritas que gravam isso.
+ * Drops `dragged` immediately before (or after) `targetId` inside `stack`, and
+ * returns the writes that record it.
  *
- * `arrastado` vem à parte porque ele pode estar vindo de outra coluna, e aí não
- * está na pilha de destino.
+ * `dragged` comes separately because it may be arriving from another column,
+ * in which case it is not in the destination stack.
  */
 export function reorderStack(
   stack: Issue[],
@@ -36,14 +36,14 @@ export function reorderStack(
   before: boolean,
 ): Position[] {
   if (dragged.id === targetId) return [];
-  const resto = stack.filter((i) => i.id !== dragged.id);
-  const destination = resto.findIndex((i) => i.id === targetId);
+  const rest = stack.filter((i) => i.id !== dragged.id);
+  const destination = rest.findIndex((i) => i.id === targetId);
   if (destination < 0) return [];
-  resto.splice(before ? destination : destination + 1, 0, dragged);
-  return numberStack(resto);
+  rest.splice(before ? destination : destination + 1, 0, dragged);
+  return numberStack(rest);
 }
 
-/** Devolve a pilha ao fluxo automático: apaga o número de quem tem um. */
+/** Returns the stack to the automatic flow: clears the number from whoever has one. */
 export function releaseStack(stack: Issue[]): Position[] {
   return stack.filter((i) => i.order !== null).map((i) => ({ id: i.id, order: null }));
 }

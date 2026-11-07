@@ -17,50 +17,65 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 
-import { ANEXOS_MAX, enviarAnexo, type AnexoPronto } from "./anexos";
+import { ATTACHMENTS_MAX, uploadAttachment, type PreparedAttachment } from "./attachments";
 import { getDb } from "./firebase";
-import type { Projeto } from "./projetos";
-import { isProjeto } from "./projetos";
-import type { Coluna, Status, Tipo } from "./status";
-import { isStatus, isTipo } from "./status";
+import type { Project } from "./projects";
+import { isProject } from "./projects";
+import type { Column, Status, IssueType } from "./status";
+import { isStatus, isIssueType } from "./status";
 
-export const LIMITE_QUADRO = 500;
-export const TITULO_MAX = 120;
-export const DESCRICAO_MAX = 4000;
-export const AUTOR_MAX = 40;
-export const CONTATO_MAX = 120;
+export const BOARD_LIMIT = 500;
+export const TITLE_MAX = 120;
+export const DESCRIPTION_MAX = 4000;
+export const NICK_MAX = 40;
+export const CONTACT_MAX = 120;
 
+/**
+ * A card, as the rest of the app sees it.
+ *
+ * These names are ours. The stored field names they come from are Firestore's
+ * and are a contract with the live database, the security rules and the
+ * composite indexes -- they appear only as string literals, in `toIssue` below
+ * and in the writes at the bottom of this file. Those are the two places where
+ * the two vocabularies meet, and nowhere else in `src/` needs to know the
+ * stored spelling.
+ */
 export type Issue = {
   id: string;
-  projeto: Projeto;
-  titulo: string;
-  descricao: string;
-  tipo: Tipo;
+  project: Project;
+  title: string;
+  description: string;
+  type: IssueType;
   status: Status;
-  arquivado: boolean;
+  archived: boolean;
   upvotes: number;
-  comentarios: number;
-  anexos: number;
-  criadoEm: Date | null;
-  atualizadoEm: Date | null;
-  /** Nick público e opcional de quem reportou. */
-  autor: string | null;
+  comments: number;
+  attachments: number;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  /** The reporter's public, optional nickname. */
+  author: string | null;
   /**
-   * Posição fixada à mão dentro da coluna, menor em cima. `null` é o normal: o
-   * card não foi arrumado e continua fluindo pela regra da coluna (votos ou
-   * data). Só a triagem escreve isto, arrastando um card em cima de outro.
+   * A position pinned by hand within the column, lowest at the top. `null` is
+   * the normal case: the card has not been arranged and keeps flowing by the
+   * column's own rule (votes, or date). Only triage writes this, by dragging
+   * one card onto another.
    */
-  ordem: number | null;
+  order: number | null;
   /**
-   * Só nas fichas `tipo: "replay"`: o que o parser leu da gravação (classe,
-   * níveis, golpes, trocas de equipamento, talentos). Fica desnormalizado aqui
-   * para a triagem ranquear sem baixar o .rrf, que tem centenas de kB.
+   * Only on `replay` cards: what the parser read out of the recording (class,
+   * levels, hits, equipment changes, traits). It is denormalised here so triage
+   * can rank a recording without downloading the .rrf, which runs to hundreds
+   * of kB.
    */
-  replay: ResumoReplay | null;
+  replay: ReplaySummary | null;
 };
 
-/** Campos que a triagem usa. O mapa guardado tem mais, e passa direto. */
-export type ResumoReplay = {
+/**
+ * The fields triage uses. The stored map holds more and passes straight
+ * through; its keys come from the simulator's parser, so they stay as they are.
+ */
+export type ReplaySummary = {
   player?: string;
   className?: string;
   baseLevel?: number;
@@ -80,39 +95,39 @@ export type ResumoReplay = {
 
 function toIssue(snap: QueryDocumentSnapshot<DocumentData>): Issue | null {
   const d = snap.data();
-  // Documento fora do formato é descartado em vez de derrubar o quadro. Só pode
-  // acontecer por edição manual no console, mas aí é um card que some, não uma
-  // tela em branco.
-  if (!isProjeto(d["projeto"]) || !isStatus(d["status"]) || !isTipo(d["tipo"])) return null;
+  // A document outside the shape is dropped rather than taking the board down.
+  // It can only happen through a hand edit in the console, but then it is one
+  // card going missing, not a blank screen.
+  if (!isProject(d["projeto"]) || !isStatus(d["status"]) || !isIssueType(d["tipo"])) return null;
 
   return {
     id: snap.id,
-    projeto: d["projeto"],
-    titulo: String(d["titulo"] ?? ""),
-    descricao: String(d["descricao"] ?? ""),
-    tipo: d["tipo"],
+    project: d["projeto"],
+    title: String(d["titulo"] ?? ""),
+    description: String(d["descricao"] ?? ""),
+    type: d["tipo"],
     status: d["status"],
-    arquivado: Boolean(d["arquivado"]),
+    archived: Boolean(d["arquivado"]),
     upvotes: Number(d["upvotes"] ?? 0),
-    comentarios: Number(d["comentarios"] ?? 0),
-    // Os 62 cards migrados são anteriores ao campo e não o têm.
-    anexos: Number(d["anexos"] ?? 0),
-    criadoEm: d["criadoEm"]?.toDate?.() ?? null,
-    atualizadoEm: d["atualizadoEm"]?.toDate?.() ?? null,
-    autor: typeof d["autor"] === "string" && d["autor"] ? d["autor"] : null,
-    ordem: typeof d["ordem"] === "number" ? d["ordem"] : null,
-    replay: d["replay"] && typeof d["replay"] === "object" ? (d["replay"] as ResumoReplay) : null,
+    comments: Number(d["comentarios"] ?? 0),
+    // The 62 migrated cards predate the field and do not carry it.
+    attachments: Number(d["anexos"] ?? 0),
+    createdAt: d["criadoEm"]?.toDate?.() ?? null,
+    updatedAt: d["atualizadoEm"]?.toDate?.() ?? null,
+    author: typeof d["autor"] === "string" && d["autor"] ? d["autor"] : null,
+    order: typeof d["ordem"] === "number" ? d["ordem"] : null,
+    replay: d["replay"] && typeof d["replay"] === "object" ? (d["replay"] as ReplaySummary) : null,
   };
 }
 
 /**
- * Uma assinatura só para o app inteiro. O `where` e o `limit` não são otimização:
- * a regra `allow list` EXIGE os dois, e sem eles a consulta é rejeitada antes de
- * ler qualquer documento (ver firestore.rules).
+ * One subscription for the whole app. The `where` and the `limit` are not an
+ * optimisation: the `allow list` rule REQUIRES both, and without them the query
+ * is rejected before a single document is read (see firestore.rules).
  *
- * Filtrar por projeto/tipo/busca acontece na memória, em agrupar.ts — o acervo é
- * de algumas dezenas de cards, então trocar de filtro é instantâneo e custa zero
- * leitura.
+ * Filtering by project/type/search happens in memory, in agrupar.ts -- the
+ * collection is a few dozen cards, so switching filters is instant and costs no
+ * reads.
  */
 export function subscribeIssues(
   onIssues: (issues: Issue[]) => void,
@@ -121,12 +136,12 @@ export function subscribeIssues(
 ): () => void {
   const col = collection(getDb(), "issues");
   const q = opts.admin
-    ? query(col, orderBy("criadoEm", "desc"), limit(LIMITE_QUADRO))
+    ? query(col, orderBy("criadoEm", "desc"), limit(BOARD_LIMIT))
     : query(
         col,
         where("arquivado", "==", false),
         orderBy("criadoEm", "desc"),
-        limit(LIMITE_QUADRO),
+        limit(BOARD_LIMIT),
       );
 
   return onSnapshot(
@@ -136,7 +151,7 @@ export function subscribeIssues(
   );
 }
 
-/** Card único. Devolve null tanto para inexistente quanto para negado (arquivado). */
+/** A single card. Returns null both for missing and for denied (archived). */
 export function subscribeIssue(
   id: string,
   onIssue: (issue: Issue | null) => void,
@@ -154,63 +169,72 @@ export async function getIssue(id: string): Promise<Issue | null> {
   return snap.exists() ? toIssue(snap as QueryDocumentSnapshot<DocumentData>) : null;
 }
 
-// Mora em `anexos.ts`, junto do resto do assunto — comentário também sobe
-// arquivo agora, e importar de `issues` para isso seria caminho torto.
-export type { AnexoPronto } from "./anexos";
+// Lives in `anexos.ts`, with the rest of that subject -- a comment uploads a
+// file too now, and importing from `issues` for that would be a crooked path.
+export type { PreparedAttachment } from "./attachments";
 
-export type NovoIssue = {
-  projeto: Projeto;
-  tipo: Tipo;
-  titulo: string;
-  descricao: string;
-  /** Nick público, opcional. */
-  autor?: string;
-  /** Discord/e-mail, opcional — vai para o subdocumento privado, nunca aparece. */
-  contato?: string;
-  /** Já reduzidos e validados pelo formulário. */
-  anexos?: AnexoPronto[];
+export type NewIssue = {
+  project: Project;
+  type: IssueType;
+  title: string;
+  description: string;
+  /** Public nickname, optional. */
+  author?: string;
+  /** Discord/e-mail, optional -- goes to the private subdocument, never shown. */
+  contact?: string;
+  /** Already shrunk and validated by the form. */
+  attachments?: PreparedAttachment[];
 };
 
-export async function createIssue(dados: NovoIssue): Promise<string> {
+export async function createIssue(data: NewIssue): Promise<string> {
   const db = getDb();
-  const anexos = (dados.anexos ?? []).slice(0, ANEXOS_MAX);
+  const attachments = (data.attachments ?? []).slice(0, ATTACHMENTS_MAX);
 
+  // Every key here is a Firestore field name, written out in full rather than
+  // by shorthand: shorthand is what would let renaming one of our names
+  // silently rename a stored field.
   const payload: Record<string, unknown> = {
-    projeto: dados.projeto,
-    tipo: dados.tipo,
-    titulo: dados.titulo.trim().slice(0, TITULO_MAX),
-    descricao: dados.descricao.trim().slice(0, DESCRICAO_MAX),
+    projeto: data.project,
+    tipo: data.type,
+    titulo: data.title.trim().slice(0, TITLE_MAX),
+    descricao: data.description.trim().slice(0, DESCRIPTION_MAX),
     status: "reportado",
     arquivado: false,
     upvotes: 0,
     comentarios: 0,
-    anexos: anexos.length,
+    anexos: attachments.length,
     criadoEm: serverTimestamp(),
     atualizadoEm: serverTimestamp(),
   };
-  const autor = dados.autor?.trim().slice(0, AUTOR_MAX);
-  if (autor) payload["autor"] = autor;
+  const author = data.author?.trim().slice(0, NICK_MAX);
+  if (author) payload["autor"] = author;
 
-  // O card vai primeiro, com o id gerado no cliente. Se algum anexo falhar
-  // depois, o relato — que é a parte que importa — já está salvo; o pior caso
-  // é o selo do card dizer 2 e existir 1. O contrário (anexo órfão embaixo de
-  // um card que nunca nasceu) seria byte invisível e impossível de limpar.
+  // The card goes first, with an id generated on the client. If an attachment
+  // fails afterwards, the report -- the part that matters -- is already saved;
+  // the worst case is the card's badge saying 2 when there is 1. The other way
+  // round (an orphan attachment under a card that was never born) would be
+  // invisible bytes, impossible to clean up.
   const ref = doc(collection(db, "issues"));
   await setDoc(ref, payload);
 
-  for (const anexo of anexos) {
-    await enviarAnexo(ref.id, crypto.randomUUID(), anexo.nome, anexo.tipo, anexo.dados).catch(
-      () => undefined,
-    );
+  for (const attachment of attachments) {
+    await uploadAttachment(
+      ref.id,
+      crypto.randomUUID(),
+      attachment.name,
+      attachment.type,
+      attachment.data,
+    ).catch(() => undefined);
   }
 
-  const contato = dados.contato?.trim().slice(0, CONTATO_MAX);
-  if (contato) {
-    // Documento à parte porque regra de segurança não esconde campo: o contato
-    // precisa ficar onde `allow read` é só do admin. Falhar aqui não pode perder
-    // o card que já foi criado, então o erro é engolido de propósito.
+  const contact = data.contact?.trim().slice(0, CONTACT_MAX);
+  if (contact) {
+    // A separate document, because a security rule cannot hide a field: the
+    // contact has to live where `allow read` is admin-only. Failing here must
+    // not lose the card that was already created, so the error is swallowed on
+    // purpose.
     await setDoc(doc(db, "issues", ref.id, "privado", "contato"), {
-      contato,
+      contato: contact,
       criadoEm: serverTimestamp(),
     }).catch(() => undefined);
   }
@@ -219,71 +243,86 @@ export async function createIssue(dados: NovoIssue): Promise<string> {
 }
 
 /**
- * Único caminho de escrita pública além de criar. `increment(1)` é resolvido no
- * servidor antes das regras, que conferem que só `upvotes` mudou e que mudou de
- * exatamente +1.
+ * The only public write path besides creating. `increment(1)` is resolved on
+ * the server before the rules run, and they check that only `upvotes` changed
+ * and that it changed by exactly +1.
  */
 export async function upvoteIssue(id: string): Promise<void> {
   await updateDoc(doc(getDb(), "issues", id), { upvotes: increment(1) });
 }
 
-/** Arquivar preserva o status real, para desarquivar devolver certo. */
-function patchColuna(coluna: Coluna): Record<string, unknown> {
-  return coluna === "arquivado"
+/** Archiving preserves the real status, so un-archiving puts it back right. */
+function columnPatch(column: Column): Record<string, unknown> {
+  return column === "arquivado"
     ? { arquivado: true, atualizadoEm: serverTimestamp() }
-    : { arquivado: false, status: coluna, atualizadoEm: serverTimestamp() };
+    : { arquivado: false, status: column, atualizadoEm: serverTimestamp() };
 }
 
 /**
- * Move o card de coluna — e apaga a ordem manual, porque ela só quer dizer
- * alguma coisa dentro da pilha onde foi arrumada. Quem quiser mover E escolher
- * a posição solta o card em cima de outro, o que cai em `ordenarIssues`.
+ * Moves the card to another column -- and clears the manual order, because an
+ * order only means something inside the stack it was arranged in. Anyone who
+ * wants to move AND choose the position drops the card onto another one, which
+ * lands in `sortIssues`.
  */
-export async function moverIssue(id: string, coluna: Coluna): Promise<void> {
+export async function moveIssue(id: string, column: Column): Promise<void> {
   await updateDoc(doc(getDb(), "issues", id), {
-    ...patchColuna(coluna),
+    ...columnPatch(column),
     ordem: deleteField(),
   });
 }
 
-/** Uma escrita de ordenação. `ordem: null` apaga o campo e devolve o card ao fluxo. */
-export type Posicao = { id: string; ordem: number | null };
+/** One ordering write. `order: null` clears the field and returns the card to the flow. */
+export type Position = { id: string; order: number | null };
 
 /**
- * Grava a pilha renumerada num lote só — ou o quadro pisca com metade dos cards
- * na posição nova e metade na velha.
+ * Writes the renumbered stack in a single batch -- otherwise the board flickers
+ * with half the cards in their new position and half in the old one.
  *
- * `movido` é o card que mudou de coluna no mesmo gesto (soltar em cima de um
- * card de outra pilha): status e posição saem juntos, na mesma escrita.
+ * `moved` is the card that changed column in the same gesture (dropped onto a
+ * card in another stack): status and position go out together, in one write.
  */
-export async function ordenarIssues(
-  posicoes: Posicao[],
-  movido?: { id: string; coluna: Coluna },
+export async function sortIssues(
+  positions: Position[],
+  moved?: { id: string; column: Column },
 ): Promise<void> {
-  if (posicoes.length === 0 && !movido) return;
+  if (positions.length === 0 && !moved) return;
   const db = getDb();
-  const lote = writeBatch(db);
-  for (const p of posicoes) {
-    lote.update(doc(db, "issues", p.id), {
-      ordem: p.ordem === null ? deleteField() : p.ordem,
-      ...(movido?.id === p.id ? patchColuna(movido.coluna) : {}),
+  const batch = writeBatch(db);
+  for (const p of positions) {
+    batch.update(doc(db, "issues", p.id), {
+      ordem: p.order === null ? deleteField() : p.order,
+      ...(moved?.id === p.id ? columnPatch(moved.column) : {}),
     });
   }
-  if (movido && !posicoes.some((p) => p.id === movido.id)) {
-    lote.update(doc(db, "issues", movido.id), patchColuna(movido.coluna));
+  if (moved && !positions.some((p) => p.id === moved.id)) {
+    batch.update(doc(db, "issues", moved.id), columnPatch(moved.column));
   }
-  await lote.commit();
+  await batch.commit();
 }
 
-export async function editarIssue(
-  id: string,
-  campos: Partial<Pick<Issue, "titulo" | "descricao" | "tipo" | "projeto" | "status">>,
-): Promise<void> {
-  await updateDoc(doc(getDb(), "issues", id), { ...campos, atualizadoEm: serverTimestamp() });
+/** What the admin panel may edit on a card. */
+export type EditableFields = Partial<
+  Pick<Issue, "title" | "description" | "type" | "project" | "status">
+>;
+
+/**
+ * Each of our names is translated to its stored one here, one by one. This used
+ * to spread the argument straight into `updateDoc`, which quietly made the
+ * field names and our names the same thing -- rename one and the write lands on
+ * a field the rules and the indexes do not know.
+ */
+export async function editIssue(id: string, fields: EditableFields): Promise<void> {
+  const patch: Record<string, unknown> = { atualizadoEm: serverTimestamp() };
+  if (fields.title !== undefined) patch["titulo"] = fields.title;
+  if (fields.description !== undefined) patch["descricao"] = fields.description;
+  if (fields.type !== undefined) patch["tipo"] = fields.type;
+  if (fields.project !== undefined) patch["projeto"] = fields.project;
+  if (fields.status !== undefined) patch["status"] = fields.status;
+  await updateDoc(doc(getDb(), "issues", id), patch);
 }
 
-/** Contato privado de quem reportou. Só o admin consegue ler — a regra recusa o resto. */
-export async function getContato(issueId: string): Promise<string | null> {
+/** The reporter's private contact. Only the admin can read it -- the rule refuses the rest. */
+export async function getContact(issueId: string): Promise<string | null> {
   const snap = await getDoc(doc(getDb(), "issues", issueId, "privado", "contato"));
   const v = snap.exists() ? snap.data()["contato"] : null;
   return typeof v === "string" ? v : null;

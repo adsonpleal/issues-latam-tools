@@ -2,40 +2,40 @@ import { useEffect, useState } from "react";
 
 import { subscribeIssues, type Issue } from "../../lib/issues";
 
-export type EstadoQuadro = {
+export type BoardState = {
   issues: Issue[];
-  carregando: boolean;
-  erro: string | null;
+  loading: boolean;
+  error: string | null;
 };
 
 /**
- * Uma assinatura ao vivo para o app inteiro. Como é onSnapshot, o quadro se move
- * sozinho na tela de quem está olhando quando eu arrasto um card — e a
- * compensação de latência do Firestore já pinta a mudança local antes da ida ao
- * servidor, então não existe estado otimista escrito à mão em lugar nenhum.
+ * One live subscription for the whole app. Because it is onSnapshot, the board
+ * moves by itself on the screen of whoever is watching when I drag a card --
+ * and Firestore's latency compensation already paints the local change before
+ * the round trip, so there is no hand-written optimistic state anywhere.
  */
-export function useBoard(opts: { admin?: boolean } = {}): EstadoQuadro {
+export function useBoard(opts: { admin?: boolean } = {}): BoardState {
   const admin = opts.admin ?? false;
   const [issues, setIssues] = useState<Issue[]>([]);
-  const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setCarregando(true);
-    setErro(null);
-    const cancelar = subscribeIssues(
-      (lista) => {
-        setIssues(lista);
-        setCarregando(false);
+    setLoading(true);
+    setError(null);
+    const cancel = subscribeIssues(
+      (list) => {
+        setIssues(list);
+        setLoading(false);
       },
       (e) => {
-        setErro(e.message);
-        setCarregando(false);
+        setError(e.message);
+        setLoading(false);
       },
       { admin },
     );
-    return cancelar;
+    return cancel;
   }, [admin]);
 
-  return { issues, carregando, erro };
+  return { issues, loading, error };
 }

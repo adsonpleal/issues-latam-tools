@@ -1,22 +1,26 @@
 rules_version = '2';
 
-// Quadro público de issues. Três regras valem por todo o resto:
+// The public issue board. Three rules stand for all the rest:
 //
-//  1. Leitura é pública, MENOS o que está arquivado.
-//  2. A única escrita pública em `issues` é `upvotes += 1`. Mais nada.
-//  3. Nada é apagado nunca — arquivar É o delete.
+//  1. Reading is public, EXCEPT what is archived.
+//  2. The only public write to `issues` is `upvotes += 1`. Nothing else.
+//  3. Nothing is ever deleted -- archiving IS the delete.
+//
+// The collection paths, the field names and the stored enum values are a
+// contract with the documents already in the database, so they keep their
+// Portuguese spelling. The function names are ours.
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Um operador só. `email_verified` é o que impede um token emitido para um
-    // endereço não verificado que apenas ALEGA ser este e-mail.
+    // One operator only. `email_verified` is what blocks a token issued for an
+    // unverified address that merely CLAIMS to be this e-mail.
     function isAdmin() {
       return request.auth != null
              && request.auth.token.email_verified == true
              && request.auth.token.email == 'adsonpleal@gmail.com';
     }
 
-    function projetos() {
+    function projects() {
       return ['visuais', 'simulador', 'recap', 'mercado', 'calc'];
     }
 
@@ -24,65 +28,66 @@ service cloud.firestore {
       return ['reportado', 'backlog', 'em_progresso', 'resolvido', 'nao_sera_feito'];
     }
 
-    // `replay` não aparece no formulário público: só o simulador cria ficha
-    // desse tipo. Mas o admin precisa poder editar uma depois.
-    function tipos() {
+    // `replay` does not appear in the public form: only the simulator creates a
+    // record of that type. But the admin has to be able to edit one afterwards.
+    function types() {
       return ['bug', 'feature', 'replay'];
     }
 
     match /issues/{issueId} {
 
-      // --- LEITURA ------------------------------------------------------
-      // `get` é avaliado contra o documento real: quem guardou a URL de um
-      // card arquivado leva negado. O cliente precisa renderizar
-      // permission-denied e not-found do mesmo jeito, senão a diferença entre
-      // as duas respostas vira um oráculo de "existe um card arquivado aqui".
+      // --- READING ------------------------------------------------------
+      // `get` is evaluated against the real document: whoever kept the URL of an
+      // archived card gets denied. The client has to render permission-denied
+      // and not-found the same way, otherwise the difference between the two
+      // answers becomes an oracle for "there is an archived card here".
       allow get: if isAdmin() || resource.data.arquivado == false;
 
-      // `list` é avaliado contra a CONSULTA, não contra o resultado: regra de
-      // segurança não filtra coleção. Quem não é admin precisa prender
-      // `arquivado` em false no próprio where, ou a consulta inteira é
-      // rejeitada antes de ler um único documento. É por isso que `arquivado`
-      // é booleano obrigatório e não um sexto status — um `!=` não compõe com
-      // o orderBy em outro campo, e um documento sem o campo derruba a
-      // consulta do quadro para todo mundo.
+      // `list` is evaluated against the QUERY, not against the result: a
+      // security rule does not filter a collection. Anybody who is not the admin
+      // has to pin `arquivado` to false in their own where, or the whole query is
+      // rejected before a single document is read. That is why `arquivado` is a
+      // mandatory boolean and not a sixth status -- a `!=` does not compose with
+      // an orderBy on another field, and a document without the field takes the
+      // board's query down for everybody.
       allow list: if isAdmin()
                   || (resource.data.arquivado == false
                       && request.query.limit <= 500);
 
-      // --- CRIAÇÃO PÚBLICA ----------------------------------------------
-      // Qualquer pessoa abre um card. Ele nasce em `reportado`, visível, com
-      // os contadores zerados e o relógio do servidor. `origem` fica de fora
-      // do hasOnly de propósito: só o seed (admin SDK, que passa por cima das
-      // regras) escreve procedência.
-      allow create: if isCardDoAdmin()
-                    || isNovoIssuePublico(request.resource.data)
-                    || isNovaGravacao(request.resource.data);
+      // --- PUBLIC CREATION ----------------------------------------------
+      // Anybody opens a card. It is born in `reportado`, visible, with the
+      // counters at zero and the server's clock. `origem` is left out of the
+      // hasOnly on purpose: only the seed (the admin SDK, which goes over the
+      // rules) writes provenance.
+      allow create: if isAdminCard()
+                    || isNewPublicIssue(request.resource.data)
+                    || isLegacyRecording(request.resource.data);
 
-      // Promover uma gravação da caixa de entrada é criar card, não editar um.
-      // `criadoEm` fica solto de propósito: o card entra no quadro com o dia em
-      // que a pessoa gravou, não com o dia em que a triagem olhou. Os enums
-      // continuam valendo — é o que impede um status sem coluna de existir.
-      function isCardDoAdmin() {
+      // Promoting a recording from the inbox is creating a card, not editing
+      // one. `criadoEm` is left loose on purpose: the card enters the board with
+      // the day the person recorded it, not the day triage looked at it. The
+      // enums still hold -- that is what stops a status with no column from
+      // existing.
+      function isAdminCard() {
         return isAdmin()
                && request.resource.data.status in statuses()
-               && request.resource.data.projeto in projetos()
-               && request.resource.data.tipo in tipos()
+               && request.resource.data.projeto in projects()
+               && request.resource.data.tipo in types()
                && request.resource.data.arquivado is bool
                && request.resource.data.criadoEm is timestamp
                && request.resource.data.atualizadoEm == request.time;
       }
 
-      // --- GRAVAÇÃO VINDA DO "AJUDE O SIMULADOR" (CAMINHO ANTIGO) ---------
-      // Substituído pela coleção `gravacoes`, lá embaixo: gravação virou dado
-      // de entrada em vez de card nascido arquivado.
+      // --- A RECORDING FROM "AJUDE O SIMULADOR" (THE OLD PATH) ------------
+      // Replaced by the `gravacoes` collection further down: a recording became
+      // input data instead of a card born archived.
       //
-      // Continua aqui só enquanto houver simulador antigo em cache por aí — um
-      // envio dessas versões ainda cai como card arquivado, e
-      // `tools/mover-gravacoes.mjs` varre para a coleção nova. Depois que o
-      // simulador atualizado estiver no ar e a varredura não achar mais nada,
-      // ISTO SAI, junto do `|| isNovaGravacao(...)` do create acima.
-      function isNovaGravacao(d) {
+      // It stays here only while there is an old simulator cached out there -- a
+      // submission from those versions still lands as an archived card, and
+      // `tools/move-recordings.mjs` sweeps it into the new collection. Once the
+      // updated simulator is live and the sweep finds nothing more, THIS GOES,
+      // along with the `|| isLegacyRecording(...)` in the create above.
+      function isLegacyRecording(d) {
         return d.keys().hasOnly([
                  'projeto', 'titulo', 'descricao', 'tipo', 'status',
                  'arquivado', 'upvotes', 'comentarios', 'anexos',
@@ -105,14 +110,14 @@ service cloud.firestore {
                && d.anexos == 1
                && d.criadoEm == request.time
                && d.atualizadoEm == request.time
-               // O que a triagem lê para ranquear sem baixar o .rrf: classe,
-               // níveis, golpes, trocas de equipamento, talentos, versão.
+               // What triage reads to rank without downloading the .rrf: class,
+               // levels, hits, equipment changes, traits, version.
                && d.replay is map && d.replay.size() <= 24
                && (!d.keys().hasAny(['autor'])
                    || (d.autor is string && d.autor.size() <= 40));
       }
 
-      function isNovoIssuePublico(d) {
+      function isNewPublicIssue(d) {
         return d.keys().hasOnly([
                  'projeto', 'titulo', 'descricao', 'tipo', 'status',
                  'arquivado', 'upvotes', 'comentarios', 'anexos',
@@ -123,12 +128,13 @@ service cloud.firestore {
                  'arquivado', 'upvotes', 'comentarios', 'anexos',
                  'criadoEm', 'atualizadoEm'
                ])
-               // Contador só para o selo do card. Quem manda de verdade é o que
-               // existe na subcoleção; este número é escrito na criação porque
-               // o público não pode atualizar o card depois.
+               // A counter only for the card's badge. What really rules is what
+               // exists in the subcollection; this number is written on creation
+               // because the public cannot update the card afterwards.
                && d.anexos is int && d.anexos >= 0 && d.anexos <= 5
-               && d.projeto is string && d.projeto in projetos()
-               // O formulário público não cria gravação — isso é do simulador.
+               && d.projeto is string && d.projeto in projects()
+               // The public form does not create a recording -- that is the
+               // simulator's.
                && d.tipo is string && d.tipo in ['bug', 'feature']
                && d.status == 'reportado'
                && d.arquivado == false
@@ -137,54 +143,56 @@ service cloud.firestore {
                && d.descricao is string && d.descricao.size() <= 4000
                && d.upvotes == 0
                && d.comentarios == 0
-               // Relógio do servidor, não o de quem chama: torna `criadoEm`
-               // confiável para ordenar e impossível de retrodatar.
+               // The server's clock, not the caller's: it makes `criadoEm`
+               // trustworthy to sort by and impossible to backdate.
                && d.criadoEm == request.time
                && d.atualizadoEm == request.time
-               // O nick é opcional e PÚBLICO — o formulário diz isso na label.
+               // The nick is optional and PUBLIC -- the form says so in the label.
                && (!d.keys().hasAny(['autor'])
                    || (d.autor is string && d.autor.size() <= 40));
       }
 
-      // --- ATUALIZAÇÃO ---------------------------------------------------
+      // --- UPDATING ------------------------------------------------------
       allow update: if isAdmin()
-                    ? (isReordenacaoAdmin() || isEdicaoAdmin())
-                    : isUpvotePublico();
+                    ? (isAdminReorder() || isAdminEdit())
+                    : isPublicUpvote();
 
-      // A única mutação pública do sistema. `increment(1)` é resolvido no
-      // servidor ANTES da regra rodar, então a conta abaixo enxerga o valor
-      // final — é a mesma forma que já roda em produção no ragreplaystats.
-      // O de-duplicado é localStorage e só: esta regra existe para limitar o
-      // estrago (um campo, +1, card visível), não para impedir gamificação.
-      function isUpvotePublico() {
+      // The system's only public mutation. `increment(1)` is resolved on the
+      // server BEFORE the rule runs, so the arithmetic below sees the final
+      // value -- the same shape already running in production on
+      // ragreplaystats. The de-duplication is localStorage and nothing else:
+      // this rule exists to limit the damage (one field, +1, a visible card),
+      // not to prevent gaming.
+      function isPublicUpvote() {
         return resource.data.arquivado == false
                && request.resource.data.diff(resource.data)
                     .affectedKeys().hasOnly(['upvotes'])
                && request.resource.data.upvotes == resource.data.upvotes + 1;
       }
 
-      // Arrastar card dentro da pilha mexe só na chave de ordenação — e de
-      // propósito NÃO carimba `atualizadoEm`: "Resolvido" e a gaveta ordenam
-      // por essa data, e arrumar a pilha não é mexer no card. Um lote de
-      // reordenação bate nesta regra uma vez por documento; o card que mudou de
-      // coluna no mesmo gesto leva status junto e cai na regra de baixo.
+      // Dragging a card inside the stack touches only the sort key -- and on
+      // purpose does NOT stamp `atualizadoEm`: "Resolvido" and the drawer sort
+      // by that date, and arranging the stack is not touching the card. A
+      // reorder batch hits this rule once per document; the card that changed
+      // column in the same gesture carries a status along and falls to the rule
+      // below.
       //
-      // `hasOnly` cobre também apagar o campo, que é o botão de voltar à ordem
-      // automática.
-      function isReordenacaoAdmin() {
+      // `hasOnly` also covers deleting the field, which is the button that goes
+      // back to automatic order.
+      function isAdminReorder() {
         return request.resource.data.diff(resource.data)
                  .affectedKeys().hasOnly(['ordem'])
                && (!request.resource.data.keys().hasAny(['ordem'])
                    || request.resource.data.ordem is int);
       }
 
-      // O admin move, edita e arquiva — mas os enums continuam valendo, senão
-      // uma edição errada no console escreve um status sem coluna e o card
-      // some de todas as telas sem erro nenhum.
-      function isEdicaoAdmin() {
+      // The admin moves, edits and archives -- but the enums still hold,
+      // otherwise one wrong edit in the console writes a status with no column
+      // and the card vanishes from every screen with no error at all.
+      function isAdminEdit() {
         return request.resource.data.status in statuses()
-               && request.resource.data.projeto in projetos()
-               && request.resource.data.tipo in tipos()
+               && request.resource.data.projeto in projects()
+               && request.resource.data.tipo in types()
                && request.resource.data.arquivado is bool
                && (!request.resource.data.keys().hasAny(['ordem'])
                    || request.resource.data.ordem is int)
@@ -194,12 +202,13 @@ service cloud.firestore {
 
       allow delete: if false;
 
-      // --- COMENTÁRIOS ---------------------------------------------------
-      // Leitura pública, escrita só do admin: é o changelog que quem reportou
-      // acompanha. O get() do pai é o que impede comentário de card arquivado
-      // de vazar para quem guardou o id. Custa uma leitura extra por avaliação,
-      // e isso só acontece na página do card — nunca no quadro.
-      match /comentarios/{comentarioId} {
+      // --- COMMENTS ------------------------------------------------------
+      // Public reading, admin-only writing: it is the changelog whoever
+      // reported follows. The parent's get() is what stops an archived card's
+      // comment from leaking to somebody who kept the id. It costs one extra
+      // read per evaluation, and that only happens on the card's page -- never
+      // on the board.
+      match /comentarios/{commentId} {
         allow read: if isAdmin()
                     || get(/databases/$(database)/documents/issues/$(issueId))
                          .data.arquivado == false;
@@ -228,27 +237,28 @@ service cloud.firestore {
         allow delete: if false;
       }
 
-      // --- ANEXOS ---------------------------------------------------------
-      // Um documento por arquivo, com o conteúdo num campo `bytes` nativo. É a
-      // mesma forma que o simulador já usa para receber .rrf — e evita depender
-      // do Cloud Storage, que exigiria plano Blaze.
+      // --- ATTACHMENTS ----------------------------------------------------
+      // One document per file, with the content in a native `bytes` field. It is
+      // the same shape the simulator already uses to receive a .rrf -- and it
+      // avoids depending on Cloud Storage, which would require the Blaze plan.
       //
-      // O teto de 900 kB por arquivo é o limite de 1 MiB por documento do
-      // Firestore menos a folga dos outros campos. .rrf de verdade fica em
-      // 50–100 kB; imagem grande é reduzida no navegador antes de subir.
-      match /anexos/{anexoId} {
-        // Anexo de card arquivado não vaza. O exists() é necessário porque o
-        // documento do anexo pode ser gravado antes do card existir, e get()
-        // em documento inexistente é erro, não null.
+      // The 900 kB ceiling per file is Firestore's 1 MiB per document limit
+      // minus the slack for the other fields. A real .rrf is 50-100 kB; a large
+      // image is shrunk in the browser before it goes up.
+      match /anexos/{attachmentId} {
+        // An archived card's attachment does not leak. The exists() is necessary
+        // because the attachment document can be written before the card exists,
+        // and get() on a non-existent document is an error, not null.
         allow read: if isAdmin()
                     || (exists(/databases/$(database)/documents/issues/$(issueId))
                         && get(/databases/$(database)/documents/issues/$(issueId))
                              .data.arquivado == false);
 
-        // `comentarioId` é opcional: quando vem, a imagem aparece DENTRO daquele
-        // comentário em vez de na lista de anexos do card. Por isso ela exige
-        // admin — comentar já é só do admin, e sem esta trava qualquer pessoa
-        // faria uma imagem sua brotar no meio da fala dele.
+        // `comentarioId` is optional: when it comes, the image appears INSIDE
+        // that comment instead of in the card's attachment list. That is why it
+        // requires the admin -- commenting is already admin-only, and without
+        // this lock anybody could make an image of theirs sprout in the middle
+        // of what the admin said.
         allow create: if request.resource.data.keys().hasOnly(
                            ['nome', 'tipo', 'tamanho', 'bytes', 'criadoEm', 'comentarioId'])
                       && request.resource.data.keys().hasAll(
@@ -271,17 +281,19 @@ service cloud.firestore {
                       && request.resource.data.criadoEm == request.time;
 
         allow update: if false;
-        // Aqui delete é permitido, ao contrário do resto: qualquer pessoa anexa
-        // arquivo, então precisa existir um jeito de tirar o que não devia ter
-        // entrado.
+        // Here delete IS allowed, unlike everywhere else: anybody can attach a
+        // file, so there has to be a way to remove what should never have come
+        // in.
         allow delete: if isAdmin();
       }
 
-      // --- CONTATO PRIVADO -----------------------------------------------
-      // Escreve e nunca mais lê: quem reporta pode deixar Discord/e-mail para
-      // o admin dar retorno, e isso não aparece no site. Mesma forma da
-      // coleção `replay_submissions` do simulador. Regra não esconde campo, por
-      // isso o contato mora num documento à parte em vez de numa coluna do card.
+      // --- THE PRIVATE CONTACT -------------------------------------------
+      // Written and never read again: whoever reports can leave a Discord
+      // handle or e-mail for the admin to get back to them, and that does not
+      // appear on the site. The same shape as the simulator's
+      // `replay_submissions` collection. A rule does not hide a field, which is
+      // why the contact lives in a document of its own rather than in a column
+      // of the card.
       match /privado/{docId} {
         allow read: if isAdmin();
 
@@ -296,42 +308,44 @@ service cloud.firestore {
       }
     }
 
-    // --- GRAVAÇÕES DO "AJUDE O SIMULADOR" --------------------------------
-    // Caixa de entrada, não quadro.
+    // --- THE RECORDINGS FROM "AJUDE O SIMULADOR" -------------------------
+    // An inbox, not a board.
     //
-    // Elas não são card: o diálogo do simulador escreve aqui, só o admin lê, e
-    // quem decide se aquilo vira ficha pública é a triagem em /gravacoes
-    // — promover CRIA um card normal, com o .rrf copiado para os anexos dele.
+    // They are not cards: the simulator's dialog writes here, only the admin
+    // reads, and what decides whether one becomes a public record is triage at
+    // /gravacoes -- promoting CREATES an ordinary card, with the .rrf copied
+    // into its attachments.
     //
-    // Antes disso não existe URL que devolva o conteúdo para ninguém. É a mesma
-    // postura que a coleção `replay_submissions` do simulador tinha com
-    // `allow read: if false`, e é o que o consentimento promete: o arquivo vira
-    // teste no repositório aberto, não uma página num quadro. Antes isso era
-    // feito com um card nascendo `arquivado`, o que dava dois significados para
-    // o mesmo booleano — "a triagem já despachou" e "ninguém olhou ainda".
-    match /gravacoes/{gravacaoId} {
+    // Before that there is no URL that hands the content to anybody. It is the
+    // same stance the simulator's `replay_submissions` collection took with
+    // `allow read: if false`, and it is what the consent promises: the file
+    // becomes a test in the open repository, not a page on a board. This used to
+    // be done with a card born `arquivado`, which gave one boolean two meanings
+    // -- "triage has dispatched it" and "nobody has looked yet".
+    match /gravacoes/{recordingId} {
       allow read: if isAdmin();
 
-      // Escrita pública, como o formulário de reportar: quem usa o diálogo do
-      // simulador não tem conta nenhuma.
-      allow create: if isAdmin() || isEnvioDeGravacao(request.resource.data);
+      // A public write, like the report form: whoever uses the simulator's
+      // dialog has no account at all.
+      allow create: if isAdmin() || isRecordingSubmission(request.resource.data);
 
-      function isEnvioDeGravacao(d) {
+      function isRecordingSubmission(d) {
         return d.keys().hasOnly([
                  'titulo', 'notas', 'resumo', 'nick', 'contato',
                  'nome', 'tamanho', 'criadoEm', 'estado'
                ])
                && d.keys().hasAll(['titulo', 'resumo', 'nome', 'tamanho', 'criadoEm', 'estado'])
-               // Nasce na fila. Os outros estados são carimbo da triagem.
+               // It is born in the queue. The other states are triage's stamp.
                && d.estado == 'fila'
                && d.titulo is string
                && d.titulo.size() >= 3 && d.titulo.size() <= 120
                && (!d.keys().hasAny(['notas']) || (d.notas is string && d.notas.size() <= 4000))
-               // O que o parser leu: classe, níveis, golpes, trocas, talentos.
+               // What the parser read: class, levels, hits, changes, traits.
                && d.resumo is map && d.resumo.size() <= 24
-               // Nick é crédito e só aparece se a ficha for promovida; contato é
-               // Discord/e-mail. Os dois ficam aqui porque a coleção inteira é
-               // privada — não precisa do subdocumento que o card exige.
+               // The nick is credit and only shows if the record is promoted;
+               // the contact is a Discord handle or e-mail. Both live here
+               // because the whole collection is private -- it needs none of the
+               // subdocument the card requires.
                && (!d.keys().hasAny(['nick']) || (d.nick is string && d.nick.size() <= 40))
                && (!d.keys().hasAny(['contato']) || (d.contato is string && d.contato.size() <= 120))
                && d.nome is string && d.nome.size() > 0 && d.nome.size() <= 200
@@ -339,34 +353,36 @@ service cloud.firestore {
                && d.criadoEm == request.time;
       }
 
-      // A triagem carimba o que decidiu. `issueId` é o card que a promoção
-      // criou — a única coisa daqui que chega ao mundo.
+      // Triage stamps what it decided. `issueId` is the card the promotion
+      // created -- the only thing from here that reaches the world.
       allow update: if isAdmin()
                     && request.resource.data.diff(resource.data).affectedKeys()
                          .hasOnly(['estado', 'issueId', 'decididaEm', 'notaTriagem'])
                     && request.resource.data.estado in
                          ['fila', 'conferida', 'descartada', 'promovida'];
 
-      // Exceção ao `delete: if false` do resto, pela mesma razão dos anexos:
-      // isto é escrita pública, então precisa existir como tirar o que não
-      // devia ter entrado. Descartar (que é o "arquivar" daqui) não apaga nada.
+      // An exception to the `delete: if false` of everywhere else, for the same
+      // reason as the attachments: this is a public write, so there has to be a
+      // way to remove what should never have come in. Discarding (which is the
+      // "archiving" of this collection) deletes nothing.
       allow delete: if isAdmin();
 
-      // O .rrf num documento à parte, e não num campo daqui, para a lista da
-      // triagem não baixar centenas de kB por linha só para mostrar o resumo.
-      // Mesmo formato de `issues/{id}/anexos/{id}`, o que faz a promoção ser
-      // uma cópia de campos em vez de uma conversão.
-      match /arquivo/{arquivoId} {
+      // The .rrf in a document of its own, rather than in a field here, so
+      // triage's list does not download hundreds of kB per row just to show the
+      // summary. The same shape as `issues/{id}/anexos/{id}`, which makes the
+      // promotion a copy of fields instead of a conversion.
+      match /arquivo/{fileId} {
         allow read: if isAdmin();
 
-        allow create: if isAdmin() || isArquivoDeGravacao(request.resource.data);
+        allow create: if isAdmin() || isRecordingFile(request.resource.data);
 
-        function isArquivoDeGravacao(d) {
+        function isRecordingFile(d) {
           return d.keys().hasOnly(['nome', 'tipo', 'tamanho', 'bytes', 'criadoEm'])
                  && d.keys().hasAll(['nome', 'tipo', 'tamanho', 'bytes', 'criadoEm'])
                  && d.nome is string && d.nome.size() > 0 && d.nome.size() <= 200
                  && d.tipo == 'rrf'
-                 // Mesmo teto dos anexos: 1 MiB por documento menos a folga.
+                 // The same ceiling as the attachments: 1 MiB per document minus
+                 // the slack.
                  && d.bytes is bytes && d.bytes.size() > 0 && d.bytes.size() <= 900000
                  && d.tamanho is int && d.tamanho == d.bytes.size()
                  && d.criadoEm == request.time;
@@ -377,7 +393,7 @@ service cloud.firestore {
       }
     }
 
-    // Tudo que não casou acima é negado.
+    // Everything that did not match above is denied.
     match /{document=**} {
       allow read, write: if false;
     }

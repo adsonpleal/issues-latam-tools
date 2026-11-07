@@ -2,124 +2,127 @@ import { Suspense, lazy, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { t } from "../i18n";
-import { PROJETOS, parseProjeto } from "../lib/projetos";
+import { PROJECTS, parseProject } from "../lib/projects";
 import { useSeo } from "../lib/seo";
-import { isTipo, type Coluna } from "../lib/status";
-import { useSessao } from "../features/admin/SessaoContext";
-import { useAcoesAdmin } from "../features/admin/useAcoesAdmin";
-import { agrupar, agruparAdmin, colunaDe, pilha } from "../features/board/agrupar";
+import { isIssueType, type Column } from "../lib/status";
+import { useSession } from "../features/admin/SessionContext";
+import { useAdminActions } from "../features/admin/useAdminActions";
+import { group, groupForAdmin, columnOf, stack } from "../features/board/group";
 import { Board } from "../features/board/Board";
-import { reordenarPilha, soltarPilha } from "../features/board/ordem";
+import { reorderStack, releaseStack } from "../features/board/order";
 import { useBoard } from "../features/board/useBoard";
 
-const PainelIssue = lazy(() =>
-  import("../features/admin/PainelIssue").then((m) => ({ default: m.PainelIssue })),
+const IssuePanel = lazy(() =>
+  import("../features/admin/IssuePanel").then((m) => ({ default: m.IssuePanel })),
 );
 
 export function BoardPage() {
   const [params] = useSearchParams();
-  const projeto = parseProjeto(params.get("projeto"));
-  const { carregando: carregandoSessao } = useSessao();
+  // The query parameters are public URLs, so they keep their spelling.
+  const project = parseProject(params.get("projeto"));
+  const { loading: loadingSession } = useSession();
 
   useSeo({
-    title: projeto
-      ? `${PROJETOS[projeto].nome} — ${t.siteNome} ${t.siteSub}`
-      : `${t.siteNome} — ${t.siteSub}`,
-    description: projeto
-      ? `Bugs e sugestões de ${PROJETOS[projeto].nome}: ${PROJETOS[projeto].descricao}. Acompanhe o progresso.`
-      : t.siteDescricao,
-    path: projeto ? `/?projeto=${projeto}` : "/",
+    title: project
+      ? `${PROJECTS[project].name} — ${t.siteName} ${t.siteSubtitle}`
+      : `${t.siteName} — ${t.siteSubtitle}`,
+    description: project
+      ? `Bugs e sugestões de ${PROJECTS[project].name}: ${PROJECTS[project].description}. Acompanhe o progresso.`
+      : t.siteDescription,
+    path: project ? `/?projeto=${project}` : "/",
   });
 
   return (
     <>
-      {projeto && (
+      {project && (
         <p className="contexto-projeto">
-          Mostrando só <strong>{PROJETOS[projeto].nome}</strong> —{" "}
-          <a href={PROJETOS[projeto].url} target="_blank" rel="noopener noreferrer">
-            {PROJETOS[projeto].url.replace("https://", "")}
+          Mostrando só <strong>{PROJECTS[project].name}</strong> —{" "}
+          <a href={PROJECTS[project].url} target="_blank" rel="noopener noreferrer">
+            {PROJECTS[project].url.replace("https://", "")}
           </a>
         </p>
       )}
-      {/* O quadro só monta com a sessão já resolvida. Para o público isso é de
-          graça — sem marca em localStorage, a sessão resolve na primeira render.
-          Para o admin, evita assinar o Firestore duas vezes (a consulta muda com
-          o `admin`) e evita o quadro já pintado piscar de volta para
-          "Carregando…" quando o SDK de auth responde. */}
-      {carregandoSessao ? <p className="aviso">{t.carregando}</p> : <Quadro />}
+      {/* The board only mounts with the session already resolved. For the public
+          that is free -- with no mark in localStorage, the session resolves on
+          the first render. For the admin it avoids subscribing to Firestore
+          twice (the query changes with `admin`) and keeps an already painted
+          board from flashing back to "Carregando…" when the auth SDK answers. */}
+      {loadingSession ? <p className="aviso">{t.loading}</p> : <BoardBody />}
     </>
   );
 }
 
-function Quadro() {
+function BoardBody() {
   const [params, setParams] = useSearchParams();
-  const projeto = parseProjeto(params.get("projeto"));
-  const tipoBruto = params.get("tipo");
-  const tipo = isTipo(tipoBruto) ? tipoBruto : null;
-  const busca = params.get("busca") ?? "";
+  const project = parseProject(params.get("projeto"));
+  const rawType = params.get("tipo");
+  const type = isIssueType(rawType) ? rawType : null;
+  const search = params.get("busca") ?? "";
 
-  const { sessao, admin } = useSessao();
-  // Com admin, a consulta perde o where de arquivado — a regra permite listar
-  // tudo para este e-mail, então a gaveta de arquivados aparece.
-  const { issues, carregando, erro } = useBoard({ admin });
-  const { mover, ordenar, comentar, editar, erro: erroAcao } = useAcoesAdmin(sessao);
+  const { session, admin } = useSession();
+  // With an admin, the query loses the archived `where` -- the rule allows
+  // listing everything for this e-mail, so the archive drawer shows up.
+  const { issues, loading, error } = useBoard({ admin });
+  const { move, sort, comment, edit, error: actionError } = useAdminActions(session);
 
-  // O painel aberto mora na querystring, junto dos filtros: assim a URL da barra
-  // de endereço já é o link do card, e voltar no navegador fecha o painel.
-  const aberto = params.get("card");
-  function abrir(id: string | null) {
-    const novos = new URLSearchParams(params);
-    if (id) novos.set("card", id);
-    else novos.delete("card");
-    setParams(novos);
+  // The open panel lives in the query string, next to the filters: that way the
+  // address bar's URL is already the card's link, and going back in the browser
+  // closes the panel.
+  const openId = params.get("card");
+  function open(id: string | null) {
+    const next = new URLSearchParams(params);
+    if (id) next.set("card", id);
+    else next.delete("card");
+    setParams(next);
   }
 
-  const colunas = useMemo(
-    () => (admin ? agruparAdmin : agrupar)(issues, { projeto, tipo, busca }),
-    [admin, issues, projeto, tipo, busca],
+  const columns = useMemo(
+    () => (admin ? groupForAdmin : group)(issues, { project, type, search }),
+    [admin, issues, project, type, search],
   );
-  // Procurado na lista inteira, não nas colunas: um link direto precisa abrir o
-  // card mesmo quando o filtro em vigor o esconderia do quadro.
-  const issueAberta = admin ? (issues.find((i) => i.id === aberto) ?? null) : null;
+  // Looked up in the whole list, not in the columns: a direct link has to open
+  // the card even when the filter in force would hide it from the board.
+  const openIssue = admin ? (issues.find((i) => i.id === openId) ?? null) : null;
 
-  // Soltar em cima de um card fixa a posição. A conta roda sempre na pilha
-  // COMPLETA da coluna de destino — o que está na tela pode ser um pedaço dela,
-  // e renumerar só o pedaço embaralharia o que o filtro esconde.
-  function fixar(id: string, alvoId: string, antes: boolean) {
-    const arrastado = issues.find((i) => i.id === id);
-    const alvo = issues.find((i) => i.id === alvoId);
-    if (!arrastado || !alvo) return;
-    const destino = colunaDe(alvo);
-    const posicoes = reordenarPilha(pilha(issues, destino), arrastado, alvoId, antes);
-    // Veio de outra coluna: status e posição saem na mesma escrita, senão o card
-    // aparece um instante na coluna nova e no lugar errado.
-    const mudouDeColuna = colunaDe(arrastado) !== destino;
-    void ordenar(posicoes, mudouDeColuna ? { id, coluna: destino } : undefined);
+  // Dropping onto a card pins the position. The arithmetic always runs on the
+  // destination column's COMPLETE stack -- what is on screen may be a slice of
+  // it, and renumbering only the slice would shuffle what the filter hides.
+  function pin(id: string, targetId: string, before: boolean) {
+    const dragged = issues.find((i) => i.id === id);
+    const target = issues.find((i) => i.id === targetId);
+    if (!dragged || !target) return;
+    const destination = columnOf(target);
+    const positions = reorderStack(stack(issues, destination), dragged, targetId, before);
+    // It came from another column: status and position go out in the same
+    // write, otherwise the card shows for an instant in the new column and in
+    // the wrong place.
+    const changedColumn = columnOf(dragged) !== destination;
+    void sort(positions, changedColumn ? { id, column: destination } : undefined);
   }
 
-  function ordemAutomatica(coluna: Coluna) {
-    void ordenar(soltarPilha(pilha(issues, coluna)));
+  function autoOrder(column: Column) {
+    void sort(releaseStack(stack(issues, column)));
   }
 
   return (
     <>
-      {erroAcao && <p className="aviso aviso-erro">{erroAcao}</p>}
+      {actionError && <p className="aviso aviso-erro">{actionError}</p>}
       <Board
-        colunas={colunas}
-        carregando={carregando}
-        erro={erro}
-        onMover={admin ? (id, coluna) => void mover(id, coluna) : undefined}
-        onAbrir={admin ? abrir : undefined}
-        onFixar={admin ? fixar : undefined}
-        onOrdemAutomatica={admin ? ordemAutomatica : undefined}
+        columns={columns}
+        loading={loading}
+        error={error}
+        onMove={admin ? (id, column) => void move(id, column) : undefined}
+        onOpen={admin ? open : undefined}
+        onPin={admin ? pin : undefined}
+        onAutoOrder={admin ? autoOrder : undefined}
       />
-      {issueAberta && (
-        <Suspense fallback={<p className="aviso">{t.carregando}</p>}>
-          <PainelIssue
-            issue={issueAberta}
-            onFechar={() => abrir(null)}
-            onComentar={(texto, imagens) => void comentar(issueAberta.id, texto, imagens)}
-            onEditar={(campos) => void editar(issueAberta.id, campos)}
+      {openIssue && (
+        <Suspense fallback={<p className="aviso">{t.loading}</p>}>
+          <IssuePanel
+            issue={openIssue}
+            onClose={() => open(null)}
+            onComment={(text, images) => void comment(openIssue.id, text, images)}
+            onEdit={(fields) => void edit(openIssue.id, fields)}
           />
         </Suspense>
       )}

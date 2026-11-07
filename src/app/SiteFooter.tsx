@@ -7,18 +7,18 @@ export function SiteFooter() {
   return (
     <footer className="site-footer">
       <p>
-        {t.maisFerramentas}{" "}
+        {t.moreTools}{" "}
         <a href="https://latam-tools.com.br" target="_blank" rel="noopener noreferrer">
           latam-tools.com.br
         </a>
         .
       </p>
       <p>
-        {t.entreNoDiscord}{" "}
+        {t.joinDiscord}{" "}
         <a href={DISCORD} target="_blank" rel="noopener noreferrer">
           Discord
         </a>
-        . {t.codigoAberto}{" "}
+        . {t.openSource}{" "}
         <a href={REPO} target="_blank" rel="noopener noreferrer">
           GitHub
         </a>

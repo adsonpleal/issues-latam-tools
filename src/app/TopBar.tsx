@@ -1,82 +1,84 @@
 import { Link, useSearchParams } from "react-router-dom";
 
-import { useSessao } from "../features/admin/SessaoContext";
-import { LABEL_TIPO, t } from "../i18n";
-import { PROJETOS, SLUGS_PROJETO, parseProjeto } from "../lib/projetos";
-import { TIPOS, isTipo } from "../lib/status";
+import { useSession } from "../features/admin/SessionContext";
+import { TYPE_LABEL, t } from "../i18n";
+import { PROJECTS, PROJECT_SLUGS, parseProject } from "../lib/projects";
+import { ISSUE_TYPES, isIssueType } from "../lib/status";
 
 /**
- * Os filtros moram na querystring, não em estado local: mudar o filtro já deixa
- * a URL pronta para compartilhar, e é essa mesma URL que o botão "Acompanhar"
- * dos outros sites abre (`/?projeto=visuais`).
+ * The filters live in the query string, not in local state: changing a filter
+ * already leaves the URL ready to share, and it is that same URL the other
+ * sites' "Acompanhar" button opens (`/?projeto=visuais`).
  *
- * A barra é a mesma para todo mundo. Com sessão de admin ela ganha o nome, o
- * link das gravações e o Sair — que era o cabeçalho do portão de /admin, na
- * época em que existia uma rota para pendurá-lo.
+ * The bar is the same for everybody. With an admin session it gains the name,
+ * the recordings link and Sair -- which used to be the header of the /admin
+ * gate, back when there was a route to hang it on.
+ *
+ * The parameter names are public URLs, so they keep their spelling.
  */
 export function TopBar() {
-  const { sessao, admin, sair } = useSessao();
+  const { session, admin, signOut } = useSession();
   const [params, setParams] = useSearchParams();
-  const projeto = parseProjeto(params.get("projeto"));
-  const tipoBruto = params.get("tipo");
-  const tipo = isTipo(tipoBruto) ? tipoBruto : null;
-  const busca = params.get("busca") ?? "";
+  const project = parseProject(params.get("projeto"));
+  const rawType = params.get("tipo");
+  const type = isIssueType(rawType) ? rawType : null;
+  const search = params.get("busca") ?? "";
 
-  function atualiza(chave: string, valor: string) {
-    const novos = new URLSearchParams(params);
-    if (valor) novos.set(chave, valor);
-    else novos.delete(chave);
-    setParams(novos, { replace: true });
+  function update(key: string, value: string) {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next, { replace: true });
   }
 
   return (
     <header className="topbar">
       <div className="topbar-marca">
         <Link to="/" className="topbar-titulo">
-          {t.siteNome} <span className="topbar-sub">{t.siteSub}</span>
+          {t.siteName} <span className="topbar-sub">{t.siteSubtitle}</span>
         </Link>
       </div>
 
       <div className="topbar-filtros">
         <label className="campo-inline">
-          <span className="visually-hidden">{t.filtrarProjeto}</span>
+          <span className="visually-hidden">{t.filterByProject}</span>
           <select
-            value={projeto ?? ""}
-            onChange={(e) => atualiza("projeto", e.target.value)}
-            title={t.filtrarProjeto}
+            value={project ?? ""}
+            onChange={(e) => update("projeto", e.target.value)}
+            title={t.filterByProject}
           >
-            <option value="">{t.todosProjetos}</option>
-            {SLUGS_PROJETO.map((slug) => (
+            <option value="">{t.allProjects}</option>
+            {PROJECT_SLUGS.map((slug) => (
               <option key={slug} value={slug}>
-                {PROJETOS[slug].nome}
+                {PROJECTS[slug].name}
               </option>
             ))}
           </select>
         </label>
 
         <label className="campo-inline">
-          <span className="visually-hidden">{t.filtrarTipo}</span>
+          <span className="visually-hidden">{t.filterByType}</span>
           <select
-            value={tipo ?? ""}
-            onChange={(e) => atualiza("tipo", e.target.value)}
-            title={t.filtrarTipo}
+            value={type ?? ""}
+            onChange={(e) => update("tipo", e.target.value)}
+            title={t.filterByType}
           >
-            <option value="">{t.todosTipos}</option>
-            {TIPOS.map((tp) => (
+            <option value="">{t.allTypes}</option>
+            {ISSUE_TYPES.map((tp) => (
               <option key={tp} value={tp}>
-                {LABEL_TIPO[tp]}
+                {TYPE_LABEL[tp]}
               </option>
             ))}
           </select>
         </label>
 
         <label className="campo-inline">
-          <span className="visually-hidden">{t.buscar}</span>
+          <span className="visually-hidden">{t.search}</span>
           <input
             type="search"
-            value={busca}
-            placeholder={t.buscarPlaceholder}
-            onChange={(e) => atualiza("busca", e.target.value)}
+            value={search}
+            placeholder={t.searchPlaceholder}
+            onChange={(e) => update("busca", e.target.value)}
           />
         </label>
       </div>
@@ -84,19 +86,19 @@ export function TopBar() {
       <div className="topbar-acoes">
         {admin && (
           <span className="admin-sessao">
-            <span>{sessao?.nome}</span>
-            <Link to="/gravacoes">{t.gravacoesLink}</Link>
-            <button type="button" className="botao botao-pequeno" onClick={() => void sair()}>
-              {t.sair}
+            <span>{session?.name}</span>
+            <Link to="/gravacoes">{t.recordingsLink}</Link>
+            <button type="button" className="botao botao-pequeno" onClick={() => void signOut()}>
+              {t.signOut}
             </button>
           </span>
         )}
         <Link
           className="botao botao-primario"
-          to={projeto ? `/novo?projeto=${projeto}` : "/novo"}
-          title={t.reportarTitulo}
+          to={project ? `/novo?projeto=${project}` : "/novo"}
+          title={t.reportTitle}
         >
-          {t.reportar}
+          {t.report}
         </Link>
       </div>
     </header>

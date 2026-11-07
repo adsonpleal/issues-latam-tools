@@ -1,54 +1,54 @@
 import { Link } from "react-router-dom";
 
-import { LABEL_STATUS, LABEL_TIPO, t } from "../../i18n";
-import { formatData } from "../../lib/datas";
+import { STATUS_LABEL, TYPE_LABEL, t } from "../../i18n";
+import { formatDate } from "../../lib/dates";
 import type { Issue } from "../../lib/issues";
-import { PROJETOS } from "../../lib/projetos";
-import { useVotos } from "../votos/useVotos";
-import { TextoComLinks } from "./TextoComLinks";
+import { PROJECTS } from "../../lib/projects";
+import { useVotes } from "../votes/useVotes";
+import { TextWithLinks } from "./TextWithLinks";
 
 export function IssueDetail({ issue }: { issue: Issue }) {
-  const { jaVotou, votar } = useVotos();
-  const projeto = PROJETOS[issue.projeto];
-  const votou = jaVotou(issue.id);
+  const { hasVoted, vote } = useVotes();
+  const project = PROJECTS[issue.project];
+  const votou = hasVoted(issue.id);
 
   return (
     <article className="issue-detalhe">
       <div className="issue-detalhe-selos">
         <Link
           className="selo selo-projeto"
-          style={{ borderColor: projeto.cor, color: projeto.cor }}
-          to={`/?projeto=${issue.projeto}`}
+          style={{ borderColor: project.color, color: project.color }}
+          to={`/?projeto=${issue.project}`}
         >
-          {projeto.nome}
+          {project.name}
         </Link>
-        <span className={`selo selo-tipo selo-${issue.tipo}`}>{LABEL_TIPO[issue.tipo]}</span>
+        <span className={`selo selo-tipo selo-${issue.type}`}>{TYPE_LABEL[issue.type]}</span>
         <span className={`selo selo-status selo-${issue.status}`}>
-          {LABEL_STATUS[issue.status]}
+          {STATUS_LABEL[issue.status]}
         </span>
       </div>
 
-      <h1>{issue.titulo}</h1>
+      <h1>{issue.title}</h1>
 
       <p className="issue-detalhe-meta">
-        {formatData(issue.criadoEm)}
-        {issue.autor && <> · {t.reportadoPor(issue.autor)}</>}
+        {formatDate(issue.createdAt)}
+        {issue.author && <> · {t.reportedBy(issue.author)}</>}
       </p>
 
-      {issue.descricao && (
+      {issue.description && (
         <div className="issue-detalhe-descricao">
-          <TextoComLinks texto={issue.descricao} />
+          <TextWithLinks text={issue.description} />
         </div>
       )}
 
       <button
         type="button"
         className={votou ? "voto voto-feito" : "voto"}
-        onClick={() => void votar(issue.id)}
+        onClick={() => void vote(issue.id)}
         disabled={votou}
-        title={votou ? t.jaVotou : t.votarTitulo}
+        title={votou ? t.alreadyVoted : t.voteTitle}
       >
-        <span aria-hidden="true">▲</span> {issue.upvotes} {votou ? "" : t.votar}
+        <span aria-hidden="true">▲</span> {issue.upvotes} {votou ? "" : t.vote}
       </button>
     </article>
   );

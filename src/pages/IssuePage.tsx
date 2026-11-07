@@ -2,109 +2,111 @@ import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { t } from "../i18n";
-import { apagarAnexo, subscribeAnexos, type Anexo } from "../lib/anexos";
-import { subscribeComentarios, type Comentario } from "../lib/comentarios";
+import { deleteAttachment, subscribeAttachments, type Attachment } from "../lib/attachments";
+import { subscribeComments, type IssueComment } from "../lib/comments";
 import { subscribeIssue, type Issue } from "../lib/issues";
 import { useSeo } from "../lib/seo";
-import { useSessao } from "../features/admin/SessaoContext";
-import { useAcoesAdmin } from "../features/admin/useAcoesAdmin";
+import { useSession } from "../features/admin/SessionContext";
+import { useAdminActions } from "../features/admin/useAdminActions";
 import { IssueDetail } from "../features/ticket/IssueDetail";
-import { ListaAnexos } from "../features/ticket/ListaAnexos";
-import { ListaComentarios } from "../features/ticket/ListaComentarios";
+import { AttachmentList } from "../features/ticket/AttachmentList";
+import { CommentList } from "../features/ticket/CommentList";
 
-const AcoesTicket = lazy(() =>
-  import("../features/admin/AcoesTicket").then((m) => ({ default: m.AcoesTicket })),
+const TicketActions = lazy(() =>
+  import("../features/admin/TicketActions").then((m) => ({ default: m.TicketActions })),
 );
 
-const FormularioComentario = lazy(() =>
-  import("../features/admin/AcoesIssue").then((m) => ({ default: m.FormularioComentario })),
+const CommentForm = lazy(() =>
+  import("../features/admin/IssueActions").then((m) => ({ default: m.CommentForm })),
 );
 
 export function IssuePage() {
   const { issueId = "" } = useParams();
   const [params] = useSearchParams();
-  const acabouDeCriar = params.get("novo") === "1";
+  // The query parameter is a public URL, so it keeps its spelling.
+  const justCreated = params.get("novo") === "1";
 
-  const { sessao, admin, carregando: carregandoSessao } = useSessao();
-  const uid = sessao?.uid ?? null;
-  const { mover, editar, comentar, erro: erroAcao } = useAcoesAdmin(sessao);
+  const { session, admin, loading: loadingSession } = useSession();
+  const uid = session?.uid ?? null;
+  const { move, edit, comment, error: actionError } = useAdminActions(session);
 
   const [issue, setIssue] = useState<Issue | null>(null);
-  const [comentarios, setComentarios] = useState<Comentario[]>([]);
-  const [anexos, setAnexos] = useState<Anexo[]>([]);
-  const [carregando, setCarregando] = useState(true);
+  const [comments, setComments] = useState<IssueComment[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // As três assinaturas esperam a sessão resolver, e re-assinam quando o uid
-  // muda. Não é capricho: card arquivado nega a leitura para quem não é admin, e
-  // um onSnapshot que toma permission-denied MORRE — não tenta de novo quando o
-  // token chega depois. Assinar antes da hora deixaria o admin olhando um "não
-  // encontrado" que nada mais consertaria.
+  // The three subscriptions wait for the session to resolve, and resubscribe
+  // when the uid changes. This is not fussiness: an archived card denies the
+  // read to anybody who is not the admin, and an onSnapshot that takes a
+  // permission-denied DIES -- it does not retry when the token arrives later.
+  // Subscribing too early would leave the admin staring at a "not found" that
+  // nothing else would repair.
   useEffect(() => {
-    if (!issueId || carregandoSessao) return;
-    setCarregando(true);
-    // Card arquivado devolve permission-denied, e inexistente devolve vazio. Os
-    // dois viram o MESMO "não encontrado" de propósito: a diferença entre as
-    // respostas contaria que existe um card arquivado com aquele id.
-    const cancelar = subscribeIssue(
+    if (!issueId || loadingSession) return;
+    setLoading(true);
+    // An archived card answers permission-denied, and a non-existent one answers
+    // empty. Both become the SAME "not found" on purpose: the difference between
+    // the answers would tell that an archived card with that id exists.
+    const cancel = subscribeIssue(
       issueId,
       (i) => {
         setIssue(i);
-        setCarregando(false);
+        setLoading(false);
       },
       () => {
         setIssue(null);
-        setCarregando(false);
+        setLoading(false);
       },
     );
-    return cancelar;
-  }, [issueId, carregandoSessao, uid]);
+    return cancel;
+  }, [issueId, loadingSession, uid]);
 
   useEffect(() => {
-    if (!issueId || carregandoSessao) return;
-    return subscribeComentarios(issueId, setComentarios, () => setComentarios([]));
-  }, [issueId, carregandoSessao, uid]);
+    if (!issueId || loadingSession) return;
+    return subscribeComments(issueId, setComments, () => setComments([]));
+  }, [issueId, loadingSession, uid]);
 
   useEffect(() => {
-    if (!issueId || carregandoSessao) return;
-    return subscribeAnexos(issueId, setAnexos, () => setAnexos([]));
-  }, [issueId, carregandoSessao, uid]);
+    if (!issueId || loadingSession) return;
+    return subscribeAttachments(issueId, setAttachments, () => setAttachments([]));
+  }, [issueId, loadingSession, uid]);
 
-  // Uma subscrição só para os dois usos: o que veio no relato fica na lista de
-  // anexos, o que foi colado numa atualização aparece dentro dela. Memoizado
-  // porque as duas listas viram object URL — recriá-las a cada render churnaria
-  // blob à toa.
-  const [anexosDoCard, imagensDeComentario] = useMemo(
-    () => [anexos.filter((a) => !a.comentarioId), anexos.filter((a) => a.comentarioId)],
-    [anexos],
+  // One subscription for both uses: what came with the report stays in the
+  // attachment list, what was pasted into an update shows up inside it.
+  // Memoised because both lists become object URLs -- rebuilding them on every
+  // render would churn blobs for nothing.
+  const [cardAttachments, commentImages] = useMemo(
+    () => [attachments.filter((a) => !a.commentId), attachments.filter((a) => a.commentId)],
+    [attachments],
   );
 
   useSeo({
-    title: issue ? `${issue.titulo} — ${t.siteNome}` : `${t.siteNome} — ${t.siteSub}`,
-    description: issue?.descricao.slice(0, 160) || t.siteDescricao,
+    title: issue ? `${issue.title} — ${t.siteName}` : `${t.siteName} — ${t.siteSubtitle}`,
+    description: issue?.description.slice(0, 160) || t.siteDescription,
     path: `/t/${issueId}`,
   });
 
-  // Qualquer pessoa anexa arquivo, então precisa existir moderação — e ela mora
-  // onde o arquivo aparece, não numa tela à parte.
-  const apagar = admin ? (anexoId: string) => void apagarAnexo(issueId, anexoId) : undefined;
+  // Anybody can attach a file, so moderation has to exist -- and it lives where
+  // the file shows up, not on a screen of its own.
+  const remove = admin ? (attachmentId: string) => void deleteAttachment(issueId, attachmentId) : undefined;
 
   return (
     <div className="pagina pagina-estreita">
       <p>
         <Link to="/" className="link-voltar">
-          ← {t.voltar}
+          ← {t.backToBoard}
         </Link>
       </p>
 
-      {acabouDeCriar && <p className="aviso aviso-ok">{t.enviado}</p>}
-      {erroAcao && <p className="aviso aviso-erro">{erroAcao}</p>}
+      {justCreated && <p className="aviso aviso-ok">{t.submitted}</p>}
+      {actionError && <p className="aviso aviso-erro">{actionError}</p>}
 
-      {(carregando || carregandoSessao) && <p className="aviso">{t.carregando}</p>}
+      {(loading || loadingSession) && <p className="aviso">{t.loading}</p>}
 
-      {!carregando && !carregandoSessao && !issue && (
+      {!loading && !loadingSession && !issue && (
         <>
-          <h1>{t.naoEncontrado}</h1>
-          <p className="subtitulo">{t.naoEncontradoAjuda}</p>
+          <h1>{t.notFound}</h1>
+          <p className="subtitulo">{t.notFoundHelp}</p>
         </>
       )}
 
@@ -112,28 +114,28 @@ export function IssuePage() {
         <>
           <IssueDetail issue={issue} />
           {admin && (
-            <Suspense fallback={<p className="aviso">{t.carregando}</p>}>
-              <AcoesTicket
+            <Suspense fallback={<p className="aviso">{t.loading}</p>}>
+              <TicketActions
                 issue={issue}
-                onMover={(coluna) => void mover(issue.id, coluna)}
-                onEditar={(campos) => void editar(issue.id, campos)}
+                onMove={(column) => void move(issue.id, column)}
+                onEdit={(fields) => void edit(issue.id, fields)}
               />
             </Suspense>
           )}
-          <ListaAnexos anexos={anexosDoCard} onApagar={apagar} />
-          <h2 className="secao">{t.comentariosLabel(comentarios.length)}</h2>
-          <ListaComentarios
-            comentarios={comentarios}
-            imagens={imagensDeComentario}
-            onApagarImagem={apagar}
+          <AttachmentList attachments={cardAttachments} onDelete={remove} />
+          <h2 className="secao">{t.commentCount(comments.length)}</h2>
+          <CommentList
+            comments={comments}
+            images={commentImages}
+            onDeleteImage={remove}
           />
           {admin && (
             <Suspense fallback={null}>
-              {/* Id próprio: o painel do quadro tem o mesmo formulário, e o
-                  `htmlFor` do campo de anexos precisa ser único no documento. */}
-              <FormularioComentario
+              {/* An id of its own: the board's panel has the same form, and the
+                  attachment field's `htmlFor` has to be unique in the document. */}
+              <CommentForm
                 id="imagens-comentario-ticket"
-                onEnviar={(texto, imagens) => void comentar(issue.id, texto, imagens)}
+                onSubmit={(text, images) => void comment(issue.id, text, images)}
               />
             </Suspense>
           )}

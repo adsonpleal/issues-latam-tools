@@ -1,94 +1,101 @@
 import { getFirebaseApp } from "./firebase";
 
-/** O único e-mail com poder de escrita. Espelha `isAdmin()` em firestore.rules. */
-export const EMAIL_ADMIN = "adsonpleal@gmail.com";
+/** The one e-mail with write power. Mirrors `isAdmin()` in firestore.rules. */
+export const ADMIN_EMAIL = "adsonpleal@gmail.com";
 
 /**
- * Marca de "esta máquina já entrou alguma vez", no mesmo namespace dos votos.
+ * The "this machine has signed in at some point" mark, in the same namespace
+ * as the votes.
  *
- * Ela existe por causa do peso. As ações de admin moram nas MESMAS URLs do
- * público, então alguém precisa decidir se vale baixar o SDK de auth (~40 kB gz)
- * para descobrir se há sessão. Sem marca, o provider resolve "sem sessão" sem
- * nem tocar no import — visitante nenhum paga por uma pergunta cuja resposta é
- * quase sempre não.
+ * It exists because of weight. The admin actions live at the SAME URLs as the
+ * public ones, so something has to decide whether it is worth downloading the
+ * auth SDK (~40 kB gz) to find out whether there is a session. With no mark,
+ * the provider resolves "no session" without even touching the import -- no
+ * visitor pays for a question whose answer is almost always no.
  *
- * Não é segurança: forjar a marca só faz baixar o SDK e descobrir que não há
- * sessão. Quem manda continua sendo `isAdmin()` nas regras do Firestore.
+ * It is not security: forging the mark only downloads the SDK and finds out
+ * there is no session. What decides is still `isAdmin()` in the Firestore
+ * rules.
  *
- * Perder a marca (storage limpo, outro navegador) também não tranca ninguém
- * para fora: `/entrar` liga o observador sem consultá-la, e o Firebase reconhece
- * a sessão que ainda está no IndexedDB.
+ * Losing the mark (cleared storage, another browser) does not lock anybody out
+ * either: `/entrar` turns the watcher on without consulting it, and Firebase
+ * recognises the session that is still in IndexedDB.
+ *
+ * The stored key keeps its spelling: it is a localStorage key already set on
+ * real machines, and renaming it would read as "never signed in here".
  */
-const CHAVE_SESSAO = "issues.latamtools.admin";
+const SESSION_KEY = "issues.latamtools.admin";
 
-export type Sessao = {
+export type Session = {
   uid: string;
-  nome: string;
+  name: string;
   email: string;
   admin: boolean;
 };
 
-export function talvezTemSessao(): boolean {
+export function maybeHasSession(): boolean {
   try {
-    return localStorage.getItem(CHAVE_SESSAO) === "1";
+    return localStorage.getItem(SESSION_KEY) === "1";
   } catch {
-    // localStorage bloqueado (modo privado antigo, storage cheio): o quadro
-    // público segue igual, e entrar continua funcionando por /entrar.
+    // localStorage blocked (old private mode, storage full): the public board
+    // works the same, and signing in still works through /entrar.
     return false;
   }
 }
 
-function marcarSessao(tem: boolean): void {
+function markSession(has: boolean): void {
   try {
-    if (tem) localStorage.setItem(CHAVE_SESSAO, "1");
-    else localStorage.removeItem(CHAVE_SESSAO);
+    if (has) localStorage.setItem(SESSION_KEY, "1");
+    else localStorage.removeItem(SESSION_KEY);
   } catch {
-    /* sem persistência, segue o jogo */
+    /* no persistence; carry on */
   }
 }
 
 /**
- * O SDK de auth é importado dinamicamente: quem só abre o quadro nunca baixa
- * esse código. Só chega aqui quem tem a marca acima ou quem abre /entrar.
+ * The auth SDK is imported dynamically: anyone who only opens the board never
+ * downloads that code. Only somebody with the mark above, or somebody opening
+ * /entrar, gets this far.
  */
 async function authModule() {
   const mod = await import("firebase/auth");
   return { mod, auth: mod.getAuth(getFirebaseApp()) };
 }
 
-export async function observarSessao(cb: (s: Sessao | null) => void): Promise<() => void> {
+export async function watchSession(cb: (s: Session | null) => void): Promise<() => void> {
   const { mod, auth } = await authModule();
   return mod.onAuthStateChanged(auth, (user) => {
-    // A marca acompanha o observador nos dois sentidos — inclusive quando o
-    // sair aconteceu em outra aba, que é onde o onAuthStateChanged desemboca.
-    marcarSessao(user !== null);
+    // The mark follows the watcher in both directions -- including when the
+    // sign-out happened in another tab, which is where onAuthStateChanged
+    // comes out.
+    markSession(user !== null);
     if (!user) {
       cb(null);
       return;
     }
     cb({
       uid: user.uid,
-      nome: user.displayName ?? user.email ?? "admin",
+      name: user.displayName ?? user.email ?? "admin",
       email: user.email ?? "",
-      // Espelho da UI. Quem manda de verdade são as regras: qualquer conta
-      // Google consegue entrar e criar um registro de usuário, e nenhuma delas
-      // consegue escrever nada além deste e-mail.
-      admin: user.email === EMAIL_ADMIN && user.emailVerified,
+      // A mirror for the UI. What really decides is the rules: any Google
+      // account can sign in and create a user record, and none of them can
+      // write anything except this e-mail.
+      admin: user.email === ADMIN_EMAIL && user.emailVerified,
     });
   });
 }
 
-export async function entrar(): Promise<void> {
+export async function signInWithGoogle(): Promise<void> {
   const { mod, auth } = await authModule();
   const provider = new mod.GoogleAuthProvider();
-  // Popup, não redirect: o fluxo de redirect depende de um cookie cross-site em
-  // firebaseapp.com que o ITP do Safari corta.
+  // A popup, not a redirect: the redirect flow depends on a cross-site cookie
+  // on firebaseapp.com that Safari's ITP cuts off.
   await mod.signInWithPopup(auth, provider);
-  marcarSessao(true);
+  markSession(true);
 }
 
-export async function sair(): Promise<void> {
+export async function signOut(): Promise<void> {
   const { mod, auth } = await authModule();
-  marcarSessao(false);
+  markSession(false);
   await mod.signOut(auth);
 }

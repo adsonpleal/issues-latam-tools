@@ -1,9 +1,9 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 
-import { SessaoProvider } from "../features/admin/SessaoContext";
+import { SessionProvider } from "../features/admin/SessionContext";
 import { t } from "../i18n";
-import { isProjeto } from "../lib/projetos";
+import { isProject } from "../lib/projects";
 import { BoardPage } from "../pages/BoardPage";
 import { IssuePage } from "../pages/IssuePage";
 import { NewIssuePage } from "../pages/NewIssuePage";
@@ -11,57 +11,61 @@ import { NotFoundPage } from "../pages/NotFoundPage";
 import { SiteFooter } from "./SiteFooter";
 import { TopBar } from "./TopBar";
 
-// Estas duas são as únicas páginas que só existem com sessão. Lazy porque não há
-// razão para o público carregá-las — mas o peso de verdade, o SDK de auth, quem
-// segura é a marca em localStorage (ver lib/auth.ts), não a rota.
-const EntrarPage = lazy(() =>
-  import("../pages/EntrarPage").then((m) => ({ default: m.EntrarPage })),
+// These two are the only pages that exist with a session. Lazy because there is
+// no reason for the public to download them -- but the real weight, the auth
+// SDK, is held back by the mark in localStorage (see lib/auth.ts), not by the
+// route.
+const SignInPage = lazy(() =>
+  import("../pages/SignInPage").then((m) => ({ default: m.SignInPage })),
 );
 
-const GravacoesPage = lazy(() =>
-  import("../pages/GravacoesPage").then((m) => ({ default: m.GravacoesPage })),
+const RecordingsPage = lazy(() =>
+  import("../pages/RecordingsPage").then((m) => ({ default: m.RecordingsPage })),
 );
 
 /**
- * `/visuais` digitado na mão vira `/?projeto=visuais`. O esquema canônico é a
- * querystring — ela compõe com tipo e busca, e não briga com /novo, /t/:id e
- * /gravacoes por espaço de nome.
+ * `/visuais` typed by hand becomes `/?projeto=visuais`. The canonical scheme is
+ * the query string -- it composes with type and search, and does not fight
+ * /novo, /t/:id and /gravacoes over the name space.
+ *
+ * The paths and the query parameters are public URLs, so they keep their
+ * Portuguese spelling.
  */
-function AtalhoProjeto() {
+function ProjectShortcut() {
   const { slug } = useParams();
-  if (isProjeto(slug)) return <Navigate replace to={`/?projeto=${slug}`} />;
+  if (isProject(slug)) return <Navigate replace to={`/?projeto=${slug}`} />;
   return <NotFoundPage />;
 }
 
 /**
- * Não existe espaço de URL de admin. As mesmas rotas servem todo mundo, e é ter
- * ou não sessão que decide se os controles aparecem — ver `SessaoProvider`. A
- * única rota que só faz sentido para o admin é `/entrar`, que não é linkada de
- * lugar nenhum.
+ * There is no admin URL space. The same routes serve everybody, and having a
+ * session or not is what decides whether the controls appear -- see
+ * `SessionProvider`. The only route that makes sense for the admin alone is
+ * `/entrar`, which is linked from nowhere.
  */
 export function App() {
   return (
     <BrowserRouter>
-      <SessaoProvider>
+      <SessionProvider>
         <TopBar />
         <main className="conteudo">
-          <Suspense fallback={<p className="aviso">{t.carregando}</p>}>
+          <Suspense fallback={<p className="aviso">{t.loading}</p>}>
             <Routes>
               <Route path="/" element={<BoardPage />} />
               <Route path="/novo" element={<NewIssuePage />} />
               <Route path="/t/:issueId" element={<IssuePage />} />
-              <Route path="/entrar" element={<EntrarPage />} />
-              {/* Vêm antes do atalho de projeto — o router v7 ordena por
-                  especificidade, então `/:slug` não roubaria nenhuma das duas de
-                  qualquer jeito, mas a leitura fica na ordem certa. */}
-              <Route path="/gravacoes" element={<GravacoesPage />} />
-              <Route path="/:slug" element={<AtalhoProjeto />} />
+              <Route path="/entrar" element={<SignInPage />} />
+              {/* These come before the project shortcut -- router v7 orders by
+                  specificity, so `/:slug` would not steal either of them
+                  anyway, but it reads in the right order. */}
+              <Route path="/gravacoes" element={<RecordingsPage />} />
+              <Route path="/:slug" element={<ProjectShortcut />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </Suspense>
         </main>
         <SiteFooter />
-      </SessaoProvider>
+      </SessionProvider>
     </BrowserRouter>
   );
 }

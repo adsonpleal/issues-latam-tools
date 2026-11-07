@@ -2,16 +2,18 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 /**
- * Sem `base: "./"`. O caminho relativo quebraria as rotas fundas (`/t/:id`), porque
- * o index.html servido em `/t/abc` procuraria os assets em `/t/assets/...`.
+ * No `base: "./"`. A relative path would break the deep routes (`/t/:id`),
+ * because the index.html served at `/t/abc` would look for the assets at
+ * `/t/assets/...`.
  */
 export default defineConfig({
   plugins: [react()],
   build: {
     target: "es2022",
     sourcemap: true,
-    // O SDK do Firestore sozinho passa de 500 kB. O de auth já sai num chunk
-    // separado (só quem entra importa), e o resto é react + router.
+    // The Firestore SDK alone is over 500 kB. The auth one already comes out
+    // in a chunk of its own (only whoever signs in imports it), and the rest is
+    // react + router.
     chunkSizeWarningLimit: 700,
   },
   test: {

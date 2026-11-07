@@ -23,7 +23,7 @@
 // who is not the admin, so this process CANNOT read the reporter's contact
 // details, not even by accident. An admin credential would override the rules
 // and throw that guarantee away. Whatever moves the card afterwards is
-// `triagem.mjs`, which is authenticated precisely because writing demands it.
+// `triage.mjs`, which is authenticated precisely because writing demands it.
 //
 // A resident process has the flaw the announcer describes: a stalled poller
 // stays "alive" forever with its announcements stopped. What cuts that here is
@@ -39,7 +39,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { initializeApp } from "firebase/app";
 import { collection, getFirestore, limit, onSnapshot, query, where } from "firebase/firestore";
 
-import { REPOS, urlDoCard } from "./triagem.mjs";
+import { REPOS, cardUrl } from "./triage.mjs";
 
 /** Mirrors src/lib/firebase.ts. Public web key: it already ships in the site bundle. */
 const CONFIG = {
@@ -48,7 +48,7 @@ const CONFIG = {
 };
 
 /**
- * Next to the `estado.json` that `triagem.mjs` keeps, but in a file of its own:
+ * Next to the `estado.json` that `triage.mjs` keeps, but in a file of its own:
  * that one holds the ntfy topic and the `bootstrap` watermark, and two
  * concurrent writes to the same file would lose one of them.
  */
@@ -59,7 +59,7 @@ const STATE_FILE =
   process.env["TRIAGEM_ESTADO"] || join(homedir(), ".claude", "triagem-automatica", "estado.json");
 
 /**
- * How often `reconciliar` runs. It is the half of the old dispatcher that a
+ * How often `reconcile` runs. It is the half of the old dispatcher that a
  * listener cannot replace: a card becomes `resolvido` when its pull request is
  * merged, and a merge on GitHub pushes nothing to us — only asking finds out. So
  * this half still needs a clock, and this process is the resident one we have.
@@ -76,7 +76,7 @@ const RECONCILE_EVERY_MS = Number(process.env["LISTEN_RECONCILE_MS"] || 15 * 60 
  * threw before a single test could run.
  */
 function triageCli() {
-  return fileURLToPath(new URL("./triagem.mjs", import.meta.url));
+  return fileURLToPath(new URL("./triage.mjs", import.meta.url));
 }
 
 // --- The rule, kept apart from the network ---------------------------------
@@ -111,14 +111,20 @@ export function isAfter(a, b) {
  * What is new in this snapshot, and the watermark that replaces the old one.
  *
  * `replay` is left out because a recording is nobody's request, and so is a
- * project with no known repository: the same cuts `maduros` makes in
- * `triagem.mjs`. They are repeated here on purpose, because announcing what the
+ * project with no known repository: the same cuts `triageQueue` makes in
+ * `triage.mjs`. They are repeated here on purpose, because announcing what the
  * queue would never take is a notification for nothing. What the automation
  * actually picks up is still the queue's call, not the listener's.
  *
  * A discarded card **moves the watermark just the same**. If it did not, it
  * would be re-examined on every restart: cheap, but a lie about what the
  * listener has already seen.
+ *
+ * The cards here are raw snapshot documents, straight off `doc.data()`, so
+ * their keys are Firestore's own and stay spelled the way the database spells
+ * them. This file never builds the English card shape `toCard` returns -- it
+ * does not need it, and translating only to compare two timestamps would buy
+ * nothing.
  */
 export function freshCards(cards, mark) {
   let highest = mark;
@@ -137,9 +143,12 @@ export function freshCards(cards, mark) {
   return { fresh, mark: highest };
 }
 
-/** One line per card, read by a person on a phone: id first, link last. */
+/**
+ * One line per card, read by a person on a phone: id first, link last. Reads a
+ * raw snapshot document, so the field names are Firestore's.
+ */
 export function announcement(card) {
-  return `READY ${card.id} | ${card.projeto} | ${card.titulo} | ${urlDoCard(card.id)}`;
+  return `READY ${card.id} | ${card.projeto} | ${card.titulo} | ${cardUrl(card.id)}`;
 }
 
 const lines = (text) =>
@@ -149,14 +158,14 @@ const lines = (text) =>
     .filter(Boolean);
 
 /**
- * What of a `reconciliar` run deserves a notification.
+ * What of a `reconcile` run deserves a notification.
  *
- * The cards that actually moved, and never the `reconciliados: N de M` summary:
+ * The cards that actually moved, and never the `reconciled: N of M` summary:
  * that line is printed on every run, and announcing it every quarter of an hour
  * would train whoever reads these notifications to ignore them.
  *
  * **Anything on stderr counts as a problem, even when the exit code is 0.** That
- * is not defensive padding, it is how `reconciliar` behaves: when `gh` cannot
+ * is not defensive padding, it is how `reconcile` behaves: when `gh` cannot
  * answer for one card it writes the reason to stderr, skips that card and
  * carries on, so the run ends successfully with a card left behind. Judging the
  * run by its exit code alone would let an expired `gh` login keep cards sitting
@@ -189,6 +198,8 @@ function readJson(path) {
 function storedMark() {
   const stored = instant(readJson(MARK_FILE).mark);
   if (stored) return stored;
+  // `desde` is the key already written in that file, on this machine, outside
+  // the repository -- persisted data rather than code, so it keeps its name.
   const since = readJson(STATE_FILE).desde;
   if (!since) throw new Error(`no watermark yet — run 'triagem bootstrap' first (${STATE_FILE})`);
   const ms = Date.parse(since);
@@ -214,12 +225,12 @@ function die(text, code = 1) {
 }
 
 /**
- * Runs `reconciliar` and announces what moved. Never throws and never exits: a
+ * Runs `reconcile` and announces what moved. Never throws and never exits: a
  * listener that died because `gh` had a bad minute would stop announcing new
  * cards too, and the two jobs fail independently.
  */
 function reconcile() {
-  execFile(process.execPath, [triageCli(), "reconciliar"], { windowsHide: true }, (error, out, err) => {
+  execFile(process.execPath, [triageCli(), "reconcile"], { windowsHide: true }, (error, out, err) => {
     for (const line of reconcileReport(out, err, error?.code ?? 0)) console.log(line);
   });
 }
@@ -262,7 +273,7 @@ function listen() {
 
 /**
  * The guard is the announcer's, built on `pathToFileURL`, and not the
- * `file://` + `argv[1]` comparison that `triagem.mjs` uses: on Windows the path
+ * `file://` + `argv[1]` comparison that `triage.mjs` uses: on Windows the path
  * arrives with backslashes and a drive letter, so the raw form never matches.
  * With no guard at all, importing this module — and the test imports it — opened
  * a real listener against Firestore.

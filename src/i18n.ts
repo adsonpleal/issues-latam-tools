@@ -1,167 +1,173 @@
-// Strings de UI — só pt-BR (a língua do servidor LATAM).
-import type { EstadoGravacao } from "./lib/gravacoes";
-import type { Coluna, Status, Tipo } from "./lib/status";
+// UI strings -- pt-BR only (the LATAM server's language).
+//
+// The keys are English and the values are not: every value here is read by a
+// player on the site, so translating one would change the product. The keys of
+// the four label maps at the bottom are stored values (a card's status, a
+// recording's state, an issue's type) and keep the database's spelling.
+import type { RecordingState } from "./lib/recordings";
+import type { Column, Status, IssueType } from "./lib/status";
 
 export const t = {
-  siteNome: "Issues",
-  siteSub: "Ferramentas RO LATAM",
-  siteDescricao:
+  siteName: "Issues",
+  siteSubtitle: "Ferramentas RO LATAM",
+  siteDescription:
     "Bugs e sugestões das ferramentas do RO LATAM, num quadro só. Reporte um problema e acompanhe o progresso.",
 
-  // Navegação e filtros
-  todosProjetos: "Todos os projetos",
-  filtrarProjeto: "Filtrar por projeto",
-  filtrarTipo: "Filtrar por tipo",
-  todosTipos: "Bugs e sugestões",
-  buscar: "Buscar",
-  buscarPlaceholder: "Buscar por texto…",
-  reportar: "Reportar",
-  reportarTitulo: "Reportar um bug ou sugerir uma melhoria",
-  voltar: "Voltar ao quadro",
+  // Navigation and filters
+  allProjects: "Todos os projetos",
+  filterByProject: "Filtrar por projeto",
+  filterByType: "Filtrar por tipo",
+  allTypes: "Bugs e sugestões",
+  search: "Buscar",
+  searchPlaceholder: "Buscar por texto…",
+  report: "Reportar",
+  reportTitle: "Reportar um bug ou sugerir uma melhoria",
+  backToBoard: "Voltar ao quadro",
 
-  // Quadro
-  carregando: "Carregando…",
-  colunaVazia: "Nada por aqui.",
-  quadroVazio: "Nenhum item ainda — seja a primeira pessoa a reportar.",
-  erroCarregar: "Não consegui carregar o quadro. Recarregue a página.",
-  umItem: "1 item",
-  nItens: (n: number) => `${n} itens`,
+  // The board
+  loading: "Carregando…",
+  emptyColumn: "Nada por aqui.",
+  emptyBoard: "Nenhum item ainda — seja a primeira pessoa a reportar.",
+  loadError: "Não consegui carregar o quadro. Recarregue a página.",
+  oneItem: "1 item",
+  nItems: (n: number) => `${n} itens`,
 
-  // Card
-  votar: "Votar",
-  votarTitulo: "Votar neste item",
-  jaVotou: "Você já votou neste item",
-  comentariosLabel: (n: number) => (n === 1 ? "1 comentário" : `${n} comentários`),
-  reportadoPor: (nick: string) => `por ${nick}`,
+  // A card on the board
+  vote: "Votar",
+  voteTitle: "Votar neste item",
+  alreadyVoted: "Você já votou neste item",
+  commentCount: (n: number) => (n === 1 ? "1 comentário" : `${n} comentários`),
+  reportedBy: (nick: string) => `por ${nick}`,
 
-  // Formulário
-  novoTitulo: "Reportar",
-  novoSub: "Conta o que aconteceu. Quanto mais específico, mais rápido dá pra resolver.",
-  campoProjeto: "Qual ferramenta?",
-  campoTipo: "É um bug ou uma sugestão?",
-  campoTituloLabel: "Resumo",
-  campoTituloPlaceholder: "Ex.: Falta a carta Mosca Caçadora na lista",
-  campoDescricao: "Detalhes",
-  campoDescricaoPlaceholder:
+  // The report form
+  formTitle: "Reportar",
+  formSubtitle: "Conta o que aconteceu. Quanto mais específico, mais rápido dá pra resolver.",
+  fieldProject: "Qual ferramenta?",
+  fieldType: "É um bug ou uma sugestão?",
+  fieldSummary: "Resumo",
+  fieldSummaryPlaceholder: "Ex.: Falta a carta Mosca Caçadora na lista",
+  fieldDetails: "Detalhes",
+  fieldDetailsPlaceholder:
     "O que você fez, o que aconteceu e o que você esperava que acontecesse. Se tiver um link do build ou do replay, cole aqui.",
-  campoAutor: "Seu nick (opcional)",
-  campoAutorAjuda:
+  fieldNick: "Seu nick (opcional)",
+  fieldNickHelp:
     "Aparece publicamente no card e nas novidades, como crédito. Deixe em branco se preferir não aparecer.",
-  campoAnexos: "Anexos (opcional)",
-  campoAnexosAjuda:
+  fieldAttachments: "Anexos (opcional)",
+  fieldAttachmentsHelp:
     "Replay .rrf ou print da tela — até 5 arquivos. Imagem grande é reduzida automaticamente antes de enviar.",
-  campoImagens: "Imagens (opcional)",
-  campoImagensAjuda:
+  fieldImages: "Imagens (opcional)",
+  fieldImagesHelp:
     "Print para ilustrar a atualização — até 5. Imagem grande é reduzida automaticamente antes de enviar.",
-  anexoPreparando: "Preparando os arquivos…",
-  anexoTipoInvalido: (nome: string) => `${nome}: só aceito .rrf e imagem.`,
-  anexoSoImagem: (nome: string) => `${nome}: aqui só entra imagem.`,
-  anexoGrande: (nome: string, max: string) => `${nome}: passa de ${max}.`,
-  anexoFalhou: (nome: string) => `${nome}: não consegui ler o arquivo.`,
-  anexoDemais: "Máximo de 5 arquivos.",
-  remover: "Remover",
-  anexosTitulo: "Anexos",
-  baixar: "Baixar",
-  abrirImagem: "Abrir em tamanho cheio",
+  attachmentPreparing: "Preparando os arquivos…",
+  attachmentBadType: (name: string) => `${name}: só aceito .rrf e imagem.`,
+  attachmentImageOnly: (name: string) => `${name}: aqui só entra imagem.`,
+  attachmentTooBig: (name: string, max: string) => `${name}: passa de ${max}.`,
+  attachmentUnreadable: (name: string) => `${name}: não consegui ler o arquivo.`,
+  attachmentTooMany: "Máximo de 5 arquivos.",
+  remove: "Remover",
+  attachmentsTitle: "Anexos",
+  download: "Baixar",
+  openImage: "Abrir em tamanho cheio",
 
-  campoContato: "Contato (opcional)",
-  campoContatoAjuda:
+  fieldContact: "Contato (opcional)",
+  fieldContactHelp:
     "Discord ou e-mail, caso eu precise de mais detalhes. Não aparece no site — só eu vejo.",
-  enviar: "Enviar",
-  enviando: "Enviando…",
-  enviado: "Obrigado! Seu item entrou na coluna Reportado.",
-  erroEnviar: "Não consegui enviar. Tente de novo em alguns segundos.",
-  erroTituloCurto: "Escreva um resumo com pelo menos 3 caracteres.",
-  espereUmPouco: "Calma lá — espere um pouquinho antes de enviar outro.",
+  submit: "Enviar",
+  submitting: "Enviando…",
+  submitted: "Obrigado! Seu item entrou na coluna Reportado.",
+  submitError: "Não consegui enviar. Tente de novo em alguns segundos.",
+  summaryTooShort: "Escreva um resumo com pelo menos 3 caracteres.",
+  slowDown: "Calma lá — espere um pouquinho antes de enviar outro.",
 
-  // Card individual
-  naoEncontrado: "Item não encontrado",
-  naoEncontradoAjuda: "Ele pode ter sido arquivado, ou o link está errado.",
-  semComentarios: "Sem comentários ainda.",
-  comentar: "Comentar",
-  comentarPlaceholder: "Escreva uma atualização…",
+  // A single card's page
+  notFound: "Item não encontrado",
+  notFoundHelp: "Ele pode ter sido arquivado, ou o link está errado.",
+  noComments: "Sem comentários ainda.",
+  comment: "Comentar",
+  commentPlaceholder: "Escreva uma atualização…",
 
-  // Sessão de admin
-  entrar: "Entrar com Google",
-  sair: "Sair",
-  adminEntrarAjuda: "Entre com a conta de administrador para mexer no quadro.",
-  semPermissao: "Esta conta não tem permissão para administrar o quadro.",
-  semPermissaoAjuda: "Entrar com uma conta Google não dá nenhum acesso de escrita.",
-  erroEntrar: (codigo: string) =>
+  // The admin session
+  signIn: "Entrar com Google",
+  signOut: "Sair",
+  adminSignInHelp: "Entre com a conta de administrador para mexer no quadro.",
+  noPermission: "Esta conta não tem permissão para administrar o quadro.",
+  noPermissionHelp: "Entrar com uma conta Google não dá nenhum acesso de escrita.",
+  signInError: (codigo: string) =>
     `Não consegui entrar: ${codigo}. Se for popup bloqueado, libere popups para este endereço no navegador e tente de novo.`,
-  moverPara: "Mover para",
-  subirNaPilha: "Subir na coluna",
-  descerNaPilha: "Descer na coluna",
-  ordemAutomatica: "Ordem automática",
-  ordemAutomaticaTitulo:
+  moveTo: "Mover para",
+  moveUp: "Subir na coluna",
+  moveDown: "Descer na coluna",
+  autoOrder: "Ordem automática",
+  autoOrderTitle:
     "Solta a ordem arrumada à mão e devolve a coluna à ordem padrão (votos, ou data nas colunas de encerramento)",
-  arquivar: "Arquivar",
-  salvar: "Salvar",
-  cancelar: "Cancelar",
-  editar: "Editar",
-  contatoLabel: "Contato de quem reportou",
-  semContato: "Sem contato informado.",
+  archive: "Arquivar",
+  save: "Salvar",
+  cancel: "Cancelar",
+  edit: "Editar",
+  contactLabel: "Contato de quem reportou",
+  noContact: "Sem contato informado.",
 
-  // Gravações do "Ajude o simulador a acertar as contas"
-  gravacoesTitulo: "Gravações do simulador",
-  gravacoesSub:
+  // Recordings from "Ajude o simulador a acertar as contas"
+  recordingsTitle: "Gravações do simulador",
+  recordingsSubtitle:
     'Os .rrf que chegam do "Ajude o simulador a acertar as contas". Não são cards: ficam aqui, privadas, até a triagem promover uma — é isso que cria a ficha pública, com a gravação anexada.',
-  gravacoesLink: "Gravações",
-  erroGravacoes: "Não consegui carregar a fila. Recarregue a página.",
-  gravacoesFila: "Na fila",
-  gravacoesFilaAjuda: "Esperando decisão. Nada daqui está publicado.",
-  gravacoesPromovidas: "Viraram card",
-  gravacoesPromovidasAjuda: "A ficha e a gravação estão no quadro público.",
-  gravacoesDecididas: "Fechadas sem publicar",
-  gravacoesDecididasAjuda:
+  recordingsLink: "Gravações",
+  recordingsError: "Não consegui carregar a fila. Recarregue a página.",
+  recordingsQueue: "Na fila",
+  recordingsQueueHelp: "Esperando decisão. Nada daqui está publicado.",
+  recordingsPromoted: "Viraram card",
+  recordingsPromotedHelp: "A ficha e a gravação estão no quadro público.",
+  recordingsClosed: "Fechadas sem publicar",
+  recordingsClosedHelp:
     "Conferidas ou descartadas — continuam guardadas aqui, fora do quadro.",
-  gravacoesVazio: "Nenhuma gravação chegou ainda.",
-  filaVazia: "Nada esperando decisão.",
-  promover: "Promover",
-  promoverTitulo: "Cria o card público em Backlog, com a gravação anexada",
-  marcarConferida: "Conferida",
-  marcarConferidaTitulo: "Já serviu de teste, mas não vai para o quadro",
-  descartar: "Descartar",
-  descartarTitulo: "Não dá para conferir fórmula com ela. Continua guardada aqui.",
-  devolverParaFila: "Devolver para a fila",
-  apagarGravacao: "Apagar",
-  apagarGravacaoTitulo: "Apaga a gravação e o arquivo, para sempre",
-  apagarGravacaoConfirma: (titulo: string) =>
-    `Apagar "${titulo}" e o arquivo, para sempre?\n\nIsto é para upload que não devia ter entrado. Gravação legítima que não presta é Descartar.`,
-  baixarRrf: "Baixar .rrf",
-  baixando: "Abrindo…",
-  erroBaixar: "Não consegui abrir o arquivo.",
-  verCard: "Ver o card",
-  notasDeQuemEnviou: "Observação de quem enviou",
-  notaDaTriagem: "Nota da triagem",
-  gravacaoSemResumo: "Esta ficha não tem o resumo do parser.",
-  gravacaoClasse: "Personagem",
-  gravacaoGolpes: "Golpes",
-  gravacaoTrocas: "Trocas de equipamento",
-  gravacaoTalentos: "Talentos",
-  gravacaoItensFora: "Itens fora do banco",
-  gravacaoDuracao: "Duração",
-  gravacaoArquivo: "Arquivo",
-  gravacaoVersao: "Versão do simulador",
-  talentosDaGravacao: "lidos da gravação",
-  talentosDoFormulario: "informados por quem gravou",
+  recordingsEmpty: "Nenhuma gravação chegou ainda.",
+  queueEmpty: "Nada esperando decisão.",
+  promote: "Promover",
+  promoteTitle: "Cria o card público em Backlog, com a gravação anexada",
+  markReviewed: "Conferida",
+  markReviewedTitle: "Já serviu de teste, mas não vai para o quadro",
+  discard: "Descartar",
+  discardTitle: "Não dá para conferir fórmula com ela. Continua guardada aqui.",
+  returnToQueue: "Devolver para a fila",
+  deleteRecording: "Apagar",
+  deleteRecordingTitle: "Apaga a gravação e o arquivo, para sempre",
+  deleteRecordingConfirm: (title: string) =>
+    `Apagar "${title}" e o arquivo, para sempre?\n\nIsto é para upload que não devia ter entrado. Gravação legítima que não presta é Descartar.`,
+  downloadRrf: "Baixar .rrf",
+  opening: "Abrindo…",
+  downloadError: "Não consegui abrir o arquivo.",
+  viewCard: "Ver o card",
+  submitterNotes: "Observação de quem enviou",
+  triageNote: "Nota da triagem",
+  recordingNoSummary: "Esta ficha não tem o resumo do parser.",
+  recordingCharacter: "Personagem",
+  recordingHits: "Golpes",
+  recordingEquipChanges: "Trocas de equipamento",
+  recordingTraits: "Talentos",
+  recordingUnknownItems: "Itens fora do banco",
+  recordingDuration: "Duração",
+  recordingFile: "Arquivo",
+  recordingAppVersion: "Versão do simulador",
+  traitsFromRecording: "lidos da gravação",
+  traitsFromForm: "informados por quem gravou",
 
-  // Rodapé
-  maisFerramentas: "Veja mais ferramentas em",
-  entreNoDiscord: "Entre no nosso",
-  codigoAberto: "Projeto open source no",
+  // The footer
+  moreTools: "Veja mais ferramentas em",
+  joinDiscord: "Entre no nosso",
+  openSource: "Projeto open source no",
 } as const;
 
-export const LABEL_STATUS: Record<Coluna, string> = {
+export const STATUS_LABEL: Record<Column, string> = {
   reportado: "Reportado",
   backlog: "Backlog",
   em_progresso: "Em progresso",
   resolvido: "Resolvido",
   nao_sera_feito: "Não será feito",
+  // The archived drawer, keyed by the field name it reads from.
   arquivado: "Arquivado",
 };
 
-export const AJUDA_STATUS: Record<Status, string> = {
+export const STATUS_HELP: Record<Status, string> = {
   reportado: "Chegou agora, ainda não foi analisado.",
   backlog: "Aceito, vai ser feito quando der.",
   em_progresso: "Estou mexendo nisso agora.",
@@ -169,14 +175,15 @@ export const AJUDA_STATUS: Record<Status, string> = {
   nao_sera_feito: "Analisado e descartado.",
 };
 
-export const LABEL_ESTADO: Record<EstadoGravacao, string> = {
+export const RECORDING_STATE_LABEL: Record<RecordingState, string> = {
+  // Keyed by the stored `estado` values on a recording.
   fila: "Na fila",
   promovida: "No quadro",
   conferida: "Conferida",
   descartada: "Descartada",
 };
 
-export const LABEL_TIPO: Record<Tipo, string> = {
+export const TYPE_LABEL: Record<IssueType, string> = {
   bug: "Bug",
   feature: "Sugestão",
   replay: "Gravação",

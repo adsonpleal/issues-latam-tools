@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   preview:
-    # PR vinda de fork não tem acesso aos secrets: pular é melhor do que falhar.
+    # A PR from a fork has no access to the secrets: skipping beats failing.
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:

@@ -1,12 +1,15 @@
 /**
- * As cinco colunas públicas, na ordem do quadro.
+ * The five public columns, in board order.
  *
- * `arquivado` NÃO é status: é um booleano separado no documento. Isso é o que
- * permite a regra de segurança esconder card arquivado (ver firestore.rules), e
- * é o que faz desarquivar devolver o card para `resolvido` em vez de jogá-lo de
- * volta em `reportado`.
+ * The values are the `status` strings stored on a card, so they keep the
+ * database's spelling.
+ *
+ * `arquivado` is NOT a status: it is a separate boolean on the document. That
+ * is what lets the security rule hide an archived card (see firestore.rules),
+ * and it is what makes un-archiving return a card to `resolvido` instead of
+ * dropping it back into `reportado`.
  */
-export const COLUNAS = [
+export const COLUMNS = [
   "reportado",
   "backlog",
   "em_progresso",
@@ -14,37 +17,42 @@ export const COLUNAS = [
   "nao_sera_feito",
 ] as const;
 
-export type Status = (typeof COLUNAS)[number];
-
-/** Coluna do quadro do admin: as cinco de status + a gaveta de arquivados. */
-export type Coluna = Status | "arquivado";
-
-export const COLUNAS_ADMIN: Coluna[] = [...COLUNAS, "arquivado"];
+export type Status = (typeof COLUMNS)[number];
 
 /**
- * `replay` é a gravação .rrf que chega do "Ajude o simulador a acertar as
- * contas". Não é um pedido de ninguém: é material de conferência, e serve de
- * etiqueta para a triagem achar essas fichas no meio do resto.
+ * A column on the admin board: the five status ones plus the archived drawer.
+ * `arquivado` names that drawer and is the field name it reads from, so it is
+ * spelled the same way.
  */
-export const TIPOS = ["bug", "feature", "replay"] as const;
-export type Tipo = (typeof TIPOS)[number];
+export type Column = Status | "arquivado";
 
-/** O formulário público oferece só estes dois — gravação só entra pelo simulador. */
-export const TIPOS_FORM = ["bug", "feature"] as const;
+export const ADMIN_COLUMNS: Column[] = [...COLUMNS, "arquivado"];
 
-export function isStatus(valor: unknown): valor is Status {
-  return typeof valor === "string" && (COLUNAS as readonly string[]).includes(valor);
+/**
+ * `replay` is the .rrf recording that arrives through "Ajude o simulador a
+ * acertar as contas". It is nobody's request: it is review material, and it
+ * doubles as the label triage uses to find those among the rest.
+ */
+export const ISSUE_TYPES = ["bug", "feature", "replay"] as const;
+export type IssueType = (typeof ISSUE_TYPES)[number];
+
+/** The public form offers only these two -- a recording arrives via the simulator. */
+export const FORM_ISSUE_TYPES = ["bug", "feature"] as const;
+
+export function isStatus(value: unknown): value is Status {
+  return typeof value === "string" && (COLUMNS as readonly string[]).includes(value);
 }
 
-export function isTipo(valor: unknown): valor is Tipo {
-  return typeof valor === "string" && (TIPOS as readonly string[]).includes(valor);
+export function isIssueType(value: unknown): value is IssueType {
+  return typeof value === "string" && (ISSUE_TYPES as readonly string[]).includes(value);
 }
 
 /**
- * Colunas de encerramento ordenam pela última mexida, não pelos votos: o que
- * interessa ali é "o que saiu agora", e não "o que foi mais pedido". A gaveta de
- * arquivados é a mesma ideia — ninguém procura ali pelo mais votado.
+ * The closing columns sort by when a card was last touched rather than by
+ * votes: what matters there is "what just shipped", not "what was asked for
+ * most". The archived drawer is the same idea -- nobody goes looking there for
+ * the most upvoted card.
  */
-export function ordenaPorAtualizacao(coluna: Coluna): boolean {
-  return coluna === "resolvido" || coluna === "nao_sera_feito" || coluna === "arquivado";
+export function sortsByUpdatedAt(column: Column): boolean {
+  return column === "resolvido" || column === "nao_sera_feito" || column === "arquivado";
 }
